@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useLocation } from 'wouter';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import PatientForm from '@/components/PatientForm';
@@ -10,7 +11,7 @@ import DilutionInfo from '@/components/DilutionInfo';
 import type { PatientData, Protocol, Drug, CalculatedValues } from '@/types/calculator';
 import { calculatePatientValues, calculateDrugDose } from '@/lib/calculations';
 import { generateAntiemeticProphylaxis } from '@/lib/antiemetics';
-import { FileDown, Copy, Save, History, Printer } from 'lucide-react';
+import { FileDown, Copy, Save, History, Printer, Settings as SettingsIcon } from 'lucide-react';
 import { generatePrescriptionPDF } from '@/lib/pdfGenerator';
 import { savePatientHistory } from '@/lib/patientHistory';
 import PatientHistoryDB from '@/components/PatientHistoryDB';
@@ -21,6 +22,7 @@ import { getDoseAdjustmentFactor } from '@/data/ctcae';
 import PrintablePrescription from '@/components/PrintablePrescrip tion';
 
 export default function Calculator() {
+  const [, setLocation] = useLocation();
   const [patientData, setPatientData] = useState<PatientData>({
     name: '',
     age: 0,
@@ -38,7 +40,10 @@ export default function Calculator() {
   const [selectedCycle, setSelectedCycle] = useState<number>(1);
   const [calculatedDrugs, setCalculatedDrugs] = useState<Drug[]>([]);
   const [toxicities, setToxicities] = useState<Record<string, ToxicityGrade>>({});
-  const [savedPrescriptionId, setSavedPrescriptionId] = useState<string | null>(null);
+    const [prescriptionId, setPrescriptionId] = useState<string>('');
+  
+  // Carregar configurações institucionais
+  const { data: institutionSettings } = trpc.settings.get.useQuery();
 
   // Recalcular valores quando dados do paciente mudarem
   useEffect(() => {
@@ -166,7 +171,7 @@ export default function Calculator() {
         prescriptionData,
       });
       
-      setSavedPrescriptionId(prescription.prescriptionId);
+      setPrescriptionId(prescription.prescriptionId);
       toast.success(`Prescrição salva! ID: ${prescription.prescriptionId}`);
     } catch (error) {
       console.error('Erro ao salvar:', error);
@@ -250,6 +255,10 @@ export default function Calculator() {
                 <Save className="h-4 w-4 mr-2" />
                 Salvar no Histórico
               </Button>
+              <Button variant="outline" onClick={() => setLocation('/settings')}>
+                <SettingsIcon className="h-4 w-4 mr-2" />
+                Configurações
+              </Button>
               <Button variant="outline" onClick={handlePrint}>
                 <Printer className="h-4 w-4 mr-2" />
                 Imprimir
@@ -311,6 +320,11 @@ export default function Calculator() {
           cycle={selectedCycle}
           drugs={calculatedDrugs}
           antiemetics={antiemetics}
+          prescriptionId={prescriptionId}
+          institutionName={institutionSettings?.institutionName || undefined}
+          institutionLogo={institutionSettings?.institutionLogo || undefined}
+          prescriberName={institutionSettings?.prescriberName || undefined}
+          prescriberCRM={institutionSettings?.prescriberCRM || undefined}
         />
       )}
     </div>

@@ -242,11 +242,15 @@
   - [x] Implementar função de salvamento no Calculator
   - [x] Salvar prescrição ao gerar
   - [x] Vincular QR code ao ID do banco
-- [ ] Criar painel de configurações institucionais (próxima fase)
-  - [ ] Criar página de configurações
-  - [ ] Formulário de dados institucionais
-  - [ ] Upload de logo
-  - [ ] Templates de cabeçalho/rodapé
+- [ ] Criar painel de configurações institucionais
+  - [x] Criar página /settings com rota
+  - [x] Criar componente de navegação para settings (botão no Calculator)
+  - [x] Implementar formulário de dados institucionais
+  - [x] Implementar upload de logo com preview
+  - [x] Implementar campos de templates de cabeçalho/rodapé
+  - [x] Integrar configurações com PrintablePrescription
+  - [x] Salvar configurações no banco de dados
+  - [x] Carregar configurações ao iniciar aplicação
 - [ ] Criar testes para APIs
 - [ ] Validar persistência e recuperação de dados
 
