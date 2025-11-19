@@ -146,3 +146,48 @@
 - [x] Criar componente visual para exibir informações de diluição
 - [x] Adicionar alertas de compatibilidade (PVC, fotossensibilidade, etc.)
 - [x] Criar testes para validar cálculos de diluição
+
+### Implementar Mais Protocolos do Banco de Dados
+
+#### Protocolos de LMA/LMA RR
+- [x] SMILE (LMA/Linfoma NK/T)
+
+#### Protocolos de LLA
+- [ ] ALL IC-BFM 2009
+- [ ] GRAALL-2003/2005
+
+#### Protocolos de Linfomas
+- [ ] R-Pola-CHP (DLBCL 1ª linha)
+- [ ] R-CODOX-M (Burkitt)
+- [ ] R-IVAC (Burkitt alternado)
+- [ ] R-Clorambucil (LLC/Linfoma indolente)
+
+#### Protocolos de Mieloma Múltiplo
+- [x] VCd (Bortezomibe + Ciclofosfamida + Dexametasona)
+- [ ] D-VTD (Daratumumabe + Bortezomibe + Talidomida + Dex)
+- [ ] ISA-VRd (Isatuximabe + VRd)
+- [ ] Isa-KRd (Isatuximabe + Carfilzomibe + Revlimid + Dex)
+- [ ] D-VMP (Daratumumabe + Bortezomibe + Melfalano + Pred)
+- [x] D-Rd (Daratumumabe + Revlimid + Dex)
+- [x] D-Vd (Daratumumabe + Bortezomibe + Dex)
+- [ ] D-Pd (Daratumumabe + Pomalidomida + Dex)
+
+#### Condicionamentos TMO
+- [x] BuFlu MAC (Bussulfano + Fludarabina - mieloablativo)
+- [ ] BuFlu RIC (Bussulfano + Fludarabina - intensidade reduzida)
+
+#### LLC/LMC
+- [x] FCR (Fludarabina + Ciclofosfamida + Rituximabe)
+- [ ] Ibrutinib (BTKi)
+- [ ] Acalabrutinib (BTKi)
+- [ ] Imatinib (TKI)
+- [ ] Dasatinib (TKI)
+- [ ] Nilotinib (TKI)
+- [ ] Ponatinib (TKI)
+- [ ] Ruxolitinib (Mielofibrose)
+
+#### Imunoterapias
+- [ ] Epcoritamab (Linfoma)
+- [ ] Brentuximabe Vedotina (Hodgkin/Linfoma T)
+- [ ] Teclistamab (Mieloma)
+- [ ] Talquetamab (Mieloma)
