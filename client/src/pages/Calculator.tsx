@@ -13,7 +13,8 @@ import { generateAntiemeticProphylaxis } from '@/lib/antiemetics';
 import { FileDown, Copy, Save, History, Printer } from 'lucide-react';
 import { generatePrescriptionPDF } from '@/lib/pdfGenerator';
 import { savePatientHistory } from '@/lib/patientHistory';
-import PatientHistory from '@/components/PatientHistory';
+import PatientHistoryDB from '@/components/PatientHistoryDB';
+import { trpc } from '@/lib/trpc';
 import ToxicityAssessment from '@/components/ToxicityAssessment';
 import type { ToxicityGrade } from '@/data/ctcae';
 import { getDoseAdjustmentFactor } from '@/data/ctcae';
@@ -212,7 +213,7 @@ export default function Calculator() {
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
-              <PatientHistory onLoadPatient={setPatientData} />
+              <PatientHistoryDB onLoadPatient={setPatientData} />
               <Button variant="outline" onClick={handleSaveToHistory}>
                 <Save className="h-4 w-4 mr-2" />
                 Salvar no Histórico

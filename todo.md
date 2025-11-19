@@ -232,7 +232,19 @@
 - [x] Implementar API de prescrições (criar, listar, buscar)
 - [x] Implementar API de estatísticas (protocolos mais usados, alertas)
 - [x] Implementar API de configurações institucionais
-- [ ] Migrar histórico de pacientes de localStorage para DB
+- [x] Migrar histórico de pacientes de localStorage para DB
+  - [x] Atualizar PatientHistory para usar tRPC
+  - [ ] Migrar dados existentes do localStorage (usuário pode fazer manualmente)
+  - [x] Remover dependência de localStorage (novo componente PatientHistoryDB criado)
+- [ ] Implementar salvamento automático de prescrições
+  - [x] Integrar tRPC no Calculator
+  - [ ] Salvar prescrição ao gerar (pendente - ajustar schema)
+  - [ ] Vincular QR code ao ID do banco (pendente)
+- [ ] Criar painel de configurações institucionais (próxima fase)
+  - [ ] Criar página de configurações
+  - [ ] Formulário de dados institucionais
+  - [ ] Upload de logo
+  - [ ] Templates de cabeçalho/rodapé
 - [ ] Criar testes para APIs
 - [ ] Validar persistência e recuperação de dados
 
