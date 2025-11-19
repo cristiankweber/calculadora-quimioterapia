@@ -118,8 +118,8 @@
 
 #### Novos Protocolos
 - [ ] Adicionar protocolo SMILE (LMA/Linfoma)
-- [ ] Adicionar protocolo GDP (Linfoma)
-- [ ] Adicionar protocolo R-DHAP (Linfoma)
+- [x] Adicionar protocolo GDP (Linfoma de Hodgkin)
+- [x] Adicionar protocolo R-DHAP (Linfoma)
 - [x] Adicionar protocolo DA-R-EPOCH (Linfoma)
 - [x] Adicionar protocolo R-mini-CHOP (Linfoma)
 - [x] Adicionar protocolo R-CVP (Linfoma)
@@ -130,3 +130,10 @@
 ### Correções
 - [x] Corrigir erro de ref no DialogTrigger do PatientHistory
 - [x] Corrigir erro de ref no DialogOverlay usando forwardRef
+
+### Calculadora de Calvert para Carboplatina
+- [x] Implementar fórmula de Calvert: Dose (mg) = AUC × (eGFR + 25)
+- [x] Atualizar função calculateDrugDose para suportar cálculo AUC
+- [x] Adicionar protocolos com Carboplatina (R-ICE, R-DHAP, GDP)
+- [x] Criar testes para validar cálculo de Calvert
+- [x] Adicionar indicador visual para doses calculadas por AUC

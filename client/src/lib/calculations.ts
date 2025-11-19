@@ -138,7 +138,8 @@ export function calculateDrugDose(
   bsa: number,
   weight: number,
   adjustmentFactor: number = 1.0,
-  maxDose?: number
+  maxDose?: number,
+  egfr?: number
 ): number {
   let calculatedDose = baseDose;
 
@@ -147,8 +148,13 @@ export function calculateDrugDose(
   } else if (doseUnit === 'mg/kg') {
     calculatedDose = baseDose * weight;
   } else if (doseUnit === 'AUC') {
-    // AUC - retornar como referência (cálculo real requer fórmula de Calvert)
-    return baseDose;
+    // Fórmula de Calvert para Carboplatina: Dose (mg) = AUC × (eGFR + 25)
+    if (egfr !== undefined) {
+      calculatedDose = baseDose * (egfr + 25);
+    } else {
+      // Se não houver eGFR, retornar AUC como referência
+      return baseDose;
+    }
   }
 
   calculatedDose = calculatedDose * adjustmentFactor;

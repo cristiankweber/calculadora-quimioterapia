@@ -94,6 +94,11 @@ export default function DrugsTable({ drugs, onDoseChange }: DrugsTableProps) {
                     <TableCell className="font-semibold">{drug.name}</TableCell>
                     <TableCell>
                       {drug.dose} {drug.doseUnit}
+                      {drug.doseUnit === 'AUC' && (
+                        <Badge variant="outline" className="ml-2 text-xs bg-blue-50 text-blue-700 border-blue-300">
+                          Calvert
+                        </Badge>
+                      )}
                     </TableCell>
                     <TableCell className="font-bold text-primary">
                       {editingIndex === index ? (

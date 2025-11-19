@@ -55,7 +55,8 @@ export default function Calculator() {
           calculatedValues.bsa,
           patientData.weight,
           calculatedValues.globalAdjustmentFactor,
-          drug.maxDose
+          drug.maxDose,
+          calculatedValues.egfr
         );
         return {
           ...drug,
