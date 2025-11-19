@@ -199,3 +199,13 @@
 - [x] Brentuximabe Vedotina (anti-CD30 - Hodgkin/Linfoma T)
 - [x] Epcoritamab (biespecífico CD20×CD3 - Linfoma B)
 - [x] Orientações CAR-T (pré-infusão, infusão, manejo SLC/ICANS)
+
+### Calculadora de Ajuste por Toxicidade CTCAE
+- [x] Criar estrutura de dados com graus CTCAE v5.0
+- [x] Implementar avaliação de toxicidades hematológicas (neutropenia, plaquetopenia, anemia)
+- [x] Implementar avaliação de toxicidades não-hematológicas (neuropatia, diarreia, mucosite, hepatotoxicidade, nefrotoxicidade)
+- [x] Criar lógica de recomendação de ajuste de dose por grau
+- [x] Criar componente visual de seleção de toxicidades
+- [x] Integrar ajuste de toxicidade com cálculo de doses
+- [x] Adicionar tabela de referência CTCAE
+- [x] Criar testes para validar ajustes

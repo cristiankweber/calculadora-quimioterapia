@@ -14,6 +14,9 @@ import { FileDown, Copy, Save } from 'lucide-react';
 import { generatePrescriptionPDF } from '@/lib/pdfGenerator';
 import { savePatientHistory } from '@/lib/patientHistory';
 import PatientHistory from '@/components/PatientHistory';
+import ToxicityAssessment from '@/components/ToxicityAssessment';
+import type { ToxicityGrade } from '@/data/ctcae';
+import { getDoseAdjustmentFactor } from '@/data/ctcae';
 
 export default function Calculator() {
   const [patientData, setPatientData] = useState<PatientData>({
@@ -32,6 +35,7 @@ export default function Calculator() {
   const [selectedProtocol, setSelectedProtocol] = useState<Protocol | null>(null);
   const [selectedCycle, setSelectedCycle] = useState<number>(1);
   const [calculatedDrugs, setCalculatedDrugs] = useState<Drug[]>([]);
+  const [toxicities, setToxicities] = useState<{ [toxicity: string]: ToxicityGrade }>({});
 
   // Recalcular valores quando dados do paciente mudarem
   useEffect(() => {
@@ -46,11 +50,14 @@ export default function Calculator() {
     }
   }, [patientData]);
 
-  // Recalcular doses quando protocolo ou valores calculados mudarem
+  // Recalcular doses quando protocolo, valores calculados ou toxicidades mudarem
   useEffect(() => {
     if (selectedProtocol && calculatedValues) {
+      // Calcular fator de ajuste por toxicidade
+      const toxicityFactor = getDoseAdjustmentFactor(toxicities);
+
       const drugsWithCalculatedDoses = selectedProtocol.drugs.map((drug) => {
-        const calculatedDose = calculateDrugDose(
+        const baseDose = calculateDrugDose(
           drug.dose,
           drug.doseUnit,
           calculatedValues.bsa,
@@ -59,16 +66,18 @@ export default function Calculator() {
           drug.maxDose,
           calculatedValues.egfr
         );
+        // Aplicar ajuste de toxicidade
+        const finalDose = baseDose * toxicityFactor;
         return {
           ...drug,
-          calculatedDose,
+          calculatedDose: finalDose,
         };
       });
       setCalculatedDrugs(drugsWithCalculatedDoses);
     } else {
       setCalculatedDrugs([]);
     }
-  }, [selectedProtocol, calculatedValues, patientData.weight]);
+  }, [selectedProtocol, calculatedValues, patientData.weight, toxicities]);
 
   const handleDoseChange = (index: number, newDose: number) => {
     const updatedDrugs = [...calculatedDrugs];
@@ -232,6 +241,17 @@ export default function Calculator() {
             <DrugsTable drugs={calculatedDrugs} onDoseChange={handleDoseChange} />
             <ProphylaxisAlerts protocol={selectedProtocol} antiemetics={antiemetics} />
             <DilutionInfo drugs={calculatedDrugs} />
+
+            {/* Avaliação de Toxicidade */}
+            <ToxicityAssessment
+              toxicities={toxicities}
+              onToxicityChange={(toxicity, grade) => {
+                setToxicities((prev) => ({
+                  ...prev,
+                  [toxicity]: grade,
+                }));
+              }}
+            />
           </div>
         </div>
       </main>
