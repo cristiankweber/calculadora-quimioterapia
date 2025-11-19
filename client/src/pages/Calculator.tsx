@@ -6,6 +6,7 @@ import CalculatedValuesDisplay from '@/components/CalculatedValues';
 import ProtocolSelector from '@/components/ProtocolSelector';
 import DrugsTable from '@/components/DrugsTable';
 import ProphylaxisAlerts from '@/components/ProphylaxisAlerts';
+import DilutionInfo from '@/components/DilutionInfo';
 import type { PatientData, Protocol, Drug, CalculatedValues } from '@/types/calculator';
 import { calculatePatientValues, calculateDrugDose } from '@/lib/calculations';
 import { generateAntiemeticProphylaxis } from '@/lib/antiemetics';
@@ -230,6 +231,7 @@ export default function Calculator() {
             {calculatedValues && <CalculatedValuesDisplay values={calculatedValues} />}
             <DrugsTable drugs={calculatedDrugs} onDoseChange={handleDoseChange} />
             <ProphylaxisAlerts protocol={selectedProtocol} antiemetics={antiemetics} />
+            <DilutionInfo drugs={calculatedDrugs} />
           </div>
         </div>
       </main>

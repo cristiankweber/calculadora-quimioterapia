@@ -137,3 +137,12 @@
 - [x] Adicionar protocolos com Carboplatina (R-ICE, R-DHAP, GDP)
 - [x] Criar testes para validar cálculo de Calvert
 - [x] Adicionar indicador visual para doses calculadas por AUC
+
+### Calculadora de Diluição e Tempo de Infusão
+- [x] Criar estrutura de dados com parâmetros CMI por droga
+- [x] Implementar cálculo de volume de diluição baseado em concentração máxima
+- [x] Implementar cálculo de velocidade de infusão (mL/h)
+- [x] Implementar cálculo de tempo total de infusão
+- [x] Criar componente visual para exibir informações de diluição
+- [x] Adicionar alertas de compatibilidade (PVC, fotossensibilidade, etc.)
+- [x] Criar testes para validar cálculos de diluição
