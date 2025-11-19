@@ -129,3 +129,4 @@
 
 ### Correções
 - [x] Corrigir erro de ref no DialogTrigger do PatientHistory
+- [x] Corrigir erro de ref no DialogOverlay usando forwardRef
