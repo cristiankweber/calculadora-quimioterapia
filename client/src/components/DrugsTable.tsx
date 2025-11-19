@@ -1,13 +1,19 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
 import type { Drug } from '@/types/calculator';
+import { useState } from 'react';
 
 interface DrugsTableProps {
   drugs: Drug[];
+  onDoseChange?: (index: number, newDose: number) => void;
 }
 
-export default function DrugsTable({ drugs }: DrugsTableProps) {
+export default function DrugsTable({ drugs, onDoseChange }: DrugsTableProps) {
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [editValue, setEditValue] = useState<string>('');
+
   const getEmetogenicBadge = (risk?: 'high' | 'moderate' | 'low' | 'minimal') => {
     if (!risk) return null;
     
@@ -32,12 +38,33 @@ export default function DrugsTable({ drugs }: DrugsTableProps) {
     );
   };
 
+  const handleDoseClick = (index: number, currentDose: number) => {
+    setEditingIndex(index);
+    setEditValue(currentDose.toFixed(1));
+  };
+
+  const handleDoseBlur = (index: number) => {
+    const newDose = parseFloat(editValue);
+    if (!isNaN(newDose) && newDose > 0 && onDoseChange) {
+      onDoseChange(index, newDose);
+    }
+    setEditingIndex(null);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent, index: number) => {
+    if (e.key === 'Enter') {
+      handleDoseBlur(index);
+    } else if (e.key === 'Escape') {
+      setEditingIndex(null);
+    }
+  };
+
   return (
     <Card>
       <CardHeader>
         <CardTitle>Doses Calculadas</CardTitle>
         <CardDescription>
-          Doses ajustadas por superfície corporal e fatores de correção
+          Doses ajustadas por superfície corporal e fatores de correção (clique na dose para ajustar manualmente)
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -69,7 +96,26 @@ export default function DrugsTable({ drugs }: DrugsTableProps) {
                       {drug.dose} {drug.doseUnit}
                     </TableCell>
                     <TableCell className="font-bold text-primary">
-                      {drug.calculatedDose.toFixed(1)} mg
+                      {editingIndex === index ? (
+                        <Input
+                          type="number"
+                          step="0.1"
+                          value={editValue}
+                          onChange={(e) => setEditValue(e.target.value)}
+                          onBlur={() => handleDoseBlur(index)}
+                          onKeyDown={(e) => handleKeyDown(e, index)}
+                          className="w-24 h-8"
+                          autoFocus
+                        />
+                      ) : (
+                        <button
+                          onClick={() => handleDoseClick(index, drug.calculatedDose)}
+                          className="hover:bg-muted px-2 py-1 rounded transition-colors cursor-pointer"
+                          title="Clique para ajustar manualmente"
+                        >
+                          {drug.calculatedDose.toFixed(1)} mg
+                        </button>
+                      )}
                     </TableCell>
                     <TableCell>{drug.route}</TableCell>
                     <TableCell>{drug.days}</TableCell>

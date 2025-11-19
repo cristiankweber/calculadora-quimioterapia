@@ -78,3 +78,9 @@
 - [x] Testar validação de dose cumulativa
 - [ ] Testar exportação de prescrição
 - [ ] Validar responsividade em dispositivos móveis
+
+### Correções e Melhorias Solicitadas
+- [x] Ajustar layout do botão no PatientForm (estava quase fora do dashboard)
+- [x] Permitir ajuste manual de dose na tabela para arredondar valores
+- [x] Corrigir ortografia: Allopurinol → Alopurinol
+- [x] Adicionar colírio de Dexametasona nas profilaxias (já estava presente nos protocolos FLAG-Ida e HiDAC)

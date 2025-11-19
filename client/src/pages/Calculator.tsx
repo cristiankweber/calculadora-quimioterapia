@@ -61,6 +61,13 @@ export default function Calculator() {
     }
   }, [selectedProtocol, calculatedValues, patientData.weight]);
 
+  const handleDoseChange = (index: number, newDose: number) => {
+    const updatedDrugs = [...calculatedDrugs];
+    updatedDrugs[index] = { ...updatedDrugs[index], calculatedDose: newDose };
+    setCalculatedDrugs(updatedDrugs);
+    toast.success(`Dose de ${updatedDrugs[index].name} ajustada para ${newDose.toFixed(1)} mg`);
+  };
+
   const handleExportPDF = () => {
     toast.info('Funcionalidade de exportação PDF em desenvolvimento');
   };
@@ -126,7 +133,7 @@ export default function Calculator() {
       {/* Header */}
       <header className="border-b bg-card">
         <div className="container py-6">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div>
               <h1 className="text-3xl font-bold text-foreground">
                 Calculadora de Prescrição Quimioterápica
@@ -135,7 +142,7 @@ export default function Calculator() {
                 Hematologia e Oncologia - Cálculos automáticos de dose e profilaxias
               </p>
             </div>
-            <div className="flex space-x-2">
+            <div className="flex flex-wrap gap-2">
               <Button variant="outline" onClick={handleExportPDF} disabled>
                 <FileDown className="h-4 w-4 mr-2" />
                 Exportar PDF
@@ -166,7 +173,7 @@ export default function Calculator() {
           {/* Coluna Direita - Resultados */}
           <div className="lg:col-span-2 space-y-6">
             {calculatedValues && <CalculatedValuesDisplay values={calculatedValues} />}
-            <DrugsTable drugs={calculatedDrugs} />
+            <DrugsTable drugs={calculatedDrugs} onDoseChange={handleDoseChange} />
             <ProphylaxisAlerts protocol={selectedProtocol} antiemetics={antiemetics} />
           </div>
         </div>

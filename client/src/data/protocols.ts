@@ -39,7 +39,7 @@ export const protocols: Protocol[] = [
     prophylaxis: [
       'Aciclovir 400 mg 12/12h',
       'SMX-TMP 800/160 mg SQS',
-      'Allopurinol se risco de lise tumoral',
+      'Alopurinol se risco de lise tumoral',
       'Possível antifúngico preemptivo (segundo protocolo institucional)',
     ],
     nursingCare: [
