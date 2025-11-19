@@ -170,7 +170,17 @@ export const appRouter = router({
   // Configurações Institucionais
   settings: router({
     get: protectedProcedure.query(async ({ ctx }) => {
-      return await db.getInstitutionSettings(ctx.user.id);
+      const settings = await db.getInstitutionSettings(ctx.user.id);
+      // Retornar objeto padrão se não houver configurações
+      return settings || {
+        institutionName: null,
+        institutionLogo: null,
+        prescriberName: null,
+        prescriberCRM: null,
+        prescriberSpecialty: null,
+        headerTemplate: null,
+        footerTemplate: null,
+      };
     }),
 
     upsert: protectedProcedure

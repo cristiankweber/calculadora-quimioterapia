@@ -260,3 +260,7 @@
 - [x] Adicionar botão de impressão visível
 - [x] Testar geração de QR code
 - [x] Validar layout de impressão A4
+
+### Correção de Erro settings.get
+- [x] Corrigir router settings.get para retornar valor padrão quando não há configurações
+- [x] Garantir que query nunca retorne undefined
