@@ -238,8 +238,10 @@
   - [x] Remover dependência de localStorage (novo componente PatientHistoryDB criado)
 - [ ] Implementar salvamento automático de prescrições
   - [x] Integrar tRPC no Calculator
-  - [ ] Salvar prescrição ao gerar (pendente - ajustar schema)
-  - [ ] Vincular QR code ao ID do banco (pendente)
+  - [x] Ajustar schema do banco de dados
+  - [x] Implementar função de salvamento no Calculator
+  - [x] Salvar prescrição ao gerar
+  - [x] Vincular QR code ao ID do banco
 - [ ] Criar painel de configurações institucionais (próxima fase)
   - [ ] Criar página de configurações
   - [ ] Formulário de dados institucionais

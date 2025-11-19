@@ -59,26 +59,18 @@ export type InsertPatient = typeof patients.$inferInsert;
  */
 export const prescriptions = mysqlTable("prescriptions", {
   id: int("id").autoincrement().primaryKey(),
-  prescriptionId: varchar("prescriptionId", { length: 64 }).notNull().unique(), // ID único para rastreabilidade
+  prescriptionId: varchar("prescriptionId", { length: 64 }).notNull().unique(), // ID único para rastreabilidade (QR code)
   userId: int("userId").notNull(), // Prescritor
   patientId: int("patientId").notNull(),
   patientName: varchar("patientName", { length: 255 }).notNull(),
-  protocolId: varchar("protocolId", { length: 64 }).notNull(),
   protocolName: varchar("protocolName", { length: 255 }).notNull(),
   cycle: int("cycle").notNull(),
   // Valores calculados
-  bsa: int("bsa").notNull(), // m² * 1000
-  egfr: int("egfr").notNull(), // mL/min/1.73m²
-  renalStatus: mysqlEnum("renalStatus", ["green", "yellow", "red"]).notNull(),
-  // Drogas (JSON array)
-  drugs: json("drugs").notNull(), // Array<Drug>
-  // Profilaxias (JSON)
-  antiemetics: json("antiemetics").notNull(), // AntiemeticProphylaxis
-  prophylaxis: json("prophylaxis").notNull(), // string[]
-  alerts: json("alerts").notNull(), // string[]
-  // Ajustes aplicados
-  adjustmentFactor: int("adjustmentFactor").notNull(), // * 100
-  toxicityAdjustment: json("toxicityAdjustment"), // Record<string, ToxicityGrade>
+  bsa: int("bsa").notNull(), // m² * 10000
+  egfr: int("egfr").notNull(), // mL/min/1.73m² * 100
+  renalStatus: varchar("renalStatus", { length: 20 }).notNull(),
+  // Dados completos em JSON
+  prescriptionData: json("prescriptionData").notNull(), // Todos os dados da prescrição
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 

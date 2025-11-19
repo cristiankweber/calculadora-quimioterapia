@@ -37,7 +37,8 @@ export default function Calculator() {
   const [selectedProtocol, setSelectedProtocol] = useState<Protocol | null>(null);
   const [selectedCycle, setSelectedCycle] = useState<number>(1);
   const [calculatedDrugs, setCalculatedDrugs] = useState<Drug[]>([]);
-  const [toxicities, setToxicities] = useState<{ [toxicity: string]: ToxicityGrade }>({});
+  const [toxicities, setToxicities] = useState<Record<string, ToxicityGrade>>({});
+  const [savedPrescriptionId, setSavedPrescriptionId] = useState<string | null>(null);
 
   // Recalcular valores quando dados do paciente mudarem
   useEffect(() => {
@@ -118,27 +119,58 @@ export default function Calculator() {
     }
   };
 
-  const handleSaveToHistory = () => {
-    if (!selectedProtocol || !calculatedValues) {
+  const savePrescriptionMutation = trpc.prescriptions.create.useMutation();
+  const createPatientMutation = trpc.patients.create.useMutation();
+
+  const handleSaveToHistory = async () => {
+    if (!selectedProtocol || !calculatedValues || !patientData.name) {
       toast.error('Preencha todos os dados antes de salvar');
       return;
     }
 
     try {
-      savePatientHistory({
-        patient: patientData,
-        protocol: selectedProtocol.name,
-        cycle: selectedCycle,
-        drugs: calculatedDrugs.map(drug => ({
-          name: drug.name,
-          dose: drug.calculatedDose || 0,
-          date: new Date().toISOString().split('T')[0],
-        })),
+      // Primeiro, garantir que o paciente existe no banco
+      const patientResponse = await createPatientMutation.mutateAsync({
+        name: patientData.name,
+        age: patientData.age,
+        sex: patientData.sex,
+        weight: patientData.weight,
+        height: patientData.height,
+        creatinine: Math.round(patientData.creatinine * 100),
+        bilirubin: Math.round(patientData.bilirubin * 100),
+        ecog: patientData.ecog,
+        comorbidities: patientData.comorbidities || undefined,
       });
-      toast.success('Prescrição salva no histórico do paciente!');
+
+      // Preparar dados completos da prescrição
+      const prescriptionData = {
+        patientData,
+        protocol: selectedProtocol,
+        cycle: selectedCycle,
+        calculatedValues,
+        calculatedDrugs,
+        antiemetics,
+        toxicities,
+        adjustmentFactor: getDoseAdjustmentFactor(toxicities),
+      };
+
+      // Salvar prescrição no banco
+      const prescription = await savePrescriptionMutation.mutateAsync({
+        patientId: patientResponse.id,
+        patientName: patientData.name,
+        protocolName: selectedProtocol.name,
+        cycle: selectedCycle,
+        bsa: calculatedValues.bsa,
+        egfr: calculatedValues.egfr,
+        renalStatus: calculatedValues.renalStatus,
+        prescriptionData,
+      });
+      
+      setSavedPrescriptionId(prescription.prescriptionId);
+      toast.success(`Prescrição salva! ID: ${prescription.prescriptionId}`);
     } catch (error) {
-      console.error('Erro ao salvar histórico:', error);
-      toast.error('Erro ao salvar no histórico');
+      console.error('Erro ao salvar:', error);
+      toast.error('Erro ao salvar prescrição');
     }
   };
 

@@ -9,6 +9,7 @@ interface PrintablePrescriptionProps {
   cycle: number;
   drugs: Drug[];
   antiemetics: AntiemeticProphylaxis;
+  prescriptionId?: string; // ID do banco de dados para rastreabilidade
   institutionName?: string;
   institutionLogo?: string;
   prescriberId?: string;
@@ -23,6 +24,7 @@ export default function PrintablePrescription({
   cycle,
   drugs,
   antiemetics,
+  prescriptionId: savedPrescriptionId,
   institutionName = 'Hospital / Clínica',
   institutionLogo,
   prescriberId = 'SYSTEM',
@@ -30,22 +32,24 @@ export default function PrintablePrescription({
   prescriberCRM = 'CRM XXXXX',
 }: PrintablePrescriptionProps) {
   const [qrCodeUrl, setQrCodeUrl] = useState<string>('');
-  const prescriptionId = useRef(`RX-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`);
+  // Usar ID do banco se disponível, caso contrário gerar temporário
+  const prescriptionId = savedPrescriptionId || `RX-TEMP-${Date.now()}`;
 
   useEffect(() => {
     // Gerar QR code com ID da prescrição para rastreabilidade
     const data = JSON.stringify({
-      id: prescriptionId.current,
+      id: prescriptionId,
       patient: patient.name,
       protocol: protocol.name,
       cycle,
       date: new Date().toISOString(),
+      saved: !!savedPrescriptionId, // Indica se foi salvo no banco
     });
 
     QRCode.toDataURL(data, { width: 150, margin: 1 })
       .then(setQrCodeUrl)
       .catch((err) => console.error('Erro ao gerar QR code:', err));
-  }, [patient.name, protocol.name, cycle]);
+  }, [prescriptionId, patient.name, protocol.name, cycle, savedPrescriptionId]);
 
   const formatDate = () => {
     return new Intl.DateTimeFormat('pt-BR', {
@@ -84,7 +88,7 @@ export default function PrintablePrescription({
         {qrCodeUrl && (
           <div className="text-center">
             <img src={qrCodeUrl} alt="QR Code" className="w-32 h-32" />
-            <p className="text-xs text-gray-600 mt-1">ID: {prescriptionId.current.slice(-8)}</p>
+            <p className="text-xs text-gray-600 mt-1">ID: {prescriptionId.slice(-8)}</p>
           </div>
         )}
       </div>

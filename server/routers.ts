@@ -123,37 +123,40 @@ export const appRouter = router({
 
     create: protectedProcedure
       .input(z.object({
-        prescriptionId: z.string(),
         patientId: z.number(),
         patientName: z.string(),
-        protocolId: z.string(),
         protocolName: z.string(),
         cycle: z.number(),
         bsa: z.number(),
         egfr: z.number(),
-        renalStatus: z.enum(["green", "yellow", "red"]),
-        drugs: z.any(),
-        antiemetics: z.any(),
-        prophylaxis: z.any(),
-        alerts: z.any(),
-        adjustmentFactor: z.number(),
-        toxicityAdjustment: z.any().optional(),
+        renalStatus: z.string(),
+        prescriptionData: z.any(), // Todos os dados da prescrição em JSON
       }))
       .mutation(async ({ ctx, input }) => {
-        const prescriptionData = {
-          ...input,
+        // Gerar ID único para rastreabilidade
+        const prescriptionId = `RX-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        
+        const prescriptionRecord = {
+          prescriptionId,
           userId: ctx.user.id,
-          bsa: Math.round(input.bsa * 1000),
-          egfr: Math.round(input.egfr),
-          adjustmentFactor: Math.round(input.adjustmentFactor * 100),
+          patientId: input.patientId,
+          patientName: input.patientName,
+          protocolName: input.protocolName,
+          cycle: input.cycle,
+          bsa: Math.round(input.bsa * 10000),
+          egfr: Math.round(input.egfr * 100),
+          renalStatus: input.renalStatus,
+          prescriptionData: input.prescriptionData,
         };
+        
         await db.recordProtocolUsage({
           userId: ctx.user.id,
-          protocolId: input.protocolId,
+          protocolId: input.protocolName,
           protocolName: input.protocolName,
           indication: undefined,
         });
-        return await db.createPrescription(prescriptionData);
+        
+        return await db.createPrescription(prescriptionRecord);
       }),
   }),
 
