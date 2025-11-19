@@ -17,14 +17,14 @@ export function generateAntiemeticProphylaxis(
           'Olanzapina 5 mg VO à noite (antipsicótico atípico)',
         ],
         days2to4: [
-          'Dexametasona 8 mg VO/EV 12/12h',
-          'Ondansetrona 8 mg VO/EV 8/8h',
+          'Dexametasona 10 mg EV 1x/dia',
+          'Ondansetrona 8 mg EV 8/8h',
           'Olanzapina 5 mg VO à noite',
         ],
         rescue: [
           'Metoclopramida 10 mg VO/EV 6/6-8/8h',
           'Lorazepam 0,5-1 mg VO/EV 6/6h (se componente ansioso)',
-          'Haloperidol 0,5-1 mg VO/EV 6/6h',
+          'Clorpromazina 10mg EV 6/6h',
         ],
         alerts: [
           'Monitorar prolongamento de QT se associação Ondansetrona + Olanzapina + TKI',
@@ -40,12 +40,14 @@ export function generateAntiemeticProphylaxis(
           'Dexametasona 10 mg EV (corticoide)',
         ],
         days2to4: [
-          'Ondansetrona 8 mg VO 8/8h OU',
-          'Dexametasona 4 mg VO 12/12h',
+          'Ondansetrona 8 mg EV 8/8h',
+          'Dexametasona 8 mg EV 1x/dia',
+          'Olanzapina 5 mg VO/dia',
         ],
         rescue: [
           'Metoclopramida 10 mg VO/EV 6/6-8/8h',
-          'Olanzapina 5-10 mg VO/dia (boa para náusea tardia)',
+          'Lorazepam 0,5-1 mg VO/EV 6/6h (se componente ansioso)',
+          'Clorpromazina 10mg EV 6/6h',
         ],
         alerts: [
           'Para Carboplatina: tratar como alto risco (adicionar NK1)',

@@ -209,3 +209,18 @@
 - [x] Integrar ajuste de toxicidade com cálculo de doses
 - [x] Adicionar tabela de referência CTCAE
 - [x] Criar testes para validar ajustes
+
+### Ajustes de Antieméticos
+- [x] Atualizar esquema de alto risco (Fosaprepitanto 150mg, Ondansetrona 8/8h, Dexametasona, Olanzapina)
+- [x] Atualizar esquema moderado (Ondansetrona 8/8h, Dexametasona, Olanzapina D2-4)
+- [x] Atualizar esquema baixo risco
+- [x] Atualizar medicações de resgate (Metoclopramida, Lorazepam, Clorpromazina)
+- [x] Adicionar alertas específicos (QT prolongado, Tramadol×Ondansetrona)
+
+### Modo de Impressão Otimizado
+- [x] Criar layout de impressão simplificado e profissional
+- [x] Implementar geração de QR code para rastreabilidade
+- [x] Adicionar cabeçalho institucional customizável
+- [x] Criar formatação específica para prontuário eletrônico
+- [x] Garantir compatibilidade com TASY, MV, Philips
+- [x] Adicionar rodapé com data/hora e assinatura digital

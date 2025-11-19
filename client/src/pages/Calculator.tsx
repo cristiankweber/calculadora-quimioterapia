@@ -17,6 +17,7 @@ import PatientHistory from '@/components/PatientHistory';
 import ToxicityAssessment from '@/components/ToxicityAssessment';
 import type { ToxicityGrade } from '@/data/ctcae';
 import { getDoseAdjustmentFactor } from '@/data/ctcae';
+import PrintablePrescription from '@/components/PrintablePrescrip tion';
 
 export default function Calculator() {
   const [patientData, setPatientData] = useState<PatientData>({
@@ -255,6 +256,18 @@ export default function Calculator() {
           </div>
         </div>
       </main>
+
+      {/* Versão para Impressão */}
+      {selectedProtocol && calculatedValues && antiemetics && (
+        <PrintablePrescription
+          patient={patientData}
+          calculatedValues={calculatedValues}
+          protocol={selectedProtocol}
+          cycle={selectedCycle}
+          drugs={calculatedDrugs}
+          antiemetics={antiemetics}
+        />
+      )}
     </div>
   );
 }
