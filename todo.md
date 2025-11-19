@@ -224,3 +224,14 @@
 - [x] Criar formatação específica para prontuário eletrônico
 - [x] Garantir compatibilidade com TASY, MV, Philips
 - [x] Adicionar rodapé com data/hora e assinatura digital
+
+### Banco de Dados e Persistência
+- [x] Adicionar feature web-db-user ao projeto
+- [x] Criar schema de banco de dados (pacientes, prescrições, estatísticas, configurações)
+- [x] Implementar API de pacientes (CRUD)
+- [x] Implementar API de prescrições (criar, listar, buscar)
+- [x] Implementar API de estatísticas (protocolos mais usados, alertas)
+- [x] Implementar API de configurações institucionais
+- [ ] Migrar histórico de pacientes de localStorage para DB
+- [ ] Criar testes para APIs
+- [ ] Validar persistência e recuperação de dados

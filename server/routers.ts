@@ -1,0 +1,190 @@
+import { COOKIE_NAME } from "@shared/const";
+import { getSessionCookieOptions } from "./_core/cookies";
+import { systemRouter } from "./_core/systemRouter";
+import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
+import { z } from "zod";
+import * as db from "./db";
+
+export const appRouter = router({
+    // if you need to use socket.io, read and register route in server/_core/index.ts, all api should start with '/api/' so that the gateway can route correctly
+  system: systemRouter,
+  auth: router({
+    me: publicProcedure.query(opts => opts.ctx.user),
+    logout: publicProcedure.mutation(({ ctx }) => {
+      const cookieOptions = getSessionCookieOptions(ctx.req);
+      ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
+      return {
+        success: true,
+      } as const;
+    }),
+  }),
+
+  // Pacientes
+  patients: router({
+    list: protectedProcedure.query(async ({ ctx }) => {
+      return await db.getPatientsByUserId(ctx.user.id);
+    }),
+
+    get: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .query(async ({ input }) => {
+        return await db.getPatientById(input.id);
+      }),
+
+    create: protectedProcedure
+      .input(z.object({
+        name: z.string(),
+        age: z.number(),
+        sex: z.enum(["M", "F"]),
+        weight: z.number(),
+        height: z.number(),
+        creatinine: z.number(),
+        bilirubin: z.number(),
+        ecog: z.number().min(0).max(4),
+        comorbidities: z.string().optional(),
+        cumulativeDoxorubicin: z.number().optional(),
+        cumulativeDaunorubicin: z.number().optional(),
+        cumulativeIdarubicin: z.number().optional(),
+        cumulativeEpirubicin: z.number().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const patientData = {
+          ...input,
+          userId: ctx.user.id,
+          creatinine: Math.round(input.creatinine * 100),
+          bilirubin: Math.round(input.bilirubin * 100),
+        };
+        return await db.createPatient(patientData);
+      }),
+
+    update: protectedProcedure
+      .input(z.object({
+        id: z.number(),
+        name: z.string().optional(),
+        age: z.number().optional(),
+        sex: z.enum(["M", "F"]).optional(),
+        weight: z.number().optional(),
+        height: z.number().optional(),
+        creatinine: z.number().optional(),
+        bilirubin: z.number().optional(),
+        ecog: z.number().min(0).max(4).optional(),
+        comorbidities: z.string().optional(),
+        cumulativeDoxorubicin: z.number().optional(),
+        cumulativeDaunorubicin: z.number().optional(),
+        cumulativeIdarubicin: z.number().optional(),
+        cumulativeEpirubicin: z.number().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        const { id, ...data } = input;
+        const updateData: any = { ...data };
+        if (data.creatinine !== undefined) {
+          updateData.creatinine = Math.round(data.creatinine * 100);
+        }
+        if (data.bilirubin !== undefined) {
+          updateData.bilirubin = Math.round(data.bilirubin * 100);
+        }
+        await db.updatePatient(id, updateData);
+        return { success: true };
+      }),
+
+    delete: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        await db.deletePatient(input.id);
+        return { success: true };
+      }),
+  }),
+
+  // Prescrições
+  prescriptions: router({
+    list: protectedProcedure
+      .input(z.object({ limit: z.number().optional() }).optional())
+      .query(async ({ ctx, input }) => {
+        return await db.getPrescriptionsByUserId(ctx.user.id, input?.limit);
+      }),
+
+    getByPatient: protectedProcedure
+      .input(z.object({ patientId: z.number() }))
+      .query(async ({ input }) => {
+        return await db.getPrescriptionsByPatientId(input.patientId);
+      }),
+
+    getById: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .query(async ({ input }) => {
+        return await db.getPrescriptionById(input.id);
+      }),
+
+    getByPrescriptionId: protectedProcedure
+      .input(z.object({ prescriptionId: z.string() }))
+      .query(async ({ input }) => {
+        return await db.getPrescriptionByPrescriptionId(input.prescriptionId);
+      }),
+
+    create: protectedProcedure
+      .input(z.object({
+        prescriptionId: z.string(),
+        patientId: z.number(),
+        patientName: z.string(),
+        protocolId: z.string(),
+        protocolName: z.string(),
+        cycle: z.number(),
+        bsa: z.number(),
+        egfr: z.number(),
+        renalStatus: z.enum(["green", "yellow", "red"]),
+        drugs: z.any(),
+        antiemetics: z.any(),
+        prophylaxis: z.any(),
+        alerts: z.any(),
+        adjustmentFactor: z.number(),
+        toxicityAdjustment: z.any().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const prescriptionData = {
+          ...input,
+          userId: ctx.user.id,
+          bsa: Math.round(input.bsa * 1000),
+          egfr: Math.round(input.egfr),
+          adjustmentFactor: Math.round(input.adjustmentFactor * 100),
+        };
+        await db.recordProtocolUsage({
+          userId: ctx.user.id,
+          protocolId: input.protocolId,
+          protocolName: input.protocolName,
+          indication: undefined,
+        });
+        return await db.createPrescription(prescriptionData);
+      }),
+  }),
+
+  // Estatísticas
+  stats: router({
+    protocolUsage: protectedProcedure.query(async ({ ctx }) => {
+      return await db.getProtocolUsageStats(ctx.user.id);
+    }),
+  }),
+
+  // Configurações Institucionais
+  settings: router({
+    get: protectedProcedure.query(async ({ ctx }) => {
+      return await db.getInstitutionSettings(ctx.user.id);
+    }),
+
+    upsert: protectedProcedure
+      .input(z.object({
+        institutionName: z.string().optional(),
+        institutionLogo: z.string().optional(),
+        prescriberName: z.string().optional(),
+        prescriberCRM: z.string().optional(),
+        prescriberSpecialty: z.string().optional(),
+        headerTemplate: z.string().optional(),
+        footerTemplate: z.string().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        await db.upsertInstitutionSettings(ctx.user.id, input);
+        return { success: true };
+      }),
+  }),
+});
+
+export type AppRouter = typeof appRouter;
