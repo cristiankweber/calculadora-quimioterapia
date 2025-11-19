@@ -24,8 +24,8 @@ export interface CalculatedValues {
 export interface Drug {
   name: string;
   dose: number;
-  doseUnit: 'mg/m²' | 'mg/kg' | 'mg';
-  calculatedDose: number;
+  doseUnit: 'mg/m²' | 'mg/kg' | 'mg' | 'AUC';
+  calculatedDose?: number;
   route: string;
   days: string;
   observations?: string;

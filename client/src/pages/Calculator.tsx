@@ -9,7 +9,10 @@ import ProphylaxisAlerts from '@/components/ProphylaxisAlerts';
 import type { PatientData, Protocol, Drug, CalculatedValues } from '@/types/calculator';
 import { calculatePatientValues, calculateDrugDose } from '@/lib/calculations';
 import { generateAntiemeticProphylaxis } from '@/lib/antiemetics';
-import { FileDown, Copy } from 'lucide-react';
+import { FileDown, Copy, Save } from 'lucide-react';
+import { generatePrescriptionPDF } from '@/lib/pdfGenerator';
+import { savePatientHistory } from '@/lib/patientHistory';
+import PatientHistory from '@/components/PatientHistory';
 
 export default function Calculator() {
   const [patientData, setPatientData] = useState<PatientData>({
@@ -68,8 +71,50 @@ export default function Calculator() {
     toast.success(`Dose de ${updatedDrugs[index].name} ajustada para ${newDose.toFixed(1)} mg`);
   };
 
-  const handleExportPDF = () => {
-    toast.info('Funcionalidade de exportação PDF em desenvolvimento');
+  const handleExportPDF = async () => {
+    if (!selectedProtocol || !calculatedValues) {
+      toast.error('Preencha todos os dados antes de exportar o PDF');
+      return;
+    }
+
+    try {
+      await generatePrescriptionPDF({
+        patient: patientData,
+        calculatedValues,
+        protocol: selectedProtocol,
+        cycle: selectedCycle,
+        drugs: calculatedDrugs,
+        antiemetics: antiemetics!,
+      });
+      toast.success('PDF gerado com sucesso! Use Ctrl+P ou Cmd+P para salvar.');
+    } catch (error) {
+      console.error('Erro ao gerar PDF:', error);
+      toast.error('Erro ao gerar PDF. Tente novamente.');
+    }
+  };
+
+  const handleSaveToHistory = () => {
+    if (!selectedProtocol || !calculatedValues) {
+      toast.error('Preencha todos os dados antes de salvar');
+      return;
+    }
+
+    try {
+      savePatientHistory({
+        patient: patientData,
+        protocol: selectedProtocol.name,
+        cycle: selectedCycle,
+        drugs: calculatedDrugs.map(drug => ({
+          name: drug.name,
+          dose: drug.calculatedDose || 0,
+          date: new Date().toISOString().split('T')[0],
+        })),
+      });
+      toast.success('Prescrição salva no histórico do paciente!');
+    } catch (error) {
+      console.error('Erro ao salvar histórico:', error);
+      toast.error('Erro ao salvar no histórico');
+    }
   };
 
   const handleCopyPrescription = () => {
@@ -90,7 +135,7 @@ export default function Calculator() {
 
     prescription += `DROGAS:\n`;
     calculatedDrugs.forEach((drug) => {
-      prescription += `• ${drug.name}: ${drug.calculatedDose.toFixed(1)} mg ${drug.route} - Dias ${drug.days}\n`;
+      prescription += `• ${drug.name}: ${(drug.calculatedDose || 0).toFixed(1)} mg ${drug.route} - Dias ${drug.days}\n`;
       if (drug.observations) {
         prescription += `  Obs: ${drug.observations}\n`;
       }
@@ -143,7 +188,12 @@ export default function Calculator() {
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
-              <Button variant="outline" onClick={handleExportPDF} disabled>
+              <PatientHistory onLoadPatient={setPatientData} />
+              <Button variant="outline" onClick={handleSaveToHistory}>
+                <Save className="h-4 w-4 mr-2" />
+                Salvar no Histórico
+              </Button>
+              <Button variant="outline" onClick={handleExportPDF}>
                 <FileDown className="h-4 w-4 mr-2" />
                 Exportar PDF
               </Button>

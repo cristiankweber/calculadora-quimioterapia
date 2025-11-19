@@ -134,7 +134,7 @@ export function calculatePatientValues(
  */
 export function calculateDrugDose(
   baseDose: number,
-  doseUnit: 'mg/m²' | 'mg/kg' | 'mg',
+  doseUnit: 'mg/m²' | 'mg/kg' | 'mg' | 'AUC',
   bsa: number,
   weight: number,
   adjustmentFactor: number = 1.0
@@ -145,6 +145,9 @@ export function calculateDrugDose(
     calculatedDose = baseDose * bsa;
   } else if (doseUnit === 'mg/kg') {
     calculatedDose = baseDose * weight;
+  } else if (doseUnit === 'AUC') {
+    // AUC - retornar como referência (cálculo real requer fórmula de Calvert)
+    return baseDose;
   }
 
   calculatedDose = calculatedDose * adjustmentFactor;

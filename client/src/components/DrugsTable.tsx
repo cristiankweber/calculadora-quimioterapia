@@ -109,11 +109,11 @@ export default function DrugsTable({ drugs, onDoseChange }: DrugsTableProps) {
                         />
                       ) : (
                         <button
-                          onClick={() => handleDoseClick(index, drug.calculatedDose)}
+                          onClick={() => handleDoseClick(index, drug.calculatedDose || 0)}
                           className="hover:bg-muted px-2 py-1 rounded transition-colors cursor-pointer"
                           title="Clique para ajustar manualmente"
                         >
-                          {drug.calculatedDose.toFixed(1)} mg
+                          {(drug.calculatedDose || 0).toFixed(1)} mg
                         </button>
                       )}
                     </TableCell>

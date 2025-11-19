@@ -84,3 +84,26 @@
 - [x] Permitir ajuste manual de dose na tabela para arredondar valores
 - [x] Corrigir ortografia: Allopurinol → Alopurinol
 - [x] Adicionar colírio de Dexametasona nas profilaxias (já estava presente nos protocolos FLAG-Ida e HiDAC)
+
+### Próximos Passos - Novas Funcionalidades
+
+#### Exportação PDF
+- [x] Implementar geração de PDF com formatação profissional
+- [x] Adicionar cabeçalho com logo e informações institucionais
+- [x] Incluir todas as seções da prescrição no PDF
+- [x] Adicionar rodapé com data/hora e identificação do sistema
+
+#### Sistema de Histórico de Pacientes
+- [x] Criar estrutura de dados para histórico de pacientes
+- [x] Implementar salvamento local (localStorage) de pacientes
+- [x] Criar interface para buscar e carregar pacientes salvos
+- [x] Implementar rastreamento de doses cumulativas
+- [x] Adicionar alertas de cardiotoxicidade baseados em histórico
+- [x] Permitir edição e exclusão de registros históricos
+
+#### Protocolos Adicionais
+- [x] Adicionar protocolo Hyper-CVAD Parte A
+- [x] Adicionar protocolo Hyper-CVAD Parte B
+- [x] Adicionar protocolo R-ICE
+- [x] Adicionar protocolo VRd (Mieloma Múltiplo)
+- [x] Adicionar protocolo DARA-VRd (Mieloma Múltiplo)
