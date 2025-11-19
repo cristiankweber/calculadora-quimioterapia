@@ -126,3 +126,6 @@
 - [x] Adicionar protocolo BR (LLC/NHL)
 - [ ] Adicionar protocolo FCR (LLC)
 - [ ] Adicionar mais protocolos conforme banco de dados
+
+### Correções
+- [x] Corrigir erro de ref no DialogTrigger do PatientHistory
