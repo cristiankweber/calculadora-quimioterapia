@@ -137,7 +137,8 @@ export function calculateDrugDose(
   doseUnit: 'mg/m²' | 'mg/kg' | 'mg' | 'AUC',
   bsa: number,
   weight: number,
-  adjustmentFactor: number = 1.0
+  adjustmentFactor: number = 1.0,
+  maxDose?: number
 ): number {
   let calculatedDose = baseDose;
 
@@ -151,6 +152,11 @@ export function calculateDrugDose(
   }
 
   calculatedDose = calculatedDose * adjustmentFactor;
+
+  // Aplicar dose máxima se definida
+  if (maxDose !== undefined && calculatedDose > maxDose) {
+    calculatedDose = maxDose;
+  }
 
   return Math.round(calculatedDose * 10) / 10; // 1 casa decimal
 }

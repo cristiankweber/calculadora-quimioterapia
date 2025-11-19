@@ -25,6 +25,7 @@ export interface Drug {
   name: string;
   dose: number;
   doseUnit: 'mg/m²' | 'mg/kg' | 'mg' | 'AUC';
+  maxDose?: number; // Dose máxima absoluta em mg
   calculatedDose?: number;
   route: string;
   days: string;

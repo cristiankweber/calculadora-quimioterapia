@@ -107,3 +107,22 @@
 - [x] Adicionar protocolo R-ICE
 - [x] Adicionar protocolo VRd (Mieloma Múltiplo)
 - [x] Adicionar protocolo DARA-VRd (Mieloma Múltiplo)
+
+### Novas Melhorias Solicitadas
+
+#### Dose Máxima
+- [x] Adicionar campo maxDose no tipo Drug
+- [x] Implementar lógica para respeitar dose máxima nos cálculos
+- [x] Adicionar indicador visual quando dose máxima for aplicada
+- [x] Atualizar testes para validar dose máxima
+
+#### Novos Protocolos
+- [ ] Adicionar protocolo SMILE (LMA/Linfoma)
+- [ ] Adicionar protocolo GDP (Linfoma)
+- [ ] Adicionar protocolo R-DHAP (Linfoma)
+- [x] Adicionar protocolo DA-R-EPOCH (Linfoma)
+- [x] Adicionar protocolo R-mini-CHOP (Linfoma)
+- [x] Adicionar protocolo R-CVP (Linfoma)
+- [x] Adicionar protocolo BR (LLC/NHL)
+- [ ] Adicionar protocolo FCR (LLC)
+- [ ] Adicionar mais protocolos conforme banco de dados

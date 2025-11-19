@@ -48,16 +48,20 @@ export default function Calculator() {
   // Recalcular doses quando protocolo ou valores calculados mudarem
   useEffect(() => {
     if (selectedProtocol && calculatedValues) {
-      const drugsWithCalculatedDoses = selectedProtocol.drugs.map((drug) => ({
-        ...drug,
-        calculatedDose: calculateDrugDose(
+      const drugsWithCalculatedDoses = selectedProtocol.drugs.map((drug) => {
+        const calculatedDose = calculateDrugDose(
           drug.dose,
           drug.doseUnit,
           calculatedValues.bsa,
           patientData.weight,
-          calculatedValues.globalAdjustmentFactor
-        ),
-      }));
+          calculatedValues.globalAdjustmentFactor,
+          drug.maxDose
+        );
+        return {
+          ...drug,
+          calculatedDose,
+        };
+      });
       setCalculatedDrugs(drugsWithCalculatedDoses);
     } else {
       setCalculatedDrugs([]);

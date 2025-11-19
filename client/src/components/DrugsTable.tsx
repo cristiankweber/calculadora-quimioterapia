@@ -108,13 +108,20 @@ export default function DrugsTable({ drugs, onDoseChange }: DrugsTableProps) {
                           autoFocus
                         />
                       ) : (
-                        <button
-                          onClick={() => handleDoseClick(index, drug.calculatedDose || 0)}
-                          className="hover:bg-muted px-2 py-1 rounded transition-colors cursor-pointer"
-                          title="Clique para ajustar manualmente"
-                        >
-                          {(drug.calculatedDose || 0).toFixed(1)} mg
-                        </button>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => handleDoseClick(index, drug.calculatedDose || 0)}
+                            className="hover:bg-muted px-2 py-1 rounded transition-colors cursor-pointer"
+                            title="Clique para ajustar manualmente"
+                          >
+                            {(drug.calculatedDose || 0).toFixed(1)} mg
+                          </button>
+                          {drug.maxDose && drug.calculatedDose && drug.calculatedDose >= drug.maxDose && (
+                            <Badge variant="outline" className="text-xs bg-yellow-50 text-yellow-700 border-yellow-300">
+                              Máx
+                            </Badge>
+                          )}
+                        </div>
                       )}
                     </TableCell>
                     <TableCell>{drug.route}</TableCell>
