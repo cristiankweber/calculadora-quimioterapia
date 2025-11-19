@@ -10,7 +10,7 @@ import DilutionInfo from '@/components/DilutionInfo';
 import type { PatientData, Protocol, Drug, CalculatedValues } from '@/types/calculator';
 import { calculatePatientValues, calculateDrugDose } from '@/lib/calculations';
 import { generateAntiemeticProphylaxis } from '@/lib/antiemetics';
-import { FileDown, Copy, Save } from 'lucide-react';
+import { FileDown, Copy, Save, History, Printer } from 'lucide-react';
 import { generatePrescriptionPDF } from '@/lib/pdfGenerator';
 import { savePatientHistory } from '@/lib/patientHistory';
 import PatientHistory from '@/components/PatientHistory';
@@ -85,6 +85,14 @@ export default function Calculator() {
     updatedDrugs[index] = { ...updatedDrugs[index], calculatedDose: newDose };
     setCalculatedDrugs(updatedDrugs);
     toast.success(`Dose de ${updatedDrugs[index].name} ajustada para ${newDose.toFixed(1)} mg`);
+  };
+
+  const handlePrint = () => {
+    if (!selectedProtocol || !calculatedValues) {
+      toast.error('Preencha todos os dados antes de imprimir');
+      return;
+    }
+    window.print();
   };
 
   const handleExportPDF = async () => {
@@ -208,6 +216,10 @@ export default function Calculator() {
               <Button variant="outline" onClick={handleSaveToHistory}>
                 <Save className="h-4 w-4 mr-2" />
                 Salvar no Histórico
+              </Button>
+              <Button variant="outline" onClick={handlePrint}>
+                <Printer className="h-4 w-4 mr-2" />
+                Imprimir
               </Button>
               <Button variant="outline" onClick={handleExportPDF}>
                 <FileDown className="h-4 w-4 mr-2" />

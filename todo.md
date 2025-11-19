@@ -235,3 +235,10 @@
 - [ ] Migrar histórico de pacientes de localStorage para DB
 - [ ] Criar testes para APIs
 - [ ] Validar persistência e recuperação de dados
+
+### Correção do Modo de Impressão
+- [x] Verificar se PrintablePrescription está sendo renderizado
+- [x] Corrigir exibição do componente de impressão
+- [x] Adicionar botão de impressão visível
+- [x] Testar geração de QR code
+- [x] Validar layout de impressão A4
