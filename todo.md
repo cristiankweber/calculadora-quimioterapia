@@ -264,3 +264,9 @@
 ### Correção de Erro settings.get
 - [x] Corrigir router settings.get para retornar valor padrão quando não há configurações
 - [x] Garantir que query nunca retorne undefined
+
+### Correção de Erro Hyper-CVAD Parte A
+- [x] Investigar erro ao prescrever Hyper-CVAD Parte A (loop infinito no useEffect)
+- [x] Corrigir definição do protocolo (otimizado com useMemo)
+- [x] Corrigir travamento persistente ao selecionar Hyper-CVAD Parte A (substituído useEffect por useMemo)
+- [x] Testar prescrição do protocolo

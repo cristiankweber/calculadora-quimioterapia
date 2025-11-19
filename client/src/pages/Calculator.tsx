@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useLocation } from 'wouter';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
@@ -58,34 +58,41 @@ export default function Calculator() {
     }
   }, [patientData]);
 
-  // Recalcular doses quando protocolo, valores calculados ou toxicidades mudarem
-  useEffect(() => {
-    if (selectedProtocol && calculatedValues) {
-      // Calcular fator de ajuste por toxicidade
-      const toxicityFactor = getDoseAdjustmentFactor(toxicities);
+  // Memoizar fator de toxicidade para evitar recálculos desnecessários
+  const toxicityFactor = useMemo(() => {
+    return getDoseAdjustmentFactor(toxicities);
+  }, [toxicities]);
 
-      const drugsWithCalculatedDoses = selectedProtocol.drugs.map((drug) => {
-        const baseDose = calculateDrugDose(
-          drug.dose,
-          drug.doseUnit,
-          calculatedValues.bsa,
-          patientData.weight,
-          calculatedValues.globalAdjustmentFactor,
-          drug.maxDose,
-          calculatedValues.egfr
-        );
-        // Aplicar ajuste de toxicidade
-        const finalDose = baseDose * toxicityFactor;
-        return {
-          ...drug,
-          calculatedDose: finalDose,
-        };
-      });
-      setCalculatedDrugs(drugsWithCalculatedDoses);
-    } else {
-      setCalculatedDrugs([]);
+  // Recalcular doses quando protocolo, valores calculados ou toxicidades mudarem
+  // Usar useMemo em vez de useEffect para evitar loops infinitos
+  const calculatedDrugsData = useMemo(() => {
+    if (!selectedProtocol || !calculatedValues) {
+      return [];
     }
-  }, [selectedProtocol, calculatedValues, patientData.weight, toxicities]);
+
+    return selectedProtocol.drugs.map((drug) => {
+      const baseDose = calculateDrugDose(
+        drug.dose,
+        drug.doseUnit,
+        calculatedValues.bsa,
+        patientData.weight,
+        calculatedValues.globalAdjustmentFactor,
+        drug.maxDose,
+        calculatedValues.egfr
+      );
+      // Aplicar ajuste de toxicidade
+      const finalDose = baseDose * toxicityFactor;
+      return {
+        ...drug,
+        calculatedDose: finalDose,
+      };
+    });
+  }, [selectedProtocol?.id, calculatedValues, toxicityFactor, patientData.weight]);
+
+  // Atualizar estado apenas quando calculatedDrugsData mudar
+  useEffect(() => {
+    setCalculatedDrugs(calculatedDrugsData);
+  }, [calculatedDrugsData]);
 
   const handleDoseChange = (index: number, newDose: number) => {
     const updatedDrugs = [...calculatedDrugs];
@@ -231,9 +238,11 @@ export default function Calculator() {
     toast.success('Prescrição copiada para a área de transferência!');
   };
 
-  const antiemetics = selectedProtocol
-    ? generateAntiemeticProphylaxis(selectedProtocol.emetogenicRisk)
-    : null;
+  const antiemetics = useMemo(() => {
+    return selectedProtocol
+      ? generateAntiemeticProphylaxis(selectedProtocol.emetogenicRisk)
+      : null;
+  }, [selectedProtocol]);
 
   return (
     <div className="min-h-screen bg-background">
