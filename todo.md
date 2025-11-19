@@ -191,3 +191,11 @@
 - [ ] Brentuximabe Vedotina (Hodgkin/Linfoma T)
 - [ ] Teclistamab (Mieloma)
 - [ ] Talquetamab (Mieloma)
+
+### Terapias-Alvo e Imunoterapias Modernas
+- [x] Ibrutinib (BTKi - LLC/Linfoma do manto)
+- [x] Venetoclax monoterapia (BCL-2i - LMA/LLC)
+- [x] Venetoclax + Azacitidina (LMA não elegível para QT intensiva)
+- [x] Brentuximabe Vedotina (anti-CD30 - Hodgkin/Linfoma T)
+- [x] Epcoritamab (biespecífico CD20×CD3 - Linfoma B)
+- [x] Orientações CAR-T (pré-infusão, infusão, manejo SLC/ICANS)
