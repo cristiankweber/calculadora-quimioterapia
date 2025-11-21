@@ -165,6 +165,30 @@ export const appRouter = router({
     protocolUsage: protectedProcedure.query(async ({ ctx }) => {
       return await db.getProtocolUsageStats(ctx.user.id);
     }),
+
+    topProtocols: protectedProcedure
+      .input(z.object({ limit: z.number().optional().default(10) }))
+      .query(async ({ ctx, input }) => {
+        return await db.getTopProtocols(ctx.user.id, input.limit);
+      }),
+
+    protocolsByIndication: protectedProcedure.query(async ({ ctx }) => {
+      return await db.getProtocolsByIndication(ctx.user.id);
+    }),
+
+    toxicityStats: protectedProcedure.query(async ({ ctx }) => {
+      return await db.getToxicityStats(ctx.user.id);
+    }),
+
+    prescriptionTrends: protectedProcedure
+      .input(z.object({ days: z.number().optional().default(30) }))
+      .query(async ({ ctx, input }) => {
+        return await db.getPrescriptionTrends(ctx.user.id, input.days);
+      }),
+
+    overview: protectedProcedure.query(async ({ ctx }) => {
+      return await db.getStatsOverview(ctx.user.id);
+    }),
   }),
 
   // Configurações Institucionais

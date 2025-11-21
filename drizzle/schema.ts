@@ -94,6 +94,23 @@ export type ProtocolUsage = typeof protocolUsage.$inferSelect;
 export type InsertProtocolUsage = typeof protocolUsage.$inferInsert;
 
 /**
+ * Tabela de alertas de toxicidade registrados
+ * Rastreia toxicidades reportadas durante prescrições
+ */
+export const toxicityAlerts = mysqlTable("toxicity_alerts", {
+  id: int("id").autoincrement().primaryKey(),
+  prescriptionId: int("prescriptionId").notNull(),
+  userId: int("userId").notNull(),
+  toxicityType: varchar("toxicityType", { length: 100 }).notNull(),
+  toxicityGrade: int("toxicityGrade").notNull(), // 0-5 (CTCAE)
+  doseAdjustment: varchar("doseAdjustment", { length: 50 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type ToxicityAlert = typeof toxicityAlerts.$inferSelect;
+export type InsertToxicityAlert = typeof toxicityAlerts.$inferInsert;
+
+/**
  * Tabela de configurações institucionais
  * Armazena configurações personalizadas por usuário/instituição
  */

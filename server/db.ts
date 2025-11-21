@@ -264,3 +264,136 @@ export async function upsertInstitutionSettings(userId: number, settings: Partia
     set: settings,
   });
 }
+
+// ===== Funções de Estatísticas Avançadas =====
+
+export async function getTopProtocols(userId: number, limit = 10) {
+  const db = await getDb();
+  if (!db) {
+    return [];
+  }
+
+  // Agrupa protocolos por nome e conta quantas vezes foram usados
+  const results = await db
+    .select()
+    .from(protocolUsage)
+    .where(eq(protocolUsage.userId, userId))
+    .orderBy(desc(protocolUsage.usedAt));
+
+  // Agregar manualmente (Drizzle não tem GROUP BY nativo em todos os dialetos)
+  const counts = new Map<string, { name: string; count: number }>();
+  
+  for (const usage of results) {
+    const current = counts.get(usage.protocolId) || { name: usage.protocolName, count: 0 };
+    current.count++;
+    counts.set(usage.protocolId, current);
+  }
+
+  return Array.from(counts.values())
+    .sort((a, b) => b.count - a.count)
+    .slice(0, limit);
+}
+
+export async function getProtocolsByIndication(userId: number) {
+  const db = await getDb();
+  if (!db) {
+    return [];
+  }
+
+  const results = await db
+    .select()
+    .from(protocolUsage)
+    .where(eq(protocolUsage.userId, userId))
+    .orderBy(desc(protocolUsage.usedAt));
+
+  // Agregar por indicação
+  const byIndication = new Map<string, number>();
+  
+  for (const usage of results) {
+    const indication = usage.indication || "Não especificada";
+    byIndication.set(indication, (byIndication.get(indication) || 0) + 1);
+  }
+
+  return Array.from(byIndication.entries()).map(([indication, count]) => ({
+    indication,
+    count,
+  }));
+}
+
+export async function getToxicityStats(userId: number) {
+  const db = await getDb();
+  if (!db) {
+    return [];
+  }
+
+  // Por enquanto retorna array vazio - será implementado quando toxicidades forem registradas
+  // No futuro, buscar da tabela toxicityAlerts
+  return [];
+}
+
+export async function getPrescriptionTrends(userId: number, days = 30) {
+  const db = await getDb();
+  if (!db) {
+    return [];
+  }
+
+  // Buscar prescrições dos últimos N dias
+  const cutoffDate = new Date();
+  cutoffDate.setDate(cutoffDate.getDate() - days);
+
+  const results = await db
+    .select()
+    .from(prescriptions)
+    .where(eq(prescriptions.userId, userId))
+    .orderBy(desc(prescriptions.createdAt));
+
+  // Filtrar por data e agregar por dia
+  const byDay = new Map<string, number>();
+  
+  for (const prescription of results) {
+    if (prescription.createdAt < cutoffDate) continue;
+    
+    const dateKey = prescription.createdAt.toISOString().split('T')[0];
+    byDay.set(dateKey, (byDay.get(dateKey) || 0) + 1);
+  }
+
+  return Array.from(byDay.entries())
+    .map(([date, count]) => ({ date, count }))
+    .sort((a, b) => a.date.localeCompare(b.date));
+}
+
+export async function getStatsOverview(userId: number) {
+  const db = await getDb();
+  if (!db) {
+    return {
+      totalPrescriptions: 0,
+      totalPatients: 0,
+      totalProtocols: 0,
+      recentActivity: 0,
+    };
+  }
+
+  const [prescriptionsList, patientsList, protocolsList] = await Promise.all([
+    db.select().from(prescriptions).where(eq(prescriptions.userId, userId)),
+    db.select().from(patients).where(eq(patients.userId, userId)),
+    db.select().from(protocolUsage).where(eq(protocolUsage.userId, userId)),
+  ]);
+
+  // Contar atividade recente (últimos 7 dias)
+  const sevenDaysAgo = new Date();
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+  
+  const recentActivity = prescriptionsList.filter(
+    p => p.createdAt >= sevenDaysAgo
+  ).length;
+
+  // Contar protocolos únicos
+  const uniqueProtocols = new Set(protocolsList.map(p => p.protocolId));
+
+  return {
+    totalPrescriptions: prescriptionsList.length,
+    totalPatients: patientsList.length,
+    totalProtocols: uniqueProtocols.size,
+    recentActivity,
+  };
+}

@@ -344,3 +344,21 @@
 - [x] Dasatinib (LMC 2ª linha)
 - [x] Nilotinib (LMC 2ª linha)
 - [x] Ruxolitinib (Mielofibrose)
+
+### Dashboard de Estatísticas
+- [x] Criar schema de banco para estatísticas agregadas
+- [x] Implementar APIs tRPC para buscar estatísticas
+- [x] Criar componentes de gráficos (protocolos mais prescritos, distribuição por patologia)
+- [x] Criar componente de gráfico de tendências temporais
+- [x] Criar componente de alertas de toxicidade mais frequentes
+- [x] Implementar página /dashboard com visualizações
+- [x] Adicionar navegação para dashboard no cabeçalho
+- [x] Testar dashboard com dados reais
+
+### CI/CD e Testes Automatizados
+- [x] Criar arquivo .github/workflows/ci.yml
+- [x] Configurar job de testes automatizados
+- [x] Configurar job de build
+- [x] Configurar job de lint/format
+- [x] Adicionar badges de status no README
+- [x] Testar pipeline completo

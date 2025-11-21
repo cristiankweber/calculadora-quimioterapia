@@ -28,7 +28,8 @@ import {
   Copy,
   Save,
   Printer,
-  Settings as SettingsIcon
+  Settings as SettingsIcon,
+  BarChart3
 } from 'lucide-react';
 
 export default function Calculator() {
@@ -304,6 +305,9 @@ export default function Calculator() {
               </Button>
               <Button variant="outline" onClick={() => setLocation('/settings')}>
                 <SettingsIcon className="h-4 w-4 mr-2" /> Configurações
+              </Button>
+              <Button variant="outline" onClick={() => setLocation('/dashboard')}>
+                <BarChart3 className="h-4 w-4 mr-2" /> Dashboard
               </Button>
               <Button variant="outline" onClick={handlePrint}>
                 <Printer className="h-4 w-4 mr-2" /> Imprimir
