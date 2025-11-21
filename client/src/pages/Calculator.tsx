@@ -12,7 +12,7 @@ import ToxicityAssessment from '@/components/ToxicityAssessment';
 import PatientHistoryDB from '@/components/PatientHistoryDB';
 
 // Lazy load PrintablePrescription para evitar travamento ao selecionar protocolo
-const PrintablePrescription = lazy(() => import('@/components/PrintablePrescrip tion'));
+const PrintablePrescription = lazy(() => import('@/components/PrintablePrescription'));
 
 import type { PatientData, Protocol, Drug, CalculatedValues } from '@/types/calculator';
 import type { ToxicityGrade } from '@/data/ctcae';

@@ -283,5 +283,11 @@
 
 ### Correção de Travamento em Produção
 - [x] Adicionar meta tag `<meta name="manus-ignore" content="true">` no index.html
-- [ ] Salvar checkpoint
+- [x] Salvar checkpoint (versão 3c26de0e)
 - [ ] Republicar aplicação para aplicar correção
+
+### Correção de Import do PrintablePrescription
+- [x] Verificar nome correto do arquivo (tinha espaço: PrintablePrescrip tion.tsx)
+- [x] Renomear arquivo para PrintablePrescription.tsx (sem espaço)
+- [x] Corrigir import no Calculator.tsx
+- [ ] Salvar checkpoint e republicar
