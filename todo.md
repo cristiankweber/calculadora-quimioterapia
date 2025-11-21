@@ -318,3 +318,29 @@
 - [ ] Definir features prioritárias para TMO (Transplante de Medula Óssea)
 - [ ] Planejar integração com guidelines internacionais (NCCN, ESMO, EBMT)
 - [ ] Documentar próximos passos
+
+
+## Protocolos Adicionais - Fase 1 (Janeiro/2025)
+
+### Protocolos de LLA
+- [x] ALL IC-BFM 2009 (LLA pediátrica)
+- [x] GRAALL-2003/2005 (LLA adulto)
+
+### Protocolos de Linfoma
+- [x] R-Pola-CHP (DLBCL 1ª linha)
+- [x] R-CODOX-M (Burkitt)
+- [x] R-IVAC (Burkitt alternado)
+
+### Protocolos de Mieloma Múltiplo
+- [x] D-VTD (Daratumumabe + Bortezomibe + Talidomida + Dex)
+- [x] ISA-VRd (Isatuximabe + VRd)
+- [x] Teclistamab (Mieloma refratário)
+
+### Condicionamentos TMO
+- [x] BuFlu RIC (Bussulfano + Fludarabina - intensidade reduzida)
+
+### TKIs e Terapias-Alvo
+- [x] Imatinib (LMC)
+- [x] Dasatinib (LMC 2ª linha)
+- [x] Nilotinib (LMC 2ª linha)
+- [x] Ruxolitinib (Mielofibrose)
