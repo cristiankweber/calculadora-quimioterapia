@@ -707,11 +707,11 @@ export const protocols: Protocol[] = [
     drugs: [
       {
         name: 'Daratumumabe',
-        dose: 16,
-        doseUnit: 'mg/kg',
-        route: 'IV',
+        dose: 1800,
+        doseUnit: 'mg',
+        route: 'SC',
         days: '1, 8, 15 (ciclos 1-2); 1, 15 (ciclos 3-6); 1 (ciclos 7+)',
-        observations: 'Pré-medicação obrigatória',
+        observations: 'Pré-medicação obrigatória, dose fixa',
         renalAdjustment: 'Sem ajuste',
         emetogenicRisk: 'low',
       },
@@ -1309,11 +1309,11 @@ export const protocols: Protocol[] = [
     drugs: [
       {
         name: 'Daratumumabe',
-        dose: 16,
-        doseUnit: 'mg/kg',
-        route: 'IV',
+        dose: 1800,
+        doseUnit: 'mg',
+        route: 'SC',
         days: 'Ciclos 1-2: D1,8,15,22 | Ciclos 3-6: D1,15 | Ciclos 7+: D1',
-        observations: 'Pré-medicação obrigatória',
+        observations: 'Pré-medicação obrigatória, dose fixa',
         renalAdjustment: 'Sem ajuste',
         emetogenicRisk: 'low',
       },
@@ -1375,11 +1375,11 @@ export const protocols: Protocol[] = [
     drugs: [
       {
         name: 'Daratumumabe',
-        dose: 16,
-        doseUnit: 'mg/kg',
-        route: 'IV',
+        dose: 1800,
+        doseUnit: 'mg',
+        route: 'SC',
         days: 'Ciclos 1-3: D1,8,15 | Ciclos 4-8: D1,15 | Ciclos 9+: D1',
-        observations: 'Pré-medicação obrigatória',
+        observations: 'Pré-medicação obrigatória, dose fixa',
         renalAdjustment: 'Sem ajuste',
         emetogenicRisk: 'low',
       },
@@ -2538,10 +2538,10 @@ export const protocols: Protocol[] = [
     drugs: [
       {
         name: 'Daratumumabe',
-        dose: 16,
-        doseUnit: 'mg/kg',
+        dose: 1800,
+        doseUnit: 'mg',
         calculatedDose: 0,
-        route: 'IV',
+        route: 'SC',
         days: '1, 8, 15 (ciclos 1-2); 1, 15 (ciclos 3-4)',
         observations: 'Pré-medicação: montelucaste + anti-histamínico + paracetamol + corticoide',
         emetogenicRisk: 'low',
