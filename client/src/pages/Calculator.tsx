@@ -32,9 +32,6 @@ import {
 } from 'lucide-react';
 
 export default function Calculator() {
-  const renderCount = useRef(0);
-  renderCount.current++;
-  console.log(`[Calculator] Component render #${renderCount.current}`);
 
   const [, setLocation] = useLocation();
 
@@ -53,19 +50,14 @@ export default function Calculator() {
 
   /** Atualização do paciente — MEMOIZADA */
   const handlePatientChange = useCallback((newData: PatientData) => {
-    console.log('[Calculator] handlePatientChange called');
-
     setPatientData(prev => {
-      let changed = false;
+      // Comparar campo por campo para evitar updates desnecessários
       for (const key in newData) {
         if (newData[key as keyof PatientData] !== prev[key as keyof PatientData]) {
-          console.log(
-            `[Calculator] PatientData field changed: ${key}: ${prev[key as keyof PatientData]} → ${newData[key as keyof PatientData]}`
-          );
-          changed = true;
+          return newData;
         }
       }
-      return changed ? newData : prev;
+      return prev;
     });
   }, []);
 
@@ -83,9 +75,7 @@ export default function Calculator() {
 
   /** Memo toxicidade */
   const toxicityFactor = useMemo(() => {
-    const factor = getDoseAdjustmentFactor(toxicities);
-    console.log('[Calculator] toxicityFactor recalculated:', factor);
-    return factor;
+    return getDoseAdjustmentFactor(toxicities);
   }, [JSON.stringify(toxicities)]);
 
   /** REFS PARA EVITAR RE-CÁLCULOS INDESEJADOS */
@@ -102,8 +92,6 @@ export default function Calculator() {
       creatinine: patientData.creatinine
     };
 
-    console.log('[Calculator] useEffect 1 (patientData core fields) triggered', core);
-
     if (
       core.age > 0 &&
       core.weight > 0 &&
@@ -114,12 +102,10 @@ export default function Calculator() {
       const serialized = JSON.stringify(values);
 
       if (serialized !== lastCalculatedValuesRef.current) {
-        console.log('[Calculator] Updating calculatedValues - values changed');
         lastCalculatedValuesRef.current = serialized;
         setCalculatedValues(values);
       }
     } else {
-      console.log('[Calculator] Missing data to calculate values, clearing calculatedValues');
       setCalculatedValues(null);
       lastCalculatedValuesRef.current = '';
     }
@@ -139,12 +125,6 @@ export default function Calculator() {
 
   /** EFFECT 2 — CALCULAR DOSES QUANDO O NECESSÁRIO */
   useEffect(() => {
-    console.log('[Calculator] useEffect 2 (drugs) triggered', {
-      protocolId: selectedProtocol?.id,
-      hasBSA: !!calculatedValues?.bsa,
-      toxicityFactor
-    });
-
     if (!selectedProtocol || !calculatedValues) {
       if (lastCalculatedDrugsRef.current !== '') {
         lastCalculatedDrugsRef.current = '';
@@ -172,7 +152,6 @@ export default function Calculator() {
 
     const serialized = JSON.stringify(drugs);
     if (serialized !== lastCalculatedDrugsRef.current) {
-      console.log('[Calculator] Updating calculatedDrugs - values changed');
       lastCalculatedDrugsRef.current = serialized;
       setCalculatedDrugs(drugs);
     }

@@ -291,3 +291,30 @@
 - [x] Renomear arquivo para PrintablePrescription.tsx (sem espaço)
 - [x] Corrigir import no Calculator.tsx
 - [ ] Salvar checkpoint e republicar
+
+
+## Revisão Completa e Otimização (Nova Fase)
+
+### Auditoria de Código
+- [ ] Revisar todos os componentes principais (Calculator, PatientForm, DrugsTable, etc.)
+- [ ] Identificar gargalos de performance
+- [ ] Verificar erros de TypeScript e linting
+- [ ] Analisar bundle size e imports desnecessários
+
+### Correções e Otimizações
+- [ ] Corrigir erros identificados
+- [ ] Otimizar re-renders com React.memo
+- [ ] Melhorar memoização de cálculos pesados
+- [ ] Reduzir bundle size removendo dependências não utilizadas
+
+### Testes e Validação
+- [ ] Executar suite de testes completa
+- [ ] Testar todos os 30 protocolos
+- [ ] Validar cálculos de doses
+- [ ] Verificar funcionalidade de impressão
+
+### Plano de Aprimoramento Estratégico
+- [ ] Criar roadmap para tornar a calculadora referência em hematologia
+- [ ] Definir features prioritárias para TMO (Transplante de Medula Óssea)
+- [ ] Planejar integração com guidelines internacionais (NCCN, ESMO, EBMT)
+- [ ] Documentar próximos passos

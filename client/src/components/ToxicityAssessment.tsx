@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -9,7 +10,7 @@ interface ToxicityAssessmentProps {
   onToxicityChange: (toxicity: string, grade: ToxicityGrade) => void;
 }
 
-export default function ToxicityAssessment({ toxicities, onToxicityChange }: ToxicityAssessmentProps) {
+function ToxicityAssessment({ toxicities, onToxicityChange }: ToxicityAssessmentProps) {
   const adjustmentFactor = getDoseAdjustmentFactor(toxicities);
   const recommendations = getToxicityRecommendations(toxicities);
 
@@ -138,3 +139,5 @@ export default function ToxicityAssessment({ toxicities, onToxicityChange }: Tox
     </Card>
   );
 }
+
+export default memo(ToxicityAssessment);

@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -9,11 +10,8 @@ interface PatientFormProps {
   onChange: (data: PatientData) => void;
 }
 
-export default function PatientForm({ data, onChange }: PatientFormProps) {
-  console.log('[PatientForm] Render with data:', data);
-  
+function PatientForm({ data, onChange }: PatientFormProps) {
   const handleChange = (field: keyof PatientData, value: string | number) => {
-    console.log(`[PatientForm] handleChange called: ${String(field)} =`, value);
     onChange({ ...data, [field]: value });
   };
 
@@ -146,3 +144,5 @@ export default function PatientForm({ data, onChange }: PatientFormProps) {
     </Card>
   );
 }
+
+export default memo(PatientForm);

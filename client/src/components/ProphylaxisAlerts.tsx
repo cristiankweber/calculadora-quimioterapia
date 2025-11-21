@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -10,7 +11,7 @@ interface ProphylaxisAlertsProps {
   antiemetics: AntiemeticProphylaxis | null;
 }
 
-export default function ProphylaxisAlerts({ protocol, antiemetics }: ProphylaxisAlertsProps) {
+function ProphylaxisAlerts({ protocol, antiemetics }: ProphylaxisAlertsProps) {
   if (!protocol) {
     return (
       <Card>
@@ -221,3 +222,5 @@ export default function ProphylaxisAlerts({ protocol, antiemetics }: Prophylaxis
     </div>
   );
 }
+
+export default memo(ProphylaxisAlerts);

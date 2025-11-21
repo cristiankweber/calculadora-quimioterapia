@@ -3,14 +3,14 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import type { Drug } from '@/types/calculator';
-import { useState } from 'react';
+import { useState, memo } from 'react';
 
 interface DrugsTableProps {
   drugs: Drug[];
   onDoseChange?: (index: number, newDose: number) => void;
 }
 
-export default function DrugsTable({ drugs, onDoseChange }: DrugsTableProps) {
+function DrugsTable({ drugs, onDoseChange }: DrugsTableProps) {
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [editValue, setEditValue] = useState<string>('');
 
@@ -145,3 +145,5 @@ export default function DrugsTable({ drugs, onDoseChange }: DrugsTableProps) {
     </Card>
   );
 }
+
+export default memo(DrugsTable);
