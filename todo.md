@@ -362,3 +362,10 @@
 - [x] Configurar job de lint/format
 - [x] Adicionar badges de status no README
 - [x] Testar pipeline completo
+
+### Ajuste de Dose Fixa para Daratumumabe
+- [x] Identificar todos os protocolos com Daratumumabe
+- [x] Modificar protocolos para usar dose fixa 1800mg SC
+- [x] Atualizar tipo Drug para suportar dose fixa
+- [x] Criar testes para validar dose fixa de Daratumumabe
+- [x] Testar todos os protocolos modificados
