@@ -3,6 +3,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { protocols } from '@/data/protocols';
 import type { Protocol } from '@/types/calculator';
+import { useMemo } from 'react';
 
 interface ProtocolSelectorProps {
   selectedProtocol: Protocol | null;
@@ -17,6 +18,9 @@ export default function ProtocolSelector({
   onProtocolChange,
   onCycleChange,
 }: ProtocolSelectorProps) {
+  // Memoizar lista de protocolos para evitar recriar objetos
+  const protocolList = useMemo(() => protocols, []);
+
   return (
     <Card>
       <CardHeader>
@@ -29,17 +33,24 @@ export default function ProtocolSelector({
         <div className="space-y-2">
           <Label htmlFor="protocol">Protocolo Quimioterápico</Label>
           <Select
-            value={selectedProtocol?.id || ''}
+            value={selectedProtocol ? selectedProtocol.id : undefined}
             onValueChange={(id) => {
-              const protocol = protocols.find((p) => p.id === id);
-              if (protocol) onProtocolChange(protocol);
+              console.log('[ProtocolSelector] onValueChange called', { id, currentId: selectedProtocol?.id });
+              const protocol = protocolList.find((p) => p.id === id);
+              // Só chamar onProtocolChange se o protocolo realmente mudou
+              if (protocol && protocol.id !== selectedProtocol?.id) {
+                console.log('[ProtocolSelector] Calling onProtocolChange - protocol changed');
+                onProtocolChange(protocol);
+              } else {
+                console.log('[ProtocolSelector] Skipping onProtocolChange - same protocol');
+              }
             }}
           >
             <SelectTrigger id="protocol">
               <SelectValue placeholder="Selecione um protocolo" />
             </SelectTrigger>
             <SelectContent>
-              {protocols.map((protocol) => (
+              {protocolList.map((protocol) => (
                 <SelectItem key={protocol.id} value={protocol.id}>
                   {protocol.name}
                 </SelectItem>

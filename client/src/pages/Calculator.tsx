@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback, lazy, Suspense } from 'react';
 import { useLocation } from 'wouter';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
@@ -8,21 +8,37 @@ import ProtocolSelector from '@/components/ProtocolSelector';
 import DrugsTable from '@/components/DrugsTable';
 import ProphylaxisAlerts from '@/components/ProphylaxisAlerts';
 import DilutionInfo from '@/components/DilutionInfo';
+import ToxicityAssessment from '@/components/ToxicityAssessment';
+import PatientHistoryDB from '@/components/PatientHistoryDB';
+
+// Lazy load PrintablePrescription para evitar travamento ao selecionar protocolo
+const PrintablePrescription = lazy(() => import('@/components/PrintablePrescrip tion'));
+
 import type { PatientData, Protocol, Drug, CalculatedValues } from '@/types/calculator';
+import type { ToxicityGrade } from '@/data/ctcae';
+
 import { calculatePatientValues, calculateDrugDose } from '@/lib/calculations';
 import { generateAntiemeticProphylaxis } from '@/lib/antiemetics';
-import { FileDown, Copy, Save, History, Printer, Settings as SettingsIcon } from 'lucide-react';
-import { generatePrescriptionPDF } from '@/lib/pdfGenerator';
-import { savePatientHistory } from '@/lib/patientHistory';
-import PatientHistoryDB from '@/components/PatientHistoryDB';
-import { trpc } from '@/lib/trpc';
-import ToxicityAssessment from '@/components/ToxicityAssessment';
-import type { ToxicityGrade } from '@/data/ctcae';
 import { getDoseAdjustmentFactor } from '@/data/ctcae';
-import PrintablePrescription from '@/components/PrintablePrescrip tion';
+import { generatePrescriptionPDF } from '@/lib/pdfGenerator';
+import { trpc } from '@/lib/trpc';
+
+import {
+  FileDown,
+  Copy,
+  Save,
+  Printer,
+  Settings as SettingsIcon
+} from 'lucide-react';
 
 export default function Calculator() {
+  const renderCount = useRef(0);
+  renderCount.current++;
+  console.log(`[Calculator] Component render #${renderCount.current}`);
+
   const [, setLocation] = useLocation();
+
+  /** ESTADO DO PACIENTE */
   const [patientData, setPatientData] = useState<PatientData>({
     name: '',
     age: 0,
@@ -35,73 +51,161 @@ export default function Calculator() {
     comorbidities: '',
   });
 
+  /** Atualização do paciente — MEMOIZADA */
+  const handlePatientChange = useCallback((newData: PatientData) => {
+    console.log('[Calculator] handlePatientChange called');
+
+    setPatientData(prev => {
+      let changed = false;
+      for (const key in newData) {
+        if (newData[key as keyof PatientData] !== prev[key as keyof PatientData]) {
+          console.log(
+            `[Calculator] PatientData field changed: ${key}: ${prev[key as keyof PatientData]} → ${newData[key as keyof PatientData]}`
+          );
+          changed = true;
+        }
+      }
+      return changed ? newData : prev;
+    });
+  }, []);
+
+  /** ESTADOS DA CALCULADORA */
   const [calculatedValues, setCalculatedValues] = useState<CalculatedValues | null>(null);
   const [selectedProtocol, setSelectedProtocol] = useState<Protocol | null>(null);
   const [selectedCycle, setSelectedCycle] = useState<number>(1);
   const [calculatedDrugs, setCalculatedDrugs] = useState<Drug[]>([]);
   const [toxicities, setToxicities] = useState<Record<string, ToxicityGrade>>({});
-    const [prescriptionId, setPrescriptionId] = useState<string>('');
-  
-  // Carregar configurações institucionais
+  const [prescriptionId, setPrescriptionId] = useState<string>('');
+  const [showPrint, setShowPrint] = useState(false);
+
+  /** CONFIGURAÇÕES */
   const { data: institutionSettings } = trpc.settings.get.useQuery();
 
-  // Recalcular valores quando dados do paciente mudarem
+  /** Memo toxicidade */
+  const toxicityFactor = useMemo(() => {
+    const factor = getDoseAdjustmentFactor(toxicities);
+    console.log('[Calculator] toxicityFactor recalculated:', factor);
+    return factor;
+  }, [JSON.stringify(toxicities)]);
+
+  /** REFS PARA EVITAR RE-CÁLCULOS INDESEJADOS */
+  const lastCalculatedValuesRef = useRef('');
+  const lastCalculatedDrugsRef = useRef('');
+
+  /** EFFECT 1 — CALCULAR BSA/EGRF SOMENTE QUANDO CAMPOS CENTRAIS MUDAM */
   useEffect(() => {
+    const core = {
+      age: patientData.age,
+      sex: patientData.sex,
+      weight: patientData.weight,
+      height: patientData.height,
+      creatinine: patientData.creatinine
+    };
+
+    console.log('[Calculator] useEffect 1 (patientData core fields) triggered', core);
+
     if (
-      patientData.weight > 0 &&
-      patientData.height > 0 &&
-      patientData.creatinine > 0 &&
-      patientData.age > 0
+      core.age > 0 &&
+      core.weight > 0 &&
+      core.height > 0 &&
+      core.creatinine > 0
     ) {
       const values = calculatePatientValues(patientData);
-      setCalculatedValues(values);
-    }
-  }, [patientData]);
+      const serialized = JSON.stringify(values);
 
-  // Recalcular doses quando protocolo, valores calculados ou toxicidades mudarem
-  useEffect(() => {
-    if (selectedProtocol && calculatedValues) {
-      // Calcular fator de ajuste por toxicidade
-      const toxicityFactor = getDoseAdjustmentFactor(toxicities);
-
-      const drugsWithCalculatedDoses = selectedProtocol.drugs.map((drug) => {
-        const baseDose = calculateDrugDose(
-          drug.dose,
-          drug.doseUnit,
-          calculatedValues.bsa,
-          patientData.weight,
-          calculatedValues.globalAdjustmentFactor,
-          drug.maxDose,
-          calculatedValues.egfr
-        );
-        // Aplicar ajuste de toxicidade
-        const finalDose = baseDose * toxicityFactor;
-        return {
-          ...drug,
-          calculatedDose: finalDose,
-        };
-      });
-      setCalculatedDrugs(drugsWithCalculatedDoses);
+      if (serialized !== lastCalculatedValuesRef.current) {
+        console.log('[Calculator] Updating calculatedValues - values changed');
+        lastCalculatedValuesRef.current = serialized;
+        setCalculatedValues(values);
+      }
     } else {
-      setCalculatedDrugs([]);
+      console.log('[Calculator] Missing data to calculate values, clearing calculatedValues');
+      setCalculatedValues(null);
+      lastCalculatedValuesRef.current = '';
     }
-  }, [selectedProtocol, calculatedValues, patientData.weight, toxicities]);
+  }, [
+    patientData.age,
+    patientData.sex,
+    patientData.weight,
+    patientData.height,
+    patientData.creatinine,
+  ]);
 
+  /** Memo antieméticos */
+  const antiemetics = useMemo(() => {
+    if (!selectedProtocol) return null;
+    return generateAntiemeticProphylaxis(selectedProtocol.emetogenicRisk);
+  }, [selectedProtocol?.emetogenicRisk]);
+
+  /** EFFECT 2 — CALCULAR DOSES QUANDO O NECESSÁRIO */
+  useEffect(() => {
+    console.log('[Calculator] useEffect 2 (drugs) triggered', {
+      protocolId: selectedProtocol?.id,
+      hasBSA: !!calculatedValues?.bsa,
+      toxicityFactor
+    });
+
+    if (!selectedProtocol || !calculatedValues) {
+      if (lastCalculatedDrugsRef.current !== '') {
+        lastCalculatedDrugsRef.current = '';
+        setCalculatedDrugs([]);
+      }
+      return;
+    }
+
+    const drugs = selectedProtocol.drugs.map(drug => {
+      const baseDose = calculateDrugDose(
+        drug.dose,
+        drug.doseUnit,
+        calculatedValues.bsa,
+        patientData.weight,
+        calculatedValues.globalAdjustmentFactor,
+        drug.maxDose,
+        calculatedValues.egfr
+      );
+
+      return {
+        ...drug,
+        calculatedDose: baseDose * toxicityFactor
+      };
+    });
+
+    const serialized = JSON.stringify(drugs);
+    if (serialized !== lastCalculatedDrugsRef.current) {
+      console.log('[Calculator] Updating calculatedDrugs - values changed');
+      lastCalculatedDrugsRef.current = serialized;
+      setCalculatedDrugs(drugs);
+    }
+  }, [
+    selectedProtocol?.id,
+    calculatedValues?.bsa,
+    calculatedValues?.egfr,
+    calculatedValues?.globalAdjustmentFactor,
+    toxicityFactor
+  ]);
+
+  /** AJUSTE MANUAL DE DOSE */
   const handleDoseChange = (index: number, newDose: number) => {
-    const updatedDrugs = [...calculatedDrugs];
-    updatedDrugs[index] = { ...updatedDrugs[index], calculatedDose: newDose };
-    setCalculatedDrugs(updatedDrugs);
-    toast.success(`Dose de ${updatedDrugs[index].name} ajustada para ${newDose.toFixed(1)} mg`);
+    setCalculatedDrugs(prev => {
+      const clone = [...prev];
+      clone[index] = { ...clone[index], calculatedDose: newDose };
+      toast.success(`Dose ajustada: ${clone[index].name} → ${newDose.toFixed(1)} mg`);
+      return clone;
+    });
   };
 
+  /** IMPRESSÃO — carrega PrintablePrescription somente aqui */
   const handlePrint = () => {
     if (!selectedProtocol || !calculatedValues) {
       toast.error('Preencha todos os dados antes de imprimir');
       return;
     }
-    window.print();
+
+    setShowPrint(true);
+    setTimeout(() => window.print(), 80);
   };
 
+  /** EXPORTAR PDF */
   const handleExportPDF = async () => {
     if (!selectedProtocol || !calculatedValues) {
       toast.error('Preencha todos os dados antes de exportar o PDF');
@@ -117,15 +221,17 @@ export default function Calculator() {
         drugs: calculatedDrugs,
         antiemetics: antiemetics!,
       });
-      toast.success('PDF gerado com sucesso! Use Ctrl+P ou Cmd+P para salvar.');
+
+      toast.success('PDF gerado com sucesso!');
     } catch (error) {
-      console.error('Erro ao gerar PDF:', error);
-      toast.error('Erro ao gerar PDF. Tente novamente.');
+      console.error(error);
+      toast.error('Erro ao gerar PDF.');
     }
   };
 
-  const savePrescriptionMutation = trpc.prescriptions.create.useMutation();
+  /** SALVAR */
   const createPatientMutation = trpc.patients.create.useMutation();
+  const savePrescriptionMutation = trpc.prescriptions.create.useMutation();
 
   const handleSaveToHistory = async () => {
     if (!selectedProtocol || !calculatedValues || !patientData.name) {
@@ -134,8 +240,7 @@ export default function Calculator() {
     }
 
     try {
-      // Primeiro, garantir que o paciente existe no banco
-      const patientResponse = await createPatientMutation.mutateAsync({
+      const patient = await createPatientMutation.mutateAsync({
         name: patientData.name,
         age: patientData.age,
         sex: patientData.sex,
@@ -147,141 +252,102 @@ export default function Calculator() {
         comorbidities: patientData.comorbidities || undefined,
       });
 
-      // Preparar dados completos da prescrição
-      const prescriptionData = {
-        patientData,
-        protocol: selectedProtocol,
-        cycle: selectedCycle,
-        calculatedValues,
-        calculatedDrugs,
-        antiemetics,
-        toxicities,
-        adjustmentFactor: getDoseAdjustmentFactor(toxicities),
-      };
-
-      // Salvar prescrição no banco
       const prescription = await savePrescriptionMutation.mutateAsync({
-        patientId: patientResponse.id,
+        patientId: patient.id,
         patientName: patientData.name,
         protocolName: selectedProtocol.name,
         cycle: selectedCycle,
         bsa: calculatedValues.bsa,
         egfr: calculatedValues.egfr,
         renalStatus: calculatedValues.renalStatus,
-        prescriptionData,
+        prescriptionData: {
+          patientData,
+          protocol: selectedProtocol,
+          cycle: selectedCycle,
+          calculatedValues,
+          calculatedDrugs,
+          antiemetics,
+          toxicities,
+          adjustmentFactor: getDoseAdjustmentFactor(toxicities)
+        },
       });
-      
+
       setPrescriptionId(prescription.prescriptionId);
       toast.success(`Prescrição salva! ID: ${prescription.prescriptionId}`);
-    } catch (error) {
-      console.error('Erro ao salvar:', error);
-      toast.error('Erro ao salvar prescrição');
+    } catch (err) {
+      console.error(err);
+      toast.error('Erro ao salvar.');
     }
   };
 
+  /** COPY PRESCRIPTION (texto) */
   const handleCopyPrescription = () => {
     if (!selectedProtocol || !calculatedValues) {
-      toast.error('Preencha todos os dados antes de copiar a prescrição');
+      toast.error('Preencha todos os dados antes de copiar');
       return;
     }
 
-    let prescription = `PRESCRIÇÃO DE QUIMIOTERAPIA\n\n`;
-    prescription += `Paciente: ${patientData.name}\n`;
-    prescription += `Idade: ${patientData.age} anos | Sexo: ${patientData.sex === 'M' ? 'Masculino' : 'Feminino'}\n`;
-    prescription += `Peso: ${patientData.weight} kg | Altura: ${patientData.height} cm\n`;
-    prescription += `SC: ${calculatedValues.bsa.toFixed(2)} m² | eGFR: ${calculatedValues.egfr.toFixed(1)} mL/min\n`;
-    prescription += `ECOG: ${patientData.ecog}\n\n`;
+    let text = `PRESCRIÇÃO DE QUIMIOTERAPIA\n\n`;
+    text += `Paciente: ${patientData.name}\n`;
+    text += `Idade: ${patientData.age} anos | Sexo: ${patientData.sex}\n`;
+    text += `Peso: ${patientData.weight} kg | Altura: ${patientData.height} cm\n`;
+    text += `SC: ${calculatedValues.bsa.toFixed(2)} m² | eGFR: ${calculatedValues.egfr.toFixed(1)}\n\n`;
 
-    prescription += `PROTOCOLO: ${selectedProtocol.name} - Ciclo ${selectedCycle}\n`;
-    prescription += `Indicação: ${selectedProtocol.indication}\n\n`;
+    text += `PROTOCOLO: ${selectedProtocol.name}\nCiclo: ${selectedCycle}/${selectedProtocol.cycles}\n`;
+    text += `Indicação: ${selectedProtocol.indication}\n\n`;
 
-    prescription += `DROGAS:\n`;
-    calculatedDrugs.forEach((drug) => {
-      prescription += `• ${drug.name}: ${(drug.calculatedDose || 0).toFixed(1)} mg ${drug.route} - Dias ${drug.days}\n`;
-      if (drug.observations) {
-        prescription += `  Obs: ${drug.observations}\n`;
-      }
+    text += `DROGAS:\n`;
+    calculatedDrugs.forEach(d => {
+      text += `• ${d.name}: ${d.calculatedDose?.toFixed(1)} mg ${d.route} (Dias ${d.days})\n`;
     });
 
-    prescription += `\nPROFILAXIAS:\n`;
-    selectedProtocol.prophylaxis.forEach((p) => {
-      prescription += `• ${p}\n`;
-    });
-
-    const antiemetics = generateAntiemeticProphylaxis(selectedProtocol.emetogenicRisk);
-    prescription += `\nANTIEMÉTICOS (Risco ${antiemetics.risk}):\n`;
-    prescription += `Dia 1:\n`;
-    antiemetics.day1.forEach((a) => {
-      prescription += `• ${a}\n`;
-    });
-
-    prescription += `\nCUIDADOS DE ENFERMAGEM:\n`;
-    selectedProtocol.nursingCare.forEach((c) => {
-      prescription += `• ${c}\n`;
-    });
-
-    if (selectedProtocol.specialAlerts.length > 0) {
-      prescription += `\n⚠️ ALERTAS ESPECIAIS:\n`;
-      selectedProtocol.specialAlerts.forEach((a) => {
-        prescription += `• ${a}\n`;
-      });
-    }
-
-    navigator.clipboard.writeText(prescription);
-    toast.success('Prescrição copiada para a área de transferência!');
+    navigator.clipboard.writeText(text);
+    toast.success('Prescrição copiada!');
   };
-
-  const antiemetics = selectedProtocol
-    ? generateAntiemeticProphylaxis(selectedProtocol.emetogenicRisk)
-    : null;
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
+
+      {/** HEADER */}
       <header className="border-b bg-card">
         <div className="container py-6">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div className="flex justify-between items-center">
             <div>
-              <h1 className="text-3xl font-bold text-foreground">
-                Calculadora de Prescrição Quimioterápica
-              </h1>
-              <p className="text-muted-foreground mt-1">
-                Hematologia e Oncologia - Cálculos automáticos de dose e profilaxias
+              <h1 className="text-3xl font-bold">Calculadora de Prescrição Quimioterápica</h1>
+              <p className="text-muted-foreground">
+                Hematologia • Oncologia • Terapia Celular
               </p>
             </div>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex gap-2 flex-wrap">
               <PatientHistoryDB onLoadPatient={setPatientData} />
               <Button variant="outline" onClick={handleSaveToHistory}>
-                <Save className="h-4 w-4 mr-2" />
-                Salvar no Histórico
+                <Save className="h-4 w-4 mr-2" /> Salvar
               </Button>
               <Button variant="outline" onClick={() => setLocation('/settings')}>
-                <SettingsIcon className="h-4 w-4 mr-2" />
-                Configurações
+                <SettingsIcon className="h-4 w-4 mr-2" /> Configurações
               </Button>
               <Button variant="outline" onClick={handlePrint}>
-                <Printer className="h-4 w-4 mr-2" />
-                Imprimir
+                <Printer className="h-4 w-4 mr-2" /> Imprimir
               </Button>
               <Button variant="outline" onClick={handleExportPDF}>
-                <FileDown className="h-4 w-4 mr-2" />
-                Exportar PDF
+                <FileDown className="h-4 w-4 mr-2" /> PDF
               </Button>
               <Button onClick={handleCopyPrescription}>
-                <Copy className="h-4 w-4 mr-2" />
-                Copiar Prescrição
+                <Copy className="h-4 w-4 mr-2" /> Copiar
               </Button>
             </div>
           </div>
         </div>
       </header>
 
-      {/* Main Content */}
+      {/** MAIN */}
       <main className="container py-8">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Coluna Esquerda - Entrada de Dados */}
-          <div className="lg:col-span-1 space-y-6">
-            <PatientForm data={patientData} onChange={setPatientData} />
+
+          {/** COLUNA 1 */}
+          <div className="space-y-6 lg:col-span-1">
+            <PatientForm data={patientData} onChange={handlePatientChange} />
+
             <ProtocolSelector
               selectedProtocol={selectedProtocol}
               selectedCycle={selectedCycle}
@@ -290,42 +356,46 @@ export default function Calculator() {
             />
           </div>
 
-          {/* Coluna Direita - Resultados */}
-          <div className="lg:col-span-2 space-y-6">
-            {calculatedValues && <CalculatedValuesDisplay values={calculatedValues} />}
+          {/** COLUNA 2 - RESULTADOS */}
+          <div className="space-y-6 lg:col-span-2">
+            {calculatedValues && (
+              <CalculatedValuesDisplay values={calculatedValues} />
+            )}
+
             <DrugsTable drugs={calculatedDrugs} onDoseChange={handleDoseChange} />
+
             <ProphylaxisAlerts protocol={selectedProtocol} antiemetics={antiemetics} />
+
             <DilutionInfo drugs={calculatedDrugs} />
 
-            {/* Avaliação de Toxicidade */}
             <ToxicityAssessment
               toxicities={toxicities}
-              onToxicityChange={(toxicity, grade) => {
-                setToxicities((prev) => ({
-                  ...prev,
-                  [toxicity]: grade,
-                }));
-              }}
+              onToxicityChange={(tox, grade) =>
+                setToxicities(prev => ({ ...prev, [tox]: grade }))
+              }
             />
           </div>
+
         </div>
       </main>
 
-      {/* Versão para Impressão */}
-      {selectedProtocol && calculatedValues && antiemetics && (
-        <PrintablePrescription
-          patient={patientData}
-          calculatedValues={calculatedValues}
-          protocol={selectedProtocol}
-          cycle={selectedCycle}
-          drugs={calculatedDrugs}
-          antiemetics={antiemetics}
-          prescriptionId={prescriptionId}
-          institutionName={institutionSettings?.institutionName || undefined}
-          institutionLogo={institutionSettings?.institutionLogo || undefined}
-          prescriberName={institutionSettings?.prescriberName || undefined}
-          prescriberCRM={institutionSettings?.prescriberCRM || undefined}
-        />
+      {/** IMPRESSÃO — SOMENTE QUANDO NECESSÁRIO */}
+      {showPrint && selectedProtocol && calculatedValues && antiemetics && (
+        <Suspense fallback={<div className="print:hidden">Preparando impressão...</div>}>
+          <PrintablePrescription
+            patient={patientData}
+            calculatedValues={calculatedValues}
+            protocol={selectedProtocol}
+            cycle={selectedCycle}
+            drugs={calculatedDrugs}
+            antiemetics={antiemetics}
+            prescriptionId={prescriptionId}
+            institutionName={institutionSettings?.institutionName ?? undefined}
+            institutionLogo={institutionSettings?.institutionLogo ?? undefined}
+            prescriberName={institutionSettings?.prescriberName ?? undefined}
+            prescriberCRM={institutionSettings?.prescriberCRM ?? undefined}
+          />
+        </Suspense>
       )}
     </div>
   );

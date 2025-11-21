@@ -10,7 +10,10 @@ interface PatientFormProps {
 }
 
 export default function PatientForm({ data, onChange }: PatientFormProps) {
+  console.log('[PatientForm] Render with data:', data);
+  
   const handleChange = (field: keyof PatientData, value: string | number) => {
+    console.log(`[PatientForm] handleChange called: ${String(field)} =`, value);
     onChange({ ...data, [field]: value });
   };
 

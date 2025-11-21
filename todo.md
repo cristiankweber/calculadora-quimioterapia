@@ -260,3 +260,28 @@
 - [x] Adicionar botão de impressão visível
 - [x] Testar geração de QR code
 - [x] Validar layout de impressão A4
+
+
+### Correção de Travamento de Protocolos
+- [x] Identificar causa raiz: useEffect com selectedProtocol (objeto) causando loop infinito
+- [x] Aplicar correção cirúrgica: usar selectedProtocol?.id (string) nas dependências do useEffect
+- [x] Problema persiste: HiDAC ainda trava - investigar outras dependências instáveis (calculatedValues, toxicities)
+- [x] Aplicar correção completa: estabilizar TODAS as dependências usando valores primitivos
+- [x] CAUSA RAIZ REAL IDENTIFICADA: ProtocolSelector usando value="" (string vazia) no ShadUI Select
+- [x] Aplicar correção definitiva no ProtocolSelector:
+  - Usar value={selectedProtocol ? selectedProtocol.id : undefined}
+  - Adicionar proteção: if (protocol && protocol.id !== selectedProtocol?.id)
+  - Memoizar lista de protocolos com useMemo
+- [x] Problema AINDA persiste após todas as correções - adicionar logs de debug detalhados
+- [x] LOOP IDENTIFICADO NOS LOGS: Component render START + useEffect 1 em loop infinito
+- [x] CAUSA RAIZ FINAL: PrintablePrescription sendo renderizado inteiro ao selecionar protocolo (componente pesado)
+- [ ] Implementar React.lazy para PrintablePrescription
+- [ ] Renderizar PrintablePrescription apenas quando usuário clicar em Imprimir (useState)
+- [ ] Testar seleção de todos os protocolos (deve ser instantânea)
+- [ ] Validar funcionalidade de impressão
+
+
+### Correção de Travamento em Produção
+- [x] Adicionar meta tag `<meta name="manus-ignore" content="true">` no index.html
+- [ ] Salvar checkpoint
+- [ ] Republicar aplicação para aplicar correção
