@@ -369,3 +369,13 @@
 - [x] Atualizar tipo Drug para suportar dose fixa
 - [x] Criar testes para validar dose fixa de Daratumumabe
 - [x] Testar todos os protocolos modificados
+
+### Modo Emergência
+- [x] Criar estrutura de dados para protocolos de emergência
+- [x] Implementar protocolo de Síndrome de Lise Tumoral (diagnóstico e manejo)
+- [x] Implementar protocolo de LMA Hiperleucocitária
+- [x] Implementar protocolo de Mieloma com Insuficiência Renal
+- [x] Implementar protocolo de Neutropenia Febril
+- [x] Criar componente EmergencyModal com abas por situação
+- [x] Adicionar botão 🚨 Emergência no cabeçalho
+- [x] Testar acesso rápido a todos os protocolos de emergência

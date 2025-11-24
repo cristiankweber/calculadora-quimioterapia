@@ -10,6 +10,7 @@ import ProphylaxisAlerts from '@/components/ProphylaxisAlerts';
 import DilutionInfo from '@/components/DilutionInfo';
 import ToxicityAssessment from '@/components/ToxicityAssessment';
 import PatientHistoryDB from '@/components/PatientHistoryDB';
+import EmergencyModal from '@/components/EmergencyModal';
 
 // Lazy load PrintablePrescription para evitar travamento ao selecionar protocolo
 const PrintablePrescription = lazy(() => import('@/components/PrintablePrescription'));
@@ -29,7 +30,8 @@ import {
   Save,
   Printer,
   Settings as SettingsIcon,
-  BarChart3
+  BarChart3,
+  AlertCircle
 } from 'lucide-react';
 
 export default function Calculator() {
@@ -70,6 +72,7 @@ export default function Calculator() {
   const [toxicities, setToxicities] = useState<Record<string, ToxicityGrade>>({});
   const [prescriptionId, setPrescriptionId] = useState<string>('');
   const [showPrint, setShowPrint] = useState(false);
+  const [showEmergency, setShowEmergency] = useState(false);
 
   /** CONFIGURAÇÕES */
   const { data: institutionSettings } = trpc.settings.get.useQuery();
@@ -299,6 +302,13 @@ export default function Calculator() {
               </p>
             </div>
             <div className="flex gap-2 flex-wrap">
+              <Button 
+                variant="destructive" 
+                onClick={() => setShowEmergency(true)}
+                className="bg-red-600 hover:bg-red-700 font-bold"
+              >
+                <AlertCircle className="h-4 w-4 mr-2" /> 🚨 EMERGÊNCIA
+              </Button>
               <PatientHistoryDB onLoadPatient={setPatientData} />
               <Button variant="outline" onClick={handleSaveToHistory}>
                 <Save className="h-4 w-4 mr-2" /> Salvar
@@ -380,6 +390,9 @@ export default function Calculator() {
           />
         </Suspense>
       )}
+
+      {/** MODAL DE EMERGÊNCIA */}
+      <EmergencyModal open={showEmergency} onOpenChange={setShowEmergency} />
     </div>
   );
 }
