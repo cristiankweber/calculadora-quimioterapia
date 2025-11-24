@@ -15,7 +15,7 @@ import type { PatientData } from '@/types/calculator';
 import { trpc } from '@/lib/trpc';
 
 interface PatientHistoryDBProps {
-  onLoadPatient: (patient: PatientData) => void;
+  onLoadPatient: (patient: PatientData, prescriptionData?: any) => void;
 }
 
 export default function PatientHistoryDB({ onLoadPatient }: PatientHistoryDBProps) {
@@ -41,22 +41,41 @@ export default function PatientHistoryDB({ onLoadPatient }: PatientHistoryDBProp
     p.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const handleLoadPatient = (patient: any) => {
+  const utils = trpc.useUtils();
+
+  const handleLoadPatient = async (patient: any) => {
+    // Converter valores do banco (inteiros * 100) para decimais
     const patientData: PatientData = {
       name: patient.name,
       age: patient.age,
       sex: patient.sex,
       weight: patient.weight,
       height: patient.height,
-      creatinine: patient.creatinine / 100, // Converter de int para decimal
-      bilirubin: patient.bilirubin / 100,
+      creatinine: Number((patient.creatinine / 100).toFixed(2)), // Garantir precisão
+      bilirubin: Number((patient.bilirubin / 100).toFixed(2)),
       ecog: patient.ecog,
       comorbidities: patient.comorbidities || '',
     };
 
-    onLoadPatient(patientData);
+    // Tentar buscar última prescrição
+    try {
+      const prescriptions = await utils.prescriptions.getByPatient.fetch({ patientId: patient.id });
+      const lastPrescription = prescriptions && prescriptions.length > 0 ? prescriptions[0] : null;
+      
+      onLoadPatient(patientData, lastPrescription?.prescriptionData);
+      
+      if (lastPrescription) {
+        toast.success(`Paciente ${patient.name} carregado com última prescrição (${lastPrescription.protocolName})`);
+      } else {
+        toast.success(`Paciente ${patient.name} carregado (sem prescrições anteriores)`);
+      }
+    } catch (error) {
+      // Se falhar ao buscar prescrição, carregar apenas dados do paciente
+      onLoadPatient(patientData);
+      toast.success(`Paciente ${patient.name} carregado`);
+    }
+    
     setOpen(false);
-    toast.success(`Paciente ${patient.name} carregado`);
   };
 
   const handleDeletePatient = (id: number, name: string) => {

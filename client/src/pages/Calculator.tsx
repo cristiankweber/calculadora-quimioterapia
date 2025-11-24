@@ -184,6 +184,11 @@ export default function Calculator() {
       return;
     }
 
+    // Avisar se configurações não estão preenchidas
+    if (!institutionSettings?.institutionName || !institutionSettings?.prescriberName) {
+      toast.warning('Configure os dados institucionais em Configurações para personalizar a impressão');
+    }
+
     setShowPrint(true);
     setTimeout(() => window.print(), 80);
   };
@@ -193,6 +198,11 @@ export default function Calculator() {
     if (!selectedProtocol || !calculatedValues) {
       toast.error('Preencha todos os dados antes de exportar o PDF');
       return;
+    }
+
+    // Avisar se configurações não estão preenchidas
+    if (!institutionSettings?.institutionName || !institutionSettings?.prescriberName) {
+      toast.warning('Configure os dados institucionais em Configurações para personalizar o PDF');
     }
 
     try {
@@ -309,7 +319,34 @@ export default function Calculator() {
               >
                 <AlertCircle className="h-4 w-4 mr-2" /> 🚨 EMERGÊNCIA
               </Button>
-              <PatientHistoryDB onLoadPatient={setPatientData} />
+              <PatientHistoryDB onLoadPatient={(patientData, prescriptionData) => {
+                // Usar dados do paciente já corrigidos (creatinina/bilirrubina divididos por 100)
+                setPatientData(patientData);
+                
+                // Se houver dados de prescrição, restaurar protocolo e doses
+                // IMPORTANTE: NÃO restaurar prescriptionData.patientData pois pode ter valores brutos
+                if (prescriptionData) {
+                  // Restaurar protocolo selecionado
+                  if (prescriptionData.protocol) {
+                    setSelectedProtocol(prescriptionData.protocol);
+                  }
+                  
+                  // Restaurar ciclo
+                  if (prescriptionData.cycle) {
+                    setSelectedCycle(prescriptionData.cycle);
+                  }
+                  
+                  // Restaurar drogas calculadas
+                  if (prescriptionData.calculatedDrugs) {
+                    setCalculatedDrugs(prescriptionData.calculatedDrugs);
+                  }
+                  
+                  // Restaurar toxicidades
+                  if (prescriptionData.toxicities) {
+                    setToxicities(prescriptionData.toxicities);
+                  }
+                }
+              }} />
               <Button variant="outline" onClick={handleSaveToHistory}>
                 <Save className="h-4 w-4 mr-2" /> Salvar
               </Button>

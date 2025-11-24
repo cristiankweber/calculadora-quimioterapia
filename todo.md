@@ -379,3 +379,11 @@
 - [x] Criar componente EmergencyModal com abas por situação
 - [x] Adicionar botão 🚨 Emergência no cabeçalho
 - [x] Testar acesso rápido a todos os protocolos de emergência
+
+### Correção de Bugs
+- [x] Investigar por que impressão não usa configurações salvas
+- [x] Corrigir carregamento de configurações institucionais na impressão/PDF
+- [x] Investigar por que histórico altera creatinina e bilirrubina
+- [x] Investigar por que histórico não restaura protocolo prescrito
+- [x] Corrigir restauração completa de dados do histórico de pacientes
+- [x] Testar fluxo completo: salvar → carregar do histórico → imprimir
