@@ -44,15 +44,15 @@ export default function PatientHistoryDB({ onLoadPatient }: PatientHistoryDBProp
   const utils = trpc.useUtils();
 
   const handleLoadPatient = async (patient: any) => {
-    // Converter valores do banco (inteiros * 100) para decimais
+    // Valores do banco já são decimais (DECIMAL no schema)
     const patientData: PatientData = {
       name: patient.name,
       age: patient.age,
       sex: patient.sex,
       weight: patient.weight,
       height: patient.height,
-      creatinine: Number((patient.creatinine / 100).toFixed(2)), // Garantir precisão
-      bilirubin: Number((patient.bilirubin / 100).toFixed(2)),
+      creatinine: Number(patient.creatinine), // Converter string para number
+      bilirubin: Number(patient.bilirubin),
       ecog: patient.ecog,
       comorbidities: patient.comorbidities || '',
     };

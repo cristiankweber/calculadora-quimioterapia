@@ -387,3 +387,17 @@
 - [x] Investigar por que histórico não restaura protocolo prescrito
 - [x] Corrigir restauração completa de dados do histórico de pacientes
 - [x] Testar fluxo completo: salvar → carregar do histórico → imprimir
+
+### Correção Crítica: Simplificar Armazenamento de Creatinina/Bilirrubina
+- [x] Modificar schema do banco: mudar creatinine e bilirubin de INT para DECIMAL(6,2)
+- [x] Remover multiplicação por 100 ao salvar paciente
+- [x] Remover divisão por 100 ao carregar paciente
+- [x] Atualizar PatientHistoryDB para usar valores diretos
+- [x] Testar salvamento e carregamento com valores reais
+
+### Correção: Institution Settings não sendo usado na impressão
+- [x] Investigar por que institution_settings não está sendo carregado
+- [x] Verificar se query está retornando dados
+- [ ] Verificar se PrintablePrescription está recebendo props corretas
+- [ ] Adicionar logs de debug para rastrear fluxo
+- [ ] Testar impressão com configurações preenchidas

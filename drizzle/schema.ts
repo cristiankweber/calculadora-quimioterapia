@@ -1,4 +1,4 @@
-import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, json } from "drizzle-orm/mysql-core";
+import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, json, decimal } from "drizzle-orm/mysql-core";
 
 /**
  * Core user table backing auth flow.
@@ -37,8 +37,8 @@ export const patients = mysqlTable("patients", {
   sex: mysqlEnum("sex", ["M", "F"]).notNull(),
   weight: int("weight").notNull(), // kg
   height: int("height").notNull(), // cm
-  creatinine: int("creatinine").notNull(), // mg/dL * 100 (armazenado como int para evitar problemas de precisão)
-  bilirubin: int("bilirubin").notNull(), // mg/dL * 100
+  creatinine: decimal("creatinine", { precision: 6, scale: 2 }).notNull(), // mg/dL (valor real, ex: 1.20)
+  bilirubin: decimal("bilirubin", { precision: 6, scale: 2 }).notNull(), // mg/dL (valor real, ex: 0.80)
   ecog: int("ecog").notNull(), // 0-4
   comorbidities: text("comorbidities"),
   // Doses cumulativas de antraciclinas (mg/m²)

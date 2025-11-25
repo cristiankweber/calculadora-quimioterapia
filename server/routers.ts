@@ -51,8 +51,9 @@ export const appRouter = router({
         const patientData = {
           ...input,
           userId: ctx.user.id,
-          creatinine: Math.round(input.creatinine * 100),
-          bilirubin: Math.round(input.bilirubin * 100),
+          // Drizzle DECIMAL requer string
+          creatinine: input.creatinine.toFixed(2),
+          bilirubin: input.bilirubin.toFixed(2),
         };
         return await db.createPatient(patientData);
       }),
@@ -77,11 +78,12 @@ export const appRouter = router({
       .mutation(async ({ input }) => {
         const { id, ...data } = input;
         const updateData: any = { ...data };
+        // Converter para string (Drizzle DECIMAL requirement)
         if (data.creatinine !== undefined) {
-          updateData.creatinine = Math.round(data.creatinine * 100);
+          updateData.creatinine = data.creatinine.toFixed(2);
         }
         if (data.bilirubin !== undefined) {
-          updateData.bilirubin = Math.round(data.bilirubin * 100);
+          updateData.bilirubin = data.bilirubin.toFixed(2);
         }
         await db.updatePatient(id, updateData);
         return { success: true };
