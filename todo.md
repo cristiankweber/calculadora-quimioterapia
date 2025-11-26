@@ -431,3 +431,7 @@
 - [x] Adicionar métricas de performance do modelo
 - [x] Criar testes para modelo de ML
 - [x] Integrar predição no fluxo principal da calculadora
+
+### Correção de Bug: WebSocket Vite HMR
+- [x] Corrigir configuração do Vite para WebSocket funcionar com domínio proxy
+- [x] Testar Hot Module Replacement após correção
