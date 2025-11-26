@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -13,6 +13,7 @@ import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import type { PatientData } from '@/types/calculator';
 import { trpc } from '@/lib/trpc';
+import PatientHistorySkeleton from '@/components/PatientHistorySkeleton';
 
 interface PatientHistoryDBProps {
   onLoadPatient: (patient: PatientData, prescriptionData?: any) => void;
@@ -21,9 +22,11 @@ interface PatientHistoryDBProps {
 export default function PatientHistoryDB({ onLoadPatient }: PatientHistoryDBProps) {
   const [open, setOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 10;
 
   // Buscar pacientes do banco de dados
-  const { data: patients = [], refetch } = trpc.patients.list.useQuery(undefined, {
+  const { data: patients = [], refetch, isLoading } = trpc.patients.list.useQuery(undefined, {
     enabled: open, // Só busca quando o dialog está aberto
   });
 
@@ -40,6 +43,17 @@ export default function PatientHistoryDB({ onLoadPatient }: PatientHistoryDBProp
   const filteredPatients = patients.filter((p) =>
     p.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  // Paginação
+  const totalPages = Math.ceil(filteredPatients.length / ITEMS_PER_PAGE);
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+  const endIndex = startIndex + ITEMS_PER_PAGE;
+  const paginatedPatients = filteredPatients.slice(startIndex, endIndex);
+
+  // Reset page when search changes
+  React.useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
 
   const utils = trpc.useUtils();
 
@@ -125,15 +139,18 @@ export default function PatientHistoryDB({ onLoadPatient }: PatientHistoryDBProp
             />
           </div>
 
-          {filteredPatients.length === 0 ? (
+          {isLoading ? (
+            <PatientHistorySkeleton />
+          ) : filteredPatients.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               {searchTerm
                 ? 'Nenhum paciente encontrado com esse nome'
                 : 'Nenhum paciente salvo no histórico'}
             </div>
           ) : (
-            <div className="space-y-2">
-              {filteredPatients.map((patient) => (
+            <>
+              <div className="space-y-2">
+                {paginatedPatients.map((patient) => (
                 <div
                   key={patient.id}
                   className="flex items-center justify-between p-4 border rounded-lg hover:bg-accent/50 transition-colors"
@@ -166,7 +183,35 @@ export default function PatientHistoryDB({ onLoadPatient }: PatientHistoryDBProp
                   </div>
                 </div>
               ))}
-            </div>
+              </div>
+
+              {/* Controles de paginação */}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between pt-4 border-t">
+                  <div className="text-sm text-muted-foreground">
+                    Página {currentPage} de {totalPages} ({filteredPatients.length} pacientes)
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                      disabled={currentPage === 1}
+                    >
+                      Anterior
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                      disabled={currentPage === totalPages}
+                    >
+                      Próxima
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </div>
       </DialogContent>

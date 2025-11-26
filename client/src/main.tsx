@@ -6,7 +6,11 @@ import { createRoot } from "react-dom/client";
 import superjson from "superjson";
 import App from "./App";
 import { getLoginUrl } from "./const";
+import { registerServiceWorker } from "./registerSW";
 import "./index.css";
+
+// Registrar service worker para cache offline
+registerServiceWorker();
 
 const queryClient = new QueryClient();
 

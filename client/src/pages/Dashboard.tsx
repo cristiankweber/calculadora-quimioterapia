@@ -4,6 +4,7 @@ import { BarChart } from "@/components/BarChart";
 import { PieChart } from "@/components/PieChart";
 import { LineChart } from "@/components/LineChart";
 import { StatCard } from "@/components/StatCard";
+import DashboardSkeleton from "@/components/DashboardSkeleton";
 import { Activity, FileText, Users, Pill } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useLocation } from "wouter";
@@ -30,6 +31,12 @@ export default function Dashboard() {
     "#14b8a6", // teal
     "#a855f7", // purple
   ];
+
+  // Mostrar skeleton enquanto carrega
+  const isLoading = overviewLoading || topProtocolsLoading || byIndicationLoading || trendsLoading;
+  if (isLoading) {
+    return <DashboardSkeleton />;
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">

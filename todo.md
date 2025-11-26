@@ -401,3 +401,17 @@
 - [ ] Verificar se PrintablePrescription está recebendo props corretas
 - [ ] Adicionar logs de debug para rastrear fluxo
 - [ ] Testar impressão com configurações preenchidas
+
+### Otimização de Performance
+- [x] Analisar bundle size atual
+- [x] Implementar skeleton loading para Dashboard
+- [x] Implementar skeleton loading para Histórico de Pacientes
+- [x] Implementar skeleton loading para tabela de doses calculadas
+- [x] Implementar paginação no histórico de pacientes (10 por página)
+- [x] Otimizar imports (tree-shaking)
+- [x] Implementar code splitting adicional (Settings, Dashboard)
+- [x] Implementar service worker para cache offline
+- [x] Configurar cache de assets estáticos
+- [x] Configurar cache de APIs (stale-while-revalidate)
+- [x] Testar funcionamento offline
+- [x] Validar bundle size final (255KB gzip - aceitável)
