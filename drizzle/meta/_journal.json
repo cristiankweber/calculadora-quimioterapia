@@ -43,6 +43,13 @@
       "when": 1763954227795,
       "tag": "0005_same_groot",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "5",
+      "when": 1764193124314,
+      "tag": "0006_lethal_swordsman",
+      "breakpoints": true
     }
   ]
 }

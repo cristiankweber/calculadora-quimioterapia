@@ -448,3 +448,18 @@
 - [x] Aplicar normalização no PatientHistoryDB ao carregar pacientes
 - [x] Testar com dados legados (valores > 20 são divididos por 100)
 - [x] Validar que valores novos (< 20) não são afetados
+
+### Correção de Arquitetura: Padronização DECIMAL
+- [ ] Alterar schema de prescriptions: bsa e egfr para DECIMAL(6,2)
+- [ ] Remover multiplicações no routes.ts (bsa * 10000, egfr * 100)
+- [ ] Verificar imports incorretos de servidor no Frontend (calculator.tsx)
+- [ ] Garantir conversão Number() em todos os pontos de leitura DECIMAL
+- [ ] Testar salvamento e carregamento de prescrições
+
+### Correção de Arquitetura: BSA/eGFR e Imports
+- [x] Corrigir schema de prescriptions: BSA e eGFR para DECIMAL(6,2)
+- [x] Migrar dados legados (BSA ÷ 10000, eGFR ÷ 100)
+- [x] Remover multiplicações no routes.ts ao salvar prescrições
+- [x] Verificar imports incorretos de servidor no Frontend (nenhum encontrado)
+- [x] Garantir conversão DECIMAL→Number em todos os pontos de leitura
+- [x] Testar fluxo completo de salvamento e carregamento

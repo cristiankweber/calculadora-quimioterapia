@@ -1,0 +1,9 @@
+{
+  "query": "ALTER TABLE prescriptions CHANGE COLUMN bsa_new bsa DECIMAL(6,2) NOT NULL, CHANGE COLUMN egfr_new egfr DECIMAL(6,2) NOT NULL",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4m4AkPjJWYg27Fa.d556ac6be38d --database 8PZyG2h8ofbVu5oCJdRJFb --execute ALTER TABLE prescriptions CHANGE COLUMN bsa_new bsa DECIMAL(6,2) NOT NULL, CHANGE COLUMN egfr_new egfr DECIMAL(6,2) NOT NULL",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 427
+}

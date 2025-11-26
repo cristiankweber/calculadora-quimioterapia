@@ -66,8 +66,8 @@ export const prescriptions = mysqlTable("prescriptions", {
   protocolName: varchar("protocolName", { length: 255 }).notNull(),
   cycle: int("cycle").notNull(),
   // Valores calculados
-  bsa: int("bsa").notNull(), // m² * 10000
-  egfr: int("egfr").notNull(), // mL/min/1.73m² * 100
+  bsa: decimal("bsa", { precision: 6, scale: 2 }).notNull(), // m² (ex: 1.85)
+  egfr: decimal("egfr", { precision: 6, scale: 2 }).notNull(), // mL/min/1.73m² (ex: 60.00)
   renalStatus: varchar("renalStatus", { length: 20 }).notNull(),
   // Dados completos em JSON
   prescriptionData: json("prescriptionData").notNull(), // Todos os dados da prescrição

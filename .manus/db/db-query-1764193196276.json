@@ -1,0 +1,15 @@
+{
+  "query": "SELECT id, bsa, egfr FROM prescriptions LIMIT 5",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4m4AkPjJWYg27Fa.d556ac6be38d --database 8PZyG2h8ofbVu5oCJdRJFb --execute SELECT id, bsa, egfr FROM prescriptions LIMIT 5",
+  "rows": [
+    {
+      "id": "120001",
+      "bsa": "18600",
+      "egfr": "7650"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tbsa\tegfr\n120001\t18600\t7650\n",
+  "stderr": "",
+  "execution_time_ms": 60
+}

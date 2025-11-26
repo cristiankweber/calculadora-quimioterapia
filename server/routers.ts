@@ -146,8 +146,8 @@ export const appRouter = router({
           patientName: input.patientName,
           protocolName: input.protocolName,
           cycle: input.cycle,
-          bsa: Math.round(input.bsa * 10000),
-          egfr: Math.round(input.egfr * 100),
+          bsa: input.bsa.toFixed(2), // DECIMAL requer string
+          egfr: input.egfr.toFixed(2),
           renalStatus: input.renalStatus,
           prescriptionData: input.prescriptionData,
         };
