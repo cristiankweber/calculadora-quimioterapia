@@ -433,5 +433,6 @@
 - [x] Integrar predição no fluxo principal da calculadora
 
 ### Correção de Bug: WebSocket Vite HMR
-- [x] Simplificar configuração HMR (remover host/port específicos, manter apenas clientPort)
-- [x] Validar WebSocket após simplificação
+- [x] Desabilitar WebSocket HMR (não funciona com proxy HTTPS)
+- [x] Configurar fallback para polling (hmr: false)
+- [x] Validar hot reload após mudança
