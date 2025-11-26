@@ -37,10 +37,7 @@ export default defineConfig({
       "127.0.0.1",
     ],
     hmr: {
-      host: '3000-i14958hefa4356afxui52-97156c8a.manusvm.computer',
-      port: 3000,
       clientPort: 443,
-      protocol: 'wss',
     },
     fs: {
       strict: true,

@@ -433,5 +433,5 @@
 - [x] Integrar predição no fluxo principal da calculadora
 
 ### Correção de Bug: WebSocket Vite HMR
-- [x] Ajustar porta HMR para 3000 (servidor real) em vez de 5173 (Vite padrão)
-- [x] Validar conexão WebSocket após ajuste de porta
+- [x] Simplificar configuração HMR (remover host/port específicos, manter apenas clientPort)
+- [x] Validar WebSocket após simplificação
