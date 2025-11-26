@@ -14,6 +14,7 @@ import { toast } from 'sonner';
 import type { PatientData } from '@/types/calculator';
 import { trpc } from '@/lib/trpc';
 import PatientHistorySkeleton from '@/components/PatientHistorySkeleton';
+import { normalizeLabValue } from '@/lib/normalizeLabValue';
 
 interface PatientHistoryDBProps {
   onLoadPatient: (patient: PatientData, prescriptionData?: any) => void;
@@ -65,8 +66,8 @@ export default function PatientHistoryDB({ onLoadPatient }: PatientHistoryDBProp
       sex: patient.sex,
       weight: patient.weight,
       height: patient.height,
-      creatinine: Number(patient.creatinine), // Converter string para number
-      bilirubin: Number(patient.bilirubin),
+      creatinine: normalizeLabValue(Number(patient.creatinine)), // Normalizar valores legados
+      bilirubin: normalizeLabValue(Number(patient.bilirubin)),
       ecog: patient.ecog,
       comorbidities: patient.comorbidities || '',
     };

@@ -442,3 +442,9 @@
 - [x] Verificar se prescriptionData.patientData tem valores corretos
 - [x] Corrigir conversão/restauração de valores decimais (removida multiplicação x100)
 - [x] Testar fluxo: salvar prescrição → carregar do histórico → verificar valores
+
+### Normalização de Valores Legados (Creatinina/Bilirrubina)
+- [x] Criar função normalizeLabValue para detectar valores multiplicados por 100
+- [x] Aplicar normalização no PatientHistoryDB ao carregar pacientes
+- [x] Testar com dados legados (valores > 20 são divididos por 100)
+- [x] Validar que valores novos (< 20) não são afetados
