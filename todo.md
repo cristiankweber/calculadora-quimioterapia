@@ -436,3 +436,9 @@
 - [x] Desabilitar WebSocket HMR (não funciona com proxy HTTPS)
 - [x] Configurar fallback para polling (hmr: false)
 - [x] Validar hot reload após mudança
+
+### Bug: Creatinina/Bilirrubina Erradas ao Recuperar Prescrição
+- [x] Investigar onde valores são corrompidos ao carregar prescrição do histórico
+- [x] Verificar se prescriptionData.patientData tem valores corretos
+- [x] Corrigir conversão/restauração de valores decimais (removida multiplicação x100)
+- [x] Testar fluxo: salvar prescrição → carregar do histórico → verificar valores

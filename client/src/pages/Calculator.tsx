@@ -240,8 +240,8 @@ export default function Calculator() {
         sex: patientData.sex,
         weight: patientData.weight,
         height: patientData.height,
-        creatinine: Math.round(patientData.creatinine * 100),
-        bilirubin: Math.round(patientData.bilirubin * 100),
+        creatinine: patientData.creatinine,
+        bilirubin: patientData.bilirubin,
         ecog: patientData.ecog,
         comorbidities: patientData.comorbidities || undefined,
       });
