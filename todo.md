@@ -433,5 +433,5 @@
 - [x] Integrar predição no fluxo principal da calculadora
 
 ### Correção de Bug: WebSocket Vite HMR
-- [x] Corrigir configuração do Vite para WebSocket funcionar com domínio proxy
-- [x] Testar Hot Module Replacement após correção
+- [x] Adicionar hostname correto na configuração HMR
+- [x] Testar WebSocket após ajuste de hostname
