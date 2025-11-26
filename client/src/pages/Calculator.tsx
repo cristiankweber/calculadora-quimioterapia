@@ -9,6 +9,7 @@ import DrugsTable from '@/components/DrugsTable';
 import ProphylaxisAlerts from '@/components/ProphylaxisAlerts';
 import DilutionInfo from '@/components/DilutionInfo';
 import ToxicityAssessment from '@/components/ToxicityAssessment';
+import { ToxicityPredictionWithMetrics } from '@/components/ToxicityPrediction';
 import PatientHistoryDB from '@/components/PatientHistoryDB';
 import EmergencyModal from '@/components/EmergencyModal';
 
@@ -403,6 +404,12 @@ export default function Calculator() {
               onToxicityChange={(tox, grade) =>
                 setToxicities(prev => ({ ...prev, [tox]: grade }))
               }
+            />
+
+            {/* Predição de Toxicidade com IA */}
+            <ToxicityPredictionWithMetrics
+              patientData={patientData}
+              protocol={selectedProtocol}
             />
           </div>
 

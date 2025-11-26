@@ -4,6 +4,7 @@ import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
 import { z } from "zod";
 import * as db from "./db";
+import { predictToxicity, getModelMetrics } from "./toxicityModel";
 
 export const appRouter = router({
     // if you need to use socket.io, read and register route in server/_core/index.ts, all api should start with '/api/' so that the gateway can route correctly
@@ -213,6 +214,27 @@ export const appRouter = router({
         await db.upsertInstitutionSettings(ctx.user.id, input);
         return { success: true };
       }),
+  }),
+
+  // Predição de Toxicidade com ML
+  toxicity: router({
+    predict: publicProcedure
+      .input(z.object({
+        age: z.number(),
+        creatinine: z.number(),
+        bilirubin: z.number(),
+        ecog: z.number(),
+        hasComorbidities: z.boolean(),
+        protocolName: z.string(),
+        protocolRisk: z.enum(['low', 'moderate', 'high', 'very_high']),
+      }))
+      .query(({ input }) => {
+        return predictToxicity(input);
+      }),
+
+    metrics: publicProcedure.query(() => {
+      return getModelMetrics();
+    }),
   }),
 });
 

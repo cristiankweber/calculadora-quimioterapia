@@ -415,3 +415,19 @@
 - [x] Configurar cache de APIs (stale-while-revalidate)
 - [x] Testar funcionamento offline
 - [x] Validar bundle size final (255KB gzip - aceitável)
+
+### Predição de Toxicidade com Machine Learning
+- [x] Criar estrutura de dados para features de ML (idade, função renal/hepática, comorbidades, protocolo)
+- [x] Implementar modelo de Regressão Logística para predição
+- [x] Criar dataset sintético inicial para treinamento
+- [x] Implementar cálculo de probabilidade de neutropenia G3-4
+- [x] Implementar cálculo de probabilidade de mucosite G3-4
+- [x] Criar API tRPC para predição de toxicidade
+- [x] Desenvolver componente ToxicityPrediction com visualização de riscos
+- [x] Adicionar alertas preventivos baseados em probabilidade
+- [x] Implementar sugestões clínicas (G-CSF, ajuste de dose, profilaxias)
+- [x] Criar visualização de fatores de risco (feature importance)
+- [x] Implementar validação do modelo (AUC-ROC, sensibilidade, especificidade)
+- [x] Adicionar métricas de performance do modelo
+- [x] Criar testes para modelo de ML
+- [x] Integrar predição no fluxo principal da calculadora
