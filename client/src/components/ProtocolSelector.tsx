@@ -1,9 +1,11 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { protocols } from '@/data/protocols';
 import type { Protocol } from '@/types/calculator';
-import { useMemo } from 'react';
+import { Search } from 'lucide-react';
+import { useMemo, useState } from 'react';
 
 interface ProtocolSelectorProps {
   selectedProtocol: Protocol | null;
@@ -18,8 +20,23 @@ export default function ProtocolSelector({
   onProtocolChange,
   onCycleChange,
 }: ProtocolSelectorProps) {
+  const [searchTerm, setSearchTerm] = useState('');
+
   // Memoizar lista de protocolos para evitar recriar objetos
   const protocolList = useMemo(() => protocols, []);
+
+  // Filtrar protocolos baseado no termo de busca
+  const filteredProtocols = useMemo(() => {
+    if (!searchTerm.trim()) {
+      return protocolList;
+    }
+    
+    const term = searchTerm.toLowerCase();
+    return protocolList.filter((protocol) => 
+      protocol.name.toLowerCase().includes(term) ||
+      protocol.indication.toLowerCase().includes(term)
+    );
+  }, [searchTerm, protocolList]);
 
   return (
     <Card>
@@ -30,6 +47,27 @@ export default function ProtocolSelector({
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
+        {/* Campo de busca */}
+        <div className="space-y-2">
+          <Label htmlFor="search">Buscar Protocolo</Label>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              id="search"
+              type="text"
+              placeholder="Digite o nome do protocolo (ex: R-CHOP, FLAG-Ida)..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-9"
+            />
+          </div>
+          {searchTerm && (
+            <p className="text-xs text-muted-foreground">
+              {filteredProtocols.length} protocolo(s) encontrado(s)
+            </p>
+          )}
+        </div>
+
         <div className="space-y-2">
           <Label htmlFor="protocol">Protocolo Quimioterápico</Label>
           <Select
@@ -50,11 +88,17 @@ export default function ProtocolSelector({
               <SelectValue placeholder="Selecione um protocolo" />
             </SelectTrigger>
             <SelectContent>
-              {protocolList.map((protocol) => (
-                <SelectItem key={protocol.id} value={protocol.id}>
-                  {protocol.name}
-                </SelectItem>
-              ))}
+              {filteredProtocols.length > 0 ? (
+                filteredProtocols.map((protocol) => (
+                  <SelectItem key={protocol.id} value={protocol.id}>
+                    {protocol.name}
+                  </SelectItem>
+                ))
+              ) : (
+                <div className="px-2 py-6 text-center text-sm text-muted-foreground">
+                  Nenhum protocolo encontrado
+                </div>
+              )}
             </SelectContent>
           </Select>
         </div>

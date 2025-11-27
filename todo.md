@@ -463,3 +463,13 @@
 - [x] Verificar imports incorretos de servidor no Frontend (nenhum encontrado)
 - [x] Garantir conversão DECIMAL→Number em todos os pontos de leitura
 - [x] Testar fluxo completo de salvamento e carregamento
+
+### Campo de Busca no Seletor de Protocolos
+- [x] Adicionar campo de busca no ProtocolSelector
+- [x] Implementar filtro em tempo real por nome do protocolo
+- [x] Implementar busca por indicação do protocolo
+- [x] Adicionar contador de resultados
+- [x] Adicionar mensagem "Nenhum protocolo encontrado"
+- [x] Manter funcionalidade de seleção existente
+- [x] Testar busca com diferentes termos (R-CHOP, FLAG)
+- [x] Resolver problema de cache do Service Worker
