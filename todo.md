@@ -480,3 +480,15 @@
 - [x] Desabilitar HMR em server/_core/vite.ts (hmr: false)
 - [x] Testar aplicação após correção
 - [x] Documentar que HMR foi desabilitado intencionalmente (ambiente com proxy)
+
+### Investigar Campo de Busca de Protocolos Não Funcionando
+- [x] Verificar se campo está visível na página (CONFIRMADO: visível)
+- [x] Testar digitação no campo de busca (TESTADO: R-CHOP)
+- [x] Verificar se filtro está sendo aplicado (CONFIRMADO: 1 protocolo encontrado)
+- [x] Confirmar funcionalidade completa (FUNCIONAL: dropdown mostra apenas R-CHOP)
+
+### Publicar Campo de Busca de Protocolos
+- [x] Verificar versão publicada atual (257544c4)
+- [x] Confirmar que versão de desenvolvimento tem campo de busca funcional (CONFIRMADO)
+- [x] Criar novo checkpoint com campo de busca
+- [x] Instruir usuário a publicar novo checkpoint via UI
