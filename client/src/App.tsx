@@ -7,6 +7,7 @@ import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import Calculator from "./pages/Calculator";
 import DashboardSkeleton from "@/components/DashboardSkeleton";
+import { useAppVersion } from "@/hooks/useAppVersion";
 
 // Lazy load componentes pesados
 const Settings = lazy(() => import("./pages/Settings"));
@@ -40,6 +41,9 @@ function Router() {
 // - If you want to make theme switchable, pass `switchable` ThemeProvider and use `useTheme` hook
 
 function App() {
+  // Verificar automaticamente se há atualizações do aplicativo
+  useAppVersion();
+
   return (
     <ErrorBoundary>
       <ThemeProvider

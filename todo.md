@@ -257,3 +257,10 @@
 
 **Última atualização:** 27/11/2025  
 **Checkpoint atual:** 0f6162ce
+
+### Correção de Cache do Service Worker
+- [x] Investigar configuração atual do Service Worker e estratégia de cache
+- [x] Implementar headers de cache apropriados no servidor (index.html: no-cache, assets com hash: 1 ano, outros: 1 hora)
+- [x] Criar hook useAppVersion para verificar atualizações automaticamente a cada 5 minutos
+- [x] Adicionar recarregamento automático quando nova versão é detectada
+- [x] Testar atualização automática (102 testes passando)
