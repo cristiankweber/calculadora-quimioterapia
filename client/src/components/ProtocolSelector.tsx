@@ -4,8 +4,10 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { protocols } from '@/data/protocols';
 import type { Protocol } from '@/types/calculator';
-import { Search } from 'lucide-react';
+import { Search, ChevronDown } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
 interface ProtocolSelectorProps {
   selectedProtocol: Protocol | null;
@@ -21,6 +23,7 @@ export default function ProtocolSelector({
   onCycleChange,
 }: ProtocolSelectorProps) {
   const [searchTerm, setSearchTerm] = useState('');
+  const [showSuggestions, setShowSuggestions] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   // Atalho Ctrl+K (ou Cmd+K no Mac) para focar no campo de busca
@@ -62,21 +65,71 @@ export default function ProtocolSelector({
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* Campo de busca */}
+        {/* Campo de busca com autocomplete */}
         <div className="space-y-2">
           <Label htmlFor="search">Buscar Protocolo</Label>
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              ref={searchInputRef}
-              id="search"
-              type="text"
-              placeholder="Digite o nome do protocolo (ex: R-CHOP, FLAG-Ida)..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-9"
-            />
-          </div>
+          <Popover open={showSuggestions && searchTerm.length > 0 && filteredProtocols.length > 0} onOpenChange={setShowSuggestions}>
+            <PopoverTrigger asChild>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  ref={searchInputRef}
+                  id="search"
+                  type="text"
+                  placeholder="Digite o nome do protocolo (ex: R-CHOP, FLAG-Ida)..."
+                  value={searchTerm}
+                  onChange={(e) => {
+                    setSearchTerm(e.target.value);
+                    setShowSuggestions(true);
+                  }}
+                  onFocus={() => setShowSuggestions(true)}
+                  className="pl-9"
+                />
+              </div>
+            </PopoverTrigger>
+            <PopoverContent className="w-[400px] p-0" align="start">
+              <Command>
+                <CommandList>
+                  <CommandEmpty>Nenhum protocolo encontrado.</CommandEmpty>
+                  <CommandGroup heading="Sugestões">
+                    {filteredProtocols.slice(0, 10).map((protocol) => {
+                      const highlightText = (text: string, term: string) => {
+                        if (!term) return text;
+                        const parts = text.split(new RegExp(`(${term})`, 'gi'));
+                        return parts.map((part, i) => 
+                          part.toLowerCase() === term.toLowerCase() 
+                            ? <strong key={i} className="font-bold text-primary">{part}</strong>
+                            : part
+                        );
+                      };
+
+                      return (
+                        <CommandItem
+                          key={protocol.id}
+                          value={protocol.id}
+                          onSelect={() => {
+                            setSearchTerm(protocol.name);
+                            setShowSuggestions(false);
+                            onProtocolChange(protocol);
+                          }}
+                          className="cursor-pointer"
+                        >
+                          <div className="flex flex-col gap-1">
+                            <div className="font-medium">
+                              {highlightText(protocol.name, searchTerm)}
+                            </div>
+                            <div className="text-xs text-muted-foreground line-clamp-1">
+                              {highlightText(protocol.indication, searchTerm)}
+                            </div>
+                          </div>
+                        </CommandItem>
+                      );
+                    })}
+                  </CommandGroup>
+                </CommandList>
+              </Command>
+            </PopoverContent>
+          </Popover>
           {searchTerm && (
             <p className="text-xs text-muted-foreground">
               {filteredProtocols.length} protocolo(s) encontrado(s)

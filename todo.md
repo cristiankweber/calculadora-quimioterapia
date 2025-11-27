@@ -185,7 +185,7 @@
 - [x] Atalho de teclado Ctrl+K para focar no campo de busca de protocolos
 - [x] Busca no histórico de pacientes (ícone de lupa + contador de resultados)
 - [x] Validação visual de campos obrigatórios (bordas vermelhas + mensagens de erro)
-- [ ] Autocomplete no campo de busca de protocolos (sugestões enquanto digita)
+- [x] Autocomplete no campo de busca de protocolos (sugestões enquanto digita)
 - [x] Histórico de prescrições por paciente (modal com timeline)
 
 ### Novos Protocolos Adicionados (7 novos - Total agora: 50)
