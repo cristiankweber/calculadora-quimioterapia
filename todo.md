@@ -473,3 +473,10 @@
 - [x] Manter funcionalidade de seleção existente
 - [x] Testar busca com diferentes termos (R-CHOP, FLAG)
 - [x] Resolver problema de cache do Service Worker
+
+### Correção de WebSocket do Vite (HMR)
+- [x] Verificar configuração atual do vite.config.ts
+- [x] Desabilitar HMR em vite.config.ts (hmr: false)
+- [x] Desabilitar HMR em server/_core/vite.ts (hmr: false)
+- [x] Testar aplicação após correção
+- [x] Documentar que HMR foi desabilitado intencionalmente (ambiente com proxy)
