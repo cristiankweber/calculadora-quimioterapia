@@ -42,6 +42,42 @@ export default function EmergencyModal({ open, onOpenChange, patientData, onSave
 
   const currentProtocol = emergencyProtocols.find(p => p.id === selectedProtocol);
 
+  // Função para salvar prescrição de emergência
+  const handleSaveEmergencyPrescription = () => {
+    if (!currentProtocol || !patientData || !clinicalSituation.trim()) {
+      toast.error('Preencha a situação clínica antes de salvar');
+      return;
+    }
+
+    // Preparar medicações com doses calculadas
+    const medications: any[] = [];
+    currentProtocol.management.steps.forEach(step => {
+      step.medications?.forEach(med => {
+        const calculatedDose = calculatedDoses.get(med.name);
+        medications.push({
+          name: med.name,
+          dose: calculatedDose ? `${calculatedDose.value.toFixed(1)} ${calculatedDose.unit}` : med.dose,
+          route: med.route,
+          frequency: med.frequency,
+          notes: med.notes,
+          calculation: calculatedDose?.calculation
+        });
+      });
+    });
+
+    // Chamar callback para salvar
+    if (onSaveEmergencyPrescription) {
+      onSaveEmergencyPrescription(currentProtocol.title, clinicalSituation, medications);
+      toast.success('Prescrição de emergência salva no histórico!');
+      
+      // Limpar campo de situação clínica após salvar
+      setClinicalSituation('');
+      setUsePatientData(false);
+    } else {
+      toast.error('Função de salvamento não disponível');
+    }
+  };
+
   // Calcular doses automaticamente quando dados do paciente estão disponíveis
   const calculatedDoses = useMemo(() => {
     if (!usePatientData || !patientData) return new Map<string, CalculatedDose>();
@@ -79,17 +115,16 @@ export default function EmergencyModal({ open, onOpenChange, patientData, onSave
         </DialogHeader>
 
         {/* Integração com Dados do Paciente */}
-        {patientData && (
-          <div className="space-y-3 p-4 bg-blue-50 dark:bg-blue-950 rounded-lg border border-blue-200 dark:border-blue-800">
+        <div className="space-y-3 p-4 bg-blue-50 dark:bg-blue-950 rounded-lg border border-blue-200 dark:border-blue-800">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <User className="h-5 w-5 text-blue-600 dark:text-blue-400" />
                 <div>
                   <p className="font-semibold text-blue-900 dark:text-blue-300">
-                    {patientData.name || 'Paciente Atual'} - {patientData.age} anos - {patientData.sex}
+                    {patientData ? `${patientData.name || 'Paciente Atual'} - ${patientData.age} anos - ${patientData.sex}` : 'Nenhum paciente carregado'}
                   </p>
                   <p className="text-sm text-blue-700 dark:text-blue-400">
-                    Peso: {patientData.weight}kg | SC: {patientData.bsa.toFixed(2)}m² | eGFR: {patientData.egfr.toFixed(0)} mL/min
+                    {patientData ? `Peso: ${patientData.weight}kg | SC: ${patientData.bsa.toFixed(2)}m² | eGFR: ${patientData.egfr.toFixed(0)} mL/min` : 'Preencha os dados do paciente na tela principal'}
                   </p>
                 </div>
               </div>
@@ -97,6 +132,7 @@ export default function EmergencyModal({ open, onOpenChange, patientData, onSave
                 variant={usePatientData ? "default" : "outline"}
                 size="sm"
                 onClick={() => setUsePatientData(!usePatientData)}
+                disabled={!patientData}
                 className={usePatientData ? "bg-blue-600 hover:bg-blue-700" : ""}
               >
                 {usePatientData ? '✓ Usando Dados' : 'Usar Dados do Paciente'}
@@ -117,7 +153,6 @@ export default function EmergencyModal({ open, onOpenChange, patientData, onSave
               />
             </div>
           </div>
-        )}
 
         <Tabs value={selectedProtocol} onValueChange={setSelectedProtocol} className="w-full">
           <TabsList className="grid w-full grid-cols-4 mb-4">
@@ -287,6 +322,27 @@ export default function EmergencyModal({ open, onOpenChange, patientData, onSave
             </TabsContent>
           ))}
         </Tabs>
+
+        {/* Footer com botão Salvar */}
+        {usePatientData && patientData && (
+          <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-900 rounded-lg border-t">
+            <p className="text-sm text-muted-foreground">
+              {clinicalSituation ? (
+                <span>✓ Situação clínica documentada</span>
+              ) : (
+                <span className="text-yellow-600 dark:text-yellow-400">⚠️ Preencha a situação clínica antes de salvar</span>
+              )}
+            </p>
+            <Button
+              onClick={handleSaveEmergencyPrescription}
+              disabled={!clinicalSituation.trim()}
+              className="bg-green-600 hover:bg-green-700"
+            >
+              <Save className="h-4 w-4 mr-2" />
+              Salvar no Histórico
+            </Button>
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );
