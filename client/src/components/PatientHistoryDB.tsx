@@ -15,6 +15,7 @@ import { toast } from 'sonner';
 import type { PatientData } from '@/types/calculator';
 import { trpc } from '@/lib/trpc';
 import PatientHistorySkeleton from '@/components/PatientHistorySkeleton';
+import PatientPrescriptionHistory from '@/components/PatientPrescriptionHistory';
 import { normalizeLabValue } from '@/lib/normalizeLabValue';
 
 interface PatientHistoryDBProps {
@@ -179,6 +180,10 @@ export default function PatientHistoryDB({ onLoadPatient }: PatientHistoryDBProp
                     </div>
                   </div>
                   <div className="flex gap-2">
+                    <PatientPrescriptionHistory 
+                      patientId={patient.id} 
+                      patientName={patient.name}
+                    />
                     <Button
                       size="sm"
                       variant="outline"

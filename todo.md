@@ -186,7 +186,7 @@
 - [x] Busca no histórico de pacientes (ícone de lupa + contador de resultados)
 - [x] Validação visual de campos obrigatórios (bordas vermelhas + mensagens de erro)
 - [ ] Autocomplete no campo de busca de protocolos (sugestões enquanto digita)
-- [ ] Histórico de prescrições por paciente (modal com timeline)
+- [x] Histórico de prescrições por paciente (modal com timeline)
 
 ### Novos Protocolos (Média Prioridade)
 - [ ] ALL IC-BFM 2009 (LLA)
