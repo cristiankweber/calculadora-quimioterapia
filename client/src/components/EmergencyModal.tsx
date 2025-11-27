@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
+import { calculateEmergencyDose, type CalculatedDose } from '@/lib/emergencyDoseCalculations';
 
 export interface EmergencyPatientData {
   name: string;
@@ -40,6 +41,29 @@ export default function EmergencyModal({ open, onOpenChange, patientData, onSave
   const [clinicalSituation, setClinicalSituation] = useState('');
 
   const currentProtocol = emergencyProtocols.find(p => p.id === selectedProtocol);
+
+  // Calcular doses automaticamente quando dados do paciente estão disponíveis
+  const calculatedDoses = useMemo(() => {
+    if (!usePatientData || !patientData) return new Map<string, CalculatedDose>();
+    
+    const dosesMap = new Map<string, CalculatedDose>();
+    
+    // Iterar por todos os steps e medicações do protocolo atual
+    currentProtocol?.management.steps.forEach(step => {
+      step.medications?.forEach(med => {
+        const calculated = calculateEmergencyDose(med.name, {
+          weight: patientData.weight,
+          bsa: patientData.bsa,
+          egfr: patientData.egfr
+        });
+        if (calculated) {
+          dosesMap.set(med.name, calculated);
+        }
+      });
+    });
+    
+    return dosesMap;
+  }, [usePatientData, patientData, currentProtocol]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -187,7 +211,14 @@ export default function EmergencyModal({ open, onOpenChange, patientData, onSave
                                   </h4>
                                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-2 text-sm">
                                     <div>
-                                      <span className="font-semibold">Dose:</span> {med.dose}
+                                      <span className="font-semibold">Dose:</span> 
+                                      {calculatedDoses.has(med.name) ? (
+                                        <span className="font-bold text-blue-600 dark:text-blue-400">
+                                          {calculatedDoses.get(med.name)!.value.toFixed(1)} {calculatedDoses.get(med.name)!.unit}
+                                        </span>
+                                      ) : (
+                                        med.dose
+                                      )}
                                     </div>
                                     <div>
                                       <span className="font-semibold">Via:</span> {med.route}
@@ -196,6 +227,12 @@ export default function EmergencyModal({ open, onOpenChange, patientData, onSave
                                       <span className="font-semibold">Frequência:</span> {med.frequency}
                                     </div>
                                   </div>
+                                  {calculatedDoses.has(med.name) && (
+                                    <div className="mt-2 p-2 bg-blue-100 dark:bg-blue-900 rounded text-xs">
+                                      <span className="font-semibold text-blue-900 dark:text-blue-300">ℹ️ Cálculo:</span>
+                                      <span className="text-blue-800 dark:text-blue-400"> {calculatedDoses.get(med.name)!.calculation}</span>
+                                    </div>
+                                  )}
                                   {med.notes && (
                                     <p className="text-xs text-muted-foreground mt-2 italic">
                                       {med.notes}

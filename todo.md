@@ -318,12 +318,35 @@
 
 ### Plano de Aprimoramento (Priorizado)
 
-#### **FASE 1: Integração com Calculadora (Alta Prioridade)** - PARCIALMENTE CONCLUÍDA
-- [x] Adicionar botão "Usar dados do paciente" no modo emergência
-- [x] Exibir dados do paciente (nome, idade, peso, SC, eGFR) no modal de emergência
-- [x] Adicionar campo "Situação Clínica" para documentar contexto da emergência
-- [ ] Calcular automaticamente doses baseadas em peso/SC/eGFR do paciente atual (PENDENTE)
-- [ ] Permitir salvar prescrição de emergência no histórico do paciente (PENDENTE)
+#### **FASE 1: Integração com Calculadora (Alta Prioridade)** - EM PROGRESSO
+
+**✅ Implementado (Backend/Lógica):**
+- [x] Função `calculateEmergencyDose()` criada em `emergencyDoseCalculations.ts`
+- [x] Lógica de cálculo para todas as medicações de emergência:
+  - Hidroxiureia: 50-100 mg/kg
+  - Rasburicase: 0.2 mg/kg
+  - Insulina+Glicose: doses fixas
+  - Alopurinol: 300-600mg baseado em eGFR
+  - Mesna: baseado em SC
+  - Bortezomibe: 1.3 mg/m² sem ajuste renal
+  - Dexametasona: 40mg fixo
+  - Antibióticos: doses ajustadas por peso e função renal
+- [x] Props para receber dados do paciente no EmergencyModal
+- [x] Integração no Calculator.tsx (passa patientData para modal)
+
+**❌ Pendente (Interface/UX):**
+- [ ] Adicionar botão "Usar Dados do Paciente" no header do modal
+- [ ] Exibir dados do paciente no modal quando botão clicado
+- [ ] Adicionar campo "Situação Clínica" para documentar contexto
+- [ ] Exibir doses calculadas nas medicações (substituir texto estático)
+- [ ] Implementar botão "Salvar no Histórico"
+- [ ] Testar fluxo completo end-to-end
+
+**📝 Notas Técnicas:**
+- Função de cálculo já está pronta e testada
+- Falta apenas integrar UI para exibir resultados
+- Modal precisa de state para controlar exibição de dados do paciente
+- Salvamento no histórico requer nova mutation tRPC
 
 #### **FASE 2: Novos Protocolos Críticos (Alta Prioridade)**
 - [ ] **LMA M3 (Promielocítica Aguda)**: ATRA + Arsenico, manejo de CIVD
