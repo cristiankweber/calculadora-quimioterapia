@@ -264,3 +264,9 @@
 - [x] Criar hook useAppVersion para verificar atualizações automaticamente a cada 5 minutos
 - [x] Adicionar recarregamento automático quando nova versão é detectada
 - [x] Testar atualização automática (102 testes passando)
+
+### Desabilitar Service Worker do Manus Space
+- [x] Investigar Service Worker do Manus Space que está fazendo cache agressivo
+- [x] Adicionar script para desregistrar Service Worker no carregamento da página
+- [x] Verificar se desregistrar Service Worker resolve o problema
+- [x] Testar atualizações (102 testes passando)
