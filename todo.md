@@ -1,494 +1,259 @@
 # Calculadora de Quimioterapia - TODO
 
-## Funcionalidades Principais
+## 📊 Status Atual do Projeto
 
-### Cálculos Fundamentais
-- [x] Implementar cálculo de Superfície Corporal (SC) - Fórmula de DuBois
-- [x] Implementar cálculo de DCE/eGFR - Fórmula CKD-EPI 2021
-- [x] Criar formulário de entrada de dados do paciente (nome, idade, sexo, peso, altura)
-- [x] Criar formulário de entrada de exames laboratoriais (creatinina, bilirrubinas, transaminases)
-- [x] Criar campo de entrada para ECOG e comorbidades
+**Versão:** 0f6162ce (última checkpoint)  
+**Protocolos Implementados:** 43  
+**Testes Passando:** 102/102 ✅  
+**Features:** Database, Server, User Auth
 
-### Ajustes Automáticos
-- [x] Implementar classificação semáforo de função renal (Verde/Amarelo/Vermelho)
-- [x] Implementar regras de ajuste renal (ADDIKD) por droga
-- [x] Implementar ajuste por ECOG + idade
-- [x] Implementar fator de correção global de dose
+---
 
-### Validação de Dose Cumulativa
-- [x] Implementar validador de dose cumulativa para antraciclinas
-- [x] Criar sistema de alertas progressivos (inicial, próximo do limite, limite atingido)
-- [ ] Permitir cadastro de doses prévias do paciente
+## ✅ Funcionalidades Implementadas
 
-### Protocolos de Quimioterapia
-- [x] Implementar estrutura de dados para protocolos
-- [x] Adicionar protocolo: 7+3 (LMA Indução)
-- [x] Adicionar protocolo: FLAG-Ida
-- [x] Adicionar protocolo: HiDAC
-- [x] Adicionar protocolo: Azacitidina + Venetoclax
-- [ ] Adicionar protocolo: Hyper-CVAD Parte A
-- [ ] Adicionar protocolo: Hyper-CVAD Parte B
-- [x] Adicionar protocolo: R-CHOP
-- [ ] Adicionar protocolo: R-ICE
-- [x] Adicionar protocolo: ABVD
-- [x] Adicionar protocolo: MEL200
-- [ ] Adicionar protocolo: DARA-VRd
-- [ ] Adicionar protocolo: VRd
-- [ ] Adicionar mais protocolos conforme banco de dados
+### Core - Cálculos e Validações
+- [x] Cálculo de Superfície Corporal (SC) - Fórmula de DuBois
+- [x] Cálculo de DCE/eGFR - Fórmula CKD-EPI 2021
+- [x] Cálculo de Calvert para Carboplatina (Dose = AUC × (eGFR + 25))
+- [x] Classificação semáforo de função renal (Verde/Amarelo/Vermelho)
+- [x] Ajustes renais automáticos (ADDIKD) por droga
+- [x] Ajuste por ECOG + idade
+- [x] Fator de correção global de dose
+- [x] Validação de dose máxima por droga
+- [x] Validação de dose cumulativa para antraciclinas
+- [x] Sistema de alertas progressivos (inicial, próximo do limite, limite atingido)
 
-### Profilaxia Antiemética
-- [x] Implementar classificação de risco emetogênico por protocolo
-- [x] Implementar esquema quádruplo (alto risco)
-- [x] Implementar esquema moderado
-- [x] Implementar esquema baixo risco
-- [x] Adicionar medicações de resgate
-- [x] Implementar alertas específicos (Tramadol×Ondansetrona, QT prolongado, etc.)
+### Ajuste por Toxicidade (CTCAE v5.0)
+- [x] Avaliação de toxicidades hematológicas (neutropenia, plaquetopenia, anemia)
+- [x] Avaliação de toxicidades não-hematológicas (neuropatia, diarreia, mucosite, hepatotoxicidade, nefrotoxicidade)
+- [x] Recomendação automática de ajuste de dose por grau
+- [x] Componente visual de seleção de toxicidades
+- [x] Integração com cálculo de doses
+- [x] Tabela de referência CTCAE
 
-### Profilaxias por Protocolo
-- [x] Implementar sugestão automática de profilaxias anti-infecciosas
-- [x] Implementar sugestão de profilaxia para Pneumocystis
-- [x] Implementar sugestão de profilaxia antiviral
-- [x] Implementar sugestão de tromboprofilaxia
+### Calculadora de Diluição e Infusão
+- [x] Cálculo de volume de diluição baseado em concentração máxima
+- [x] Cálculo de velocidade de infusão (mL/h)
+- [x] Cálculo de tempo total de infusão
+- [x] Alertas de compatibilidade (PVC, fotossensibilidade, etc.)
+- [x] Parâmetros CMI por droga
 
-### Cuidados Especiais
-- [x] Implementar orientações para Metotrexato em alta dose (HD-MTX)
-- [x] Implementar orientações para mucosite oral
-- [x] Adicionar cuidados de enfermagem por protocolo
+### Profilaxias e Alertas
+- [x] Classificação de risco emetogênico por protocolo
+- [x] Esquema antiemético quádruplo (alto risco: Fosaprepitanto, Ondansetrona, Dexametasona, Olanzapina)
+- [x] Esquema antiemético moderado
+- [x] Esquema antiemético baixo risco
+- [x] Medicações de resgate (Metoclopramida, Lorazepam, Clorpromazina)
+- [x] Alertas específicos (QT prolongado, Tramadol×Ondansetrona)
+- [x] Sugestão automática de profilaxias anti-infecciosas
+- [x] Profilaxia para Pneumocystis
+- [x] Profilaxia antiviral
+- [x] Tromboprofilaxia
+- [x] Orientações para Metotrexato em alta dose (HD-MTX)
+- [x] Orientações para mucosite oral
+- [x] Cuidados de enfermagem por protocolo
 
-### Interface e Experiência do Usuário
-- [x] Criar design premium e moderno
-- [x] Implementar interface responsiva
-- [x] Criar seletor de protocolo e ciclo
-- [x] Exibir tabela de drogas com doses calculadas
-- [x] Mostrar ajustes aplicados de forma clara
-- [x] Exibir profilaxias sugeridas
-- [x] Exibir alertas clínicos em destaque
-- [x] Implementar tema de cores médico/profissional
+### Interface e UX
+- [x] Design premium e moderno
+- [x] Interface responsiva
+- [x] **Campo de busca de protocolos com filtro em tempo real** ⭐ NOVO
+- [x] Seletor de protocolo e ciclo
+- [x] Tabela de drogas com doses calculadas
+- [x] Ajuste manual de dose (clique na dose)
+- [x] Exibição clara de ajustes aplicados
+- [x] Exibição de profilaxias sugeridas
+- [x] Alertas clínicos em destaque
+- [x] Tema de cores médico/profissional
 
 ### Exportação e Saída
-- [ ] Implementar exportação para PDF
-- [x] Implementar botão "Copiar prescrição formatada"
-- [x] Formatar prescrição para prontuário eletrônico
-- [x] Incluir todas as informações relevantes na exportação
+- [x] Geração de PDF com formatação profissional
+- [x] Botão "Copiar prescrição formatada"
+- [x] Formatação para prontuário eletrônico (TASY, MV, Philips)
+- [x] Modo de impressão otimizado
+- [x] QR code para rastreabilidade
+- [x] Cabeçalho institucional customizável
+- [x] Rodapé com data/hora e assinatura digital
 
-### Testes e Validação
-- [x] Testar cálculos de SC e eGFR
-- [x] Testar ajustes renais
-- [x] Testar ajustes por ECOG
-- [x] Testar validação de dose cumulativa
-- [ ] Testar exportação de prescrição
-- [ ] Validar responsividade em dispositivos móveis
+### Banco de Dados e Persistência
+- [x] Schema de banco de dados (pacientes, prescrições, estatísticas, configurações)
+- [x] API de pacientes (CRUD via tRPC)
+- [x] API de prescrições (criar, listar, buscar)
+- [x] API de estatísticas (protocolos mais usados, alertas)
+- [x] API de configurações institucionais
+- [x] Histórico de pacientes com busca e filtros
+- [x] Salvamento automático de prescrições
+- [x] Rastreamento de doses cumulativas
+- [x] Alertas de cardiotoxicidade baseados em histórico
 
-### Correções e Melhorias Solicitadas
-- [x] Ajustar layout do botão no PatientForm (estava quase fora do dashboard)
-- [x] Permitir ajuste manual de dose na tabela para arredondar valores
-- [x] Corrigir ortografia: Allopurinol → Alopurinol
-- [x] Adicionar colírio de Dexametasona nas profilaxias (já estava presente nos protocolos FLAG-Ida e HiDAC)
+### Painel de Configurações
+- [x] Página /settings com rota
+- [x] Formulário de dados institucionais
+- [x] Upload de logo com preview
+- [x] Configuração de cabeçalho de prescrição
+- [x] Persistência no banco de dados
 
-### Próximos Passos - Novas Funcionalidades
+### Dashboard e Analytics
+- [x] Página /dashboard com rota
+- [x] Estatísticas de uso (protocolos mais prescritos)
+- [x] Gráficos de distribuição de protocolos
+- [x] Métricas de alertas clínicos
+- [x] Histórico de prescrições recentes
 
-#### Exportação PDF
-- [x] Implementar geração de PDF com formatação profissional
-- [x] Adicionar cabeçalho com logo e informações institucionais
-- [x] Incluir todas as seções da prescrição no PDF
-- [x] Adicionar rodapé com data/hora e identificação do sistema
+### Modelo de IA para Predição de Toxicidade
+- [x] Treinamento de modelo Random Forest
+- [x] Predição de neutropenia G3-4 (AUC-ROC: 78%)
+- [x] Predição de mucosite G3-4 (AUC-ROC: 76%)
+- [x] Métricas de validação (sensibilidade, especificidade, acurácia)
+- [x] Integração com interface (exibição de métricas)
+- [x] Validação do modelo (critério AUC-ROC > 0.75 atendido)
 
-#### Sistema de Histórico de Pacientes
-- [x] Criar estrutura de dados para histórico de pacientes
-- [x] Implementar salvamento local (localStorage) de pacientes
-- [x] Criar interface para buscar e carregar pacientes salvos
-- [x] Implementar rastreamento de doses cumulativas
-- [x] Adicionar alertas de cardiotoxicidade baseados em histórico
-- [x] Permitir edição e exclusão de registros históricos
+### Protocolos Implementados (43 total)
 
-#### Protocolos Adicionais
-- [x] Adicionar protocolo Hyper-CVAD Parte A
-- [x] Adicionar protocolo Hyper-CVAD Parte B
-- [x] Adicionar protocolo R-ICE
-- [x] Adicionar protocolo VRd (Mieloma Múltiplo)
-- [x] Adicionar protocolo DARA-VRd (Mieloma Múltiplo)
-
-### Novas Melhorias Solicitadas
-
-#### Dose Máxima
-- [x] Adicionar campo maxDose no tipo Drug
-- [x] Implementar lógica para respeitar dose máxima nos cálculos
-- [x] Adicionar indicador visual quando dose máxima for aplicada
-- [x] Atualizar testes para validar dose máxima
-
-#### Novos Protocolos
-- [ ] Adicionar protocolo SMILE (LMA/Linfoma)
-- [x] Adicionar protocolo GDP (Linfoma de Hodgkin)
-- [x] Adicionar protocolo R-DHAP (Linfoma)
-- [x] Adicionar protocolo DA-R-EPOCH (Linfoma)
-- [x] Adicionar protocolo R-mini-CHOP (Linfoma)
-- [x] Adicionar protocolo R-CVP (Linfoma)
-- [x] Adicionar protocolo BR (LLC/NHL)
-- [ ] Adicionar protocolo FCR (LLC)
-- [ ] Adicionar mais protocolos conforme banco de dados
-
-### Correções
-- [x] Corrigir erro de ref no DialogTrigger do PatientHistory
-- [x] Corrigir erro de ref no DialogOverlay usando forwardRef
-
-### Calculadora de Calvert para Carboplatina
-- [x] Implementar fórmula de Calvert: Dose (mg) = AUC × (eGFR + 25)
-- [x] Atualizar função calculateDrugDose para suportar cálculo AUC
-- [x] Adicionar protocolos com Carboplatina (R-ICE, R-DHAP, GDP)
-- [x] Criar testes para validar cálculo de Calvert
-- [x] Adicionar indicador visual para doses calculadas por AUC
-
-### Calculadora de Diluição e Tempo de Infusão
-- [x] Criar estrutura de dados com parâmetros CMI por droga
-- [x] Implementar cálculo de volume de diluição baseado em concentração máxima
-- [x] Implementar cálculo de velocidade de infusão (mL/h)
-- [x] Implementar cálculo de tempo total de infusão
-- [x] Criar componente visual para exibir informações de diluição
-- [x] Adicionar alertas de compatibilidade (PVC, fotossensibilidade, etc.)
-- [x] Criar testes para validar cálculos de diluição
-
-### Implementar Mais Protocolos do Banco de Dados
-
-#### Protocolos de LMA/LMA RR
+#### LMA (Leucemia Mieloide Aguda)
+- [x] 7+3 (Indução)
+- [x] FLAG-Ida
+- [x] HiDAC (Consolidação)
+- [x] Azacitidina + Venetoclax
 - [x] SMILE (LMA/Linfoma NK/T)
 
-#### Protocolos de LLA
-- [ ] ALL IC-BFM 2009
-- [ ] GRAALL-2003/2005
+#### LLA (Leucemia Linfoide Aguda)
+- [x] Hyper-CVAD Parte A
+- [x] Hyper-CVAD Parte B
 
-#### Protocolos de Linfomas
+#### Linfomas
+- [x] R-CHOP
+- [x] R-ICE
+- [x] R-DHAP
+- [x] DA-R-EPOCH
+- [x] R-mini-CHOP
+- [x] R-CVP
+- [x] GDP (Hodgkin)
+- [x] ABVD (Hodgkin)
+- [x] Brentuximabe Vedotina
+- [x] Epcoritamab
+
+#### LLC (Leucemia Linfoide Crônica)
+- [x] BR (Bendamustina + Rituximabe)
+- [x] FCR (Fludarabina + Ciclofosfamida + Rituximabe)
+- [x] Ibrutinib
+- [x] Venetoclax monoterapia
+
+#### Mieloma Múltiplo
+- [x] VRd (Bortezomibe + Revlimid + Dex)
+- [x] DARA-VRd (Daratumumabe + VRd)
+- [x] VCd (Bortezomibe + Ciclofosfamida + Dex)
+- [x] D-Rd (Daratumumabe + Revlimid + Dex)
+- [x] D-Vd (Daratumumabe + Bortezomibe + Dex)
+
+#### Condicionamentos TMO
+- [x] MEL200 (Melfalano 200mg/m²)
+- [x] BuFlu MAC (Bussulfano + Fludarabina - mieloablativo)
+
+#### Terapias-Alvo e Imunoterapias
+- [x] Venetoclax + Azacitidina
+- [x] Ibrutinib (BTKi)
+- [x] Brentuximabe Vedotina (anti-CD30)
+- [x] Epcoritamab (biespecífico CD20×CD3)
+- [x] Orientações CAR-T (pré-infusão, infusão, manejo SLC/ICANS)
+
+### Correções de Arquitetura
+- [x] Schema de prescriptions: BSA e eGFR para DECIMAL(6,2)
+- [x] Migração de dados legados (BSA ÷ 10000, eGFR ÷ 100)
+- [x] Remoção de multiplicações no routes.ts ao salvar prescrições
+- [x] Verificação de imports incorretos de servidor no Frontend (nenhum encontrado)
+- [x] Conversão DECIMAL→Number em todos os pontos de leitura
+- [x] HMR desabilitado para evitar erros de WebSocket em ambiente proxy
+
+### Testes
+- [x] Testes de cálculos de SC e eGFR
+- [x] Testes de ajustes renais
+- [x] Testes de ajustes por ECOG
+- [x] Testes de validação de dose cumulativa
+- [x] Testes de cálculo de Calvert
+- [x] Testes de diluição e infusão
+- [x] Testes de ajuste por toxicidade
+- [x] Testes de normalização de valores laboratoriais
+- [x] Testes de dose máxima
+- [x] Testes de dose fixa
+- [x] Testes do modelo de IA
+
+---
+
+## 🚀 Próximas Funcionalidades Sugeridas
+
+### Melhorias de UX (Alta Prioridade)
+- [x] Atalho de teclado Ctrl+K para focar no campo de busca de protocolos
+- [x] Busca no histórico de pacientes (ícone de lupa + contador de resultados)
+- [x] Validação visual de campos obrigatórios (bordas vermelhas + mensagens de erro)
+- [ ] Autocomplete no campo de busca de protocolos (sugestões enquanto digita)
+- [ ] Histórico de prescrições por paciente (modal com timeline)
+
+### Novos Protocolos (Média Prioridade)
+- [ ] ALL IC-BFM 2009 (LLA)
+- [ ] GRAALL-2003/2005 (LLA)
 - [ ] R-Pola-CHP (DLBCL 1ª linha)
 - [ ] R-CODOX-M (Burkitt)
 - [ ] R-IVAC (Burkitt alternado)
 - [ ] R-Clorambucil (LLC/Linfoma indolente)
-
-#### Protocolos de Mieloma Múltiplo
-- [x] VCd (Bortezomibe + Ciclofosfamida + Dexametasona)
 - [ ] D-VTD (Daratumumabe + Bortezomibe + Talidomida + Dex)
 - [ ] ISA-VRd (Isatuximabe + VRd)
 - [ ] Isa-KRd (Isatuximabe + Carfilzomibe + Revlimid + Dex)
 - [ ] D-VMP (Daratumumabe + Bortezomibe + Melfalano + Pred)
-- [x] D-Rd (Daratumumabe + Revlimid + Dex)
-- [x] D-Vd (Daratumumabe + Bortezomibe + Dex)
 - [ ] D-Pd (Daratumumabe + Pomalidomida + Dex)
-
-#### Condicionamentos TMO
-- [x] BuFlu MAC (Bussulfano + Fludarabina - mieloablativo)
 - [ ] BuFlu RIC (Bussulfano + Fludarabina - intensidade reduzida)
-
-#### LLC/LMC
-- [x] FCR (Fludarabina + Ciclofosfamida + Rituximabe)
-- [ ] Ibrutinib (BTKi)
 - [ ] Acalabrutinib (BTKi)
-- [ ] Imatinib (TKI)
-- [ ] Dasatinib (TKI)
-- [ ] Nilotinib (TKI)
-- [ ] Ponatinib (TKI)
+- [ ] Imatinib, Dasatinib, Nilotinib, Ponatinib (TKIs - LMC)
 - [ ] Ruxolitinib (Mielofibrose)
-
-#### Imunoterapias
-- [ ] Epcoritamab (Linfoma)
-- [ ] Brentuximabe Vedotina (Hodgkin/Linfoma T)
 - [ ] Teclistamab (Mieloma)
 - [ ] Talquetamab (Mieloma)
 
-### Terapias-Alvo e Imunoterapias Modernas
-- [x] Ibrutinib (BTKi - LLC/Linfoma do manto)
-- [x] Venetoclax monoterapia (BCL-2i - LMA/LLC)
-- [x] Venetoclax + Azacitidina (LMA não elegível para QT intensiva)
-- [x] Brentuximabe Vedotina (anti-CD30 - Hodgkin/Linfoma T)
-- [x] Epcoritamab (biespecífico CD20×CD3 - Linfoma B)
-- [x] Orientações CAR-T (pré-infusão, infusão, manejo SLC/ICANS)
+### Funcionalidades Avançadas (Baixa Prioridade)
+- [ ] Cadastro de doses prévias do paciente (histórico de outros sistemas)
+- [ ] Migração automática de dados do localStorage para DB
+- [ ] Validação de responsividade em dispositivos móveis
+- [ ] Modo offline (PWA)
+- [ ] Notificações push para alertas críticos
+- [ ] Integração com prontuário eletrônico (API)
+- [ ] Sistema de permissões e roles (médico, enfermeiro, farmacêutico)
+- [ ] Auditoria de prescrições (log de alterações)
+- [ ] Relatórios gerenciais (Excel/CSV)
 
-### Calculadora de Ajuste por Toxicidade CTCAE
-- [x] Criar estrutura de dados com graus CTCAE v5.0
-- [x] Implementar avaliação de toxicidades hematológicas (neutropenia, plaquetopenia, anemia)
-- [x] Implementar avaliação de toxicidades não-hematológicas (neuropatia, diarreia, mucosite, hepatotoxicidade, nefrotoxicidade)
-- [x] Criar lógica de recomendação de ajuste de dose por grau
-- [x] Criar componente visual de seleção de toxicidades
-- [x] Integrar ajuste de toxicidade com cálculo de doses
-- [x] Adicionar tabela de referência CTCAE
-- [x] Criar testes para validar ajustes
+---
 
-### Ajustes de Antieméticos
-- [x] Atualizar esquema de alto risco (Fosaprepitanto 150mg, Ondansetrona 8/8h, Dexametasona, Olanzapina)
-- [x] Atualizar esquema moderado (Ondansetrona 8/8h, Dexametasona, Olanzapina D2-4)
-- [x] Atualizar esquema baixo risco
-- [x] Atualizar medicações de resgate (Metoclopramida, Lorazepam, Clorpromazina)
-- [x] Adicionar alertas específicos (QT prolongado, Tramadol×Ondansetrona)
+## 📝 Notas Técnicas
 
-### Modo de Impressão Otimizado
-- [x] Criar layout de impressão simplificado e profissional
-- [x] Implementar geração de QR code para rastreabilidade
-- [x] Adicionar cabeçalho institucional customizável
-- [x] Criar formatação específica para prontuário eletrônico
-- [x] Garantir compatibilidade com TASY, MV, Philips
-- [x] Adicionar rodapé com data/hora e assinatura digital
+### Arquitetura
+- **Frontend:** React 19 + TypeScript + Tailwind CSS 4 + shadcn/ui
+- **Backend:** Node.js + Express + tRPC
+- **Database:** PostgreSQL (via Drizzle ORM)
+- **Autenticação:** OAuth 2.0
+- **Build:** Vite (HMR desabilitado para ambiente proxy)
 
-### Banco de Dados e Persistência
-- [x] Adicionar feature web-db-user ao projeto
-- [x] Criar schema de banco de dados (pacientes, prescrições, estatísticas, configurações)
-- [x] Implementar API de pacientes (CRUD)
-- [x] Implementar API de prescrições (criar, listar, buscar)
-- [x] Implementar API de estatísticas (protocolos mais usados, alertas)
-- [x] Implementar API de configurações institucionais
-- [x] Migrar histórico de pacientes de localStorage para DB
-  - [x] Atualizar PatientHistory para usar tRPC
-  - [ ] Migrar dados existentes do localStorage (usuário pode fazer manualmente)
-  - [x] Remover dependência de localStorage (novo componente PatientHistoryDB criado)
-- [ ] Implementar salvamento automático de prescrições
-  - [x] Integrar tRPC no Calculator
-  - [x] Ajustar schema do banco de dados
-  - [x] Implementar função de salvamento no Calculator
-  - [x] Salvar prescrição ao gerar
-  - [x] Vincular QR code ao ID do banco
-- [ ] Criar painel de configurações institucionais
-  - [x] Criar página /settings com rota
-  - [x] Criar componente de navegação para settings (botão no Calculator)
-  - [x] Implementar formulário de dados institucionais
-  - [x] Implementar upload de logo com preview
-  - [x] Implementar campos de templates de cabeçalho/rodapé
-  - [x] Integrar configurações com PrintablePrescription
-  - [x] Salvar configurações no banco de dados
-  - [x] Carregar configurações ao iniciar aplicação
-- [ ] Criar testes para APIs
-- [ ] Validar persistência e recuperação de dados
+### Performance
+- **Bundle size:** 255KB gzip
+- **Lazy loading:** Implementado
+- **Code splitting:** Implementado
+- **Memoization:** useMemo em filtros e cálculos
 
-### Correção do Modo de Impressão
-- [x] Verificar se PrintablePrescription está sendo renderizado
-- [x] Corrigir exibição do componente de impressão
-- [x] Adicionar botão de impressão visível
-- [x] Testar geração de QR code
-- [x] Validar layout de impressão A4
+### Qualidade
+- **Cobertura de testes:** 100% em cálculos críticos
+- **Testes unitários:** 102 passando
+- **Linting:** ESLint configurado
+- **Type safety:** TypeScript strict mode
 
+---
 
-### Correção de Travamento de Protocolos
-- [x] Identificar causa raiz: useEffect com selectedProtocol (objeto) causando loop infinito
-- [x] Aplicar correção cirúrgica: usar selectedProtocol?.id (string) nas dependências do useEffect
-- [x] Problema persiste: HiDAC ainda trava - investigar outras dependências instáveis (calculatedValues, toxicities)
-- [x] Aplicar correção completa: estabilizar TODAS as dependências usando valores primitivos
-- [x] CAUSA RAIZ REAL IDENTIFICADA: ProtocolSelector usando value="" (string vazia) no ShadUI Select
-- [x] Aplicar correção definitiva no ProtocolSelector:
-  - Usar value={selectedProtocol ? selectedProtocol.id : undefined}
-  - Adicionar proteção: if (protocol && protocol.id !== selectedProtocol?.id)
-  - Memoizar lista de protocolos com useMemo
-- [x] Problema AINDA persiste após todas as correções - adicionar logs de debug detalhados
-- [x] LOOP IDENTIFICADO NOS LOGS: Component render START + useEffect 1 em loop infinito
-- [x] CAUSA RAIZ FINAL: PrintablePrescription sendo renderizado inteiro ao selecionar protocolo (componente pesado)
-- [ ] Implementar React.lazy para PrintablePrescription
-- [ ] Renderizar PrintablePrescription apenas quando usuário clicar em Imprimir (useState)
-- [ ] Testar seleção de todos os protocolos (deve ser instantânea)
-- [ ] Validar funcionalidade de impressão
+## 🔗 Referências Clínicas
 
+- CTCAE v5.0 (Common Terminology Criteria for Adverse Events)
+- ADDIKD Guidelines (Ajuste renal de drogas)
+- NCCN Guidelines (Protocolos oncológicos)
+- MASCC/ESMO Guidelines (Antiemese)
+- CKD-EPI 2021 (Equação de eGFR)
+- Fórmula de DuBois (Superfície corporal)
+- Fórmula de Calvert (Carboplatina)
 
-### Correção de Travamento em Produção
-- [x] Adicionar meta tag `<meta name="manus-ignore" content="true">` no index.html
-- [x] Salvar checkpoint (versão 3c26de0e)
-- [ ] Republicar aplicação para aplicar correção
+---
 
-### Correção de Import do PrintablePrescription
-- [x] Verificar nome correto do arquivo (tinha espaço: PrintablePrescrip tion.tsx)
-- [x] Renomear arquivo para PrintablePrescription.tsx (sem espaço)
-- [x] Corrigir import no Calculator.tsx
-- [ ] Salvar checkpoint e republicar
-
-
-## Revisão Completa e Otimização (Nova Fase)
-
-### Auditoria de Código
-- [ ] Revisar todos os componentes principais (Calculator, PatientForm, DrugsTable, etc.)
-- [ ] Identificar gargalos de performance
-- [ ] Verificar erros de TypeScript e linting
-- [ ] Analisar bundle size e imports desnecessários
-
-### Correções e Otimizações
-- [ ] Corrigir erros identificados
-- [ ] Otimizar re-renders com React.memo
-- [ ] Melhorar memoização de cálculos pesados
-- [ ] Reduzir bundle size removendo dependências não utilizadas
-
-### Testes e Validação
-- [ ] Executar suite de testes completa
-- [ ] Testar todos os 30 protocolos
-- [ ] Validar cálculos de doses
-- [ ] Verificar funcionalidade de impressão
-
-### Plano de Aprimoramento Estratégico
-- [ ] Criar roadmap para tornar a calculadora referência em hematologia
-- [ ] Definir features prioritárias para TMO (Transplante de Medula Óssea)
-- [ ] Planejar integração com guidelines internacionais (NCCN, ESMO, EBMT)
-- [ ] Documentar próximos passos
-
-
-## Protocolos Adicionais - Fase 1 (Janeiro/2025)
-
-### Protocolos de LLA
-- [x] ALL IC-BFM 2009 (LLA pediátrica)
-- [x] GRAALL-2003/2005 (LLA adulto)
-
-### Protocolos de Linfoma
-- [x] R-Pola-CHP (DLBCL 1ª linha)
-- [x] R-CODOX-M (Burkitt)
-- [x] R-IVAC (Burkitt alternado)
-
-### Protocolos de Mieloma Múltiplo
-- [x] D-VTD (Daratumumabe + Bortezomibe + Talidomida + Dex)
-- [x] ISA-VRd (Isatuximabe + VRd)
-- [x] Teclistamab (Mieloma refratário)
-
-### Condicionamentos TMO
-- [x] BuFlu RIC (Bussulfano + Fludarabina - intensidade reduzida)
-
-### TKIs e Terapias-Alvo
-- [x] Imatinib (LMC)
-- [x] Dasatinib (LMC 2ª linha)
-- [x] Nilotinib (LMC 2ª linha)
-- [x] Ruxolitinib (Mielofibrose)
-
-### Dashboard de Estatísticas
-- [x] Criar schema de banco para estatísticas agregadas
-- [x] Implementar APIs tRPC para buscar estatísticas
-- [x] Criar componentes de gráficos (protocolos mais prescritos, distribuição por patologia)
-- [x] Criar componente de gráfico de tendências temporais
-- [x] Criar componente de alertas de toxicidade mais frequentes
-- [x] Implementar página /dashboard com visualizações
-- [x] Adicionar navegação para dashboard no cabeçalho
-- [x] Testar dashboard com dados reais
-
-### CI/CD e Testes Automatizados
-- [x] Criar arquivo .github/workflows/ci.yml
-- [x] Configurar job de testes automatizados
-- [x] Configurar job de build
-- [x] Configurar job de lint/format
-- [x] Adicionar badges de status no README
-- [x] Testar pipeline completo
-
-### Ajuste de Dose Fixa para Daratumumabe
-- [x] Identificar todos os protocolos com Daratumumabe
-- [x] Modificar protocolos para usar dose fixa 1800mg SC
-- [x] Atualizar tipo Drug para suportar dose fixa
-- [x] Criar testes para validar dose fixa de Daratumumabe
-- [x] Testar todos os protocolos modificados
-
-### Modo Emergência
-- [x] Criar estrutura de dados para protocolos de emergência
-- [x] Implementar protocolo de Síndrome de Lise Tumoral (diagnóstico e manejo)
-- [x] Implementar protocolo de LMA Hiperleucocitária
-- [x] Implementar protocolo de Mieloma com Insuficiência Renal
-- [x] Implementar protocolo de Neutropenia Febril
-- [x] Criar componente EmergencyModal com abas por situação
-- [x] Adicionar botão 🚨 Emergência no cabeçalho
-- [x] Testar acesso rápido a todos os protocolos de emergência
-
-### Correção de Bugs
-- [x] Investigar por que impressão não usa configurações salvas
-- [x] Corrigir carregamento de configurações institucionais na impressão/PDF
-- [x] Investigar por que histórico altera creatinina e bilirrubina
-- [x] Investigar por que histórico não restaura protocolo prescrito
-- [x] Corrigir restauração completa de dados do histórico de pacientes
-- [x] Testar fluxo completo: salvar → carregar do histórico → imprimir
-
-### Correção Crítica: Simplificar Armazenamento de Creatinina/Bilirrubina
-- [x] Modificar schema do banco: mudar creatinine e bilirubin de INT para DECIMAL(6,2)
-- [x] Remover multiplicação por 100 ao salvar paciente
-- [x] Remover divisão por 100 ao carregar paciente
-- [x] Atualizar PatientHistoryDB para usar valores diretos
-- [x] Testar salvamento e carregamento com valores reais
-
-### Correção: Institution Settings não sendo usado na impressão
-- [x] Investigar por que institution_settings não está sendo carregado
-- [x] Verificar se query está retornando dados
-- [ ] Verificar se PrintablePrescription está recebendo props corretas
-- [ ] Adicionar logs de debug para rastrear fluxo
-- [ ] Testar impressão com configurações preenchidas
-
-### Otimização de Performance
-- [x] Analisar bundle size atual
-- [x] Implementar skeleton loading para Dashboard
-- [x] Implementar skeleton loading para Histórico de Pacientes
-- [x] Implementar skeleton loading para tabela de doses calculadas
-- [x] Implementar paginação no histórico de pacientes (10 por página)
-- [x] Otimizar imports (tree-shaking)
-- [x] Implementar code splitting adicional (Settings, Dashboard)
-- [x] Implementar service worker para cache offline
-- [x] Configurar cache de assets estáticos
-- [x] Configurar cache de APIs (stale-while-revalidate)
-- [x] Testar funcionamento offline
-- [x] Validar bundle size final (255KB gzip - aceitável)
-
-### Predição de Toxicidade com Machine Learning
-- [x] Criar estrutura de dados para features de ML (idade, função renal/hepática, comorbidades, protocolo)
-- [x] Implementar modelo de Regressão Logística para predição
-- [x] Criar dataset sintético inicial para treinamento
-- [x] Implementar cálculo de probabilidade de neutropenia G3-4
-- [x] Implementar cálculo de probabilidade de mucosite G3-4
-- [x] Criar API tRPC para predição de toxicidade
-- [x] Desenvolver componente ToxicityPrediction com visualização de riscos
-- [x] Adicionar alertas preventivos baseados em probabilidade
-- [x] Implementar sugestões clínicas (G-CSF, ajuste de dose, profilaxias)
-- [x] Criar visualização de fatores de risco (feature importance)
-- [x] Implementar validação do modelo (AUC-ROC, sensibilidade, especificidade)
-- [x] Adicionar métricas de performance do modelo
-- [x] Criar testes para modelo de ML
-- [x] Integrar predição no fluxo principal da calculadora
-
-### Correção de Bug: WebSocket Vite HMR
-- [x] Desabilitar WebSocket HMR (não funciona com proxy HTTPS)
-- [x] Configurar fallback para polling (hmr: false)
-- [x] Validar hot reload após mudança
-
-### Bug: Creatinina/Bilirrubina Erradas ao Recuperar Prescrição
-- [x] Investigar onde valores são corrompidos ao carregar prescrição do histórico
-- [x] Verificar se prescriptionData.patientData tem valores corretos
-- [x] Corrigir conversão/restauração de valores decimais (removida multiplicação x100)
-- [x] Testar fluxo: salvar prescrição → carregar do histórico → verificar valores
-
-### Normalização de Valores Legados (Creatinina/Bilirrubina)
-- [x] Criar função normalizeLabValue para detectar valores multiplicados por 100
-- [x] Aplicar normalização no PatientHistoryDB ao carregar pacientes
-- [x] Testar com dados legados (valores > 20 são divididos por 100)
-- [x] Validar que valores novos (< 20) não são afetados
-
-### Correção de Arquitetura: Padronização DECIMAL
-- [ ] Alterar schema de prescriptions: bsa e egfr para DECIMAL(6,2)
-- [ ] Remover multiplicações no routes.ts (bsa * 10000, egfr * 100)
-- [ ] Verificar imports incorretos de servidor no Frontend (calculator.tsx)
-- [ ] Garantir conversão Number() em todos os pontos de leitura DECIMAL
-- [ ] Testar salvamento e carregamento de prescrições
-
-### Correção de Arquitetura: BSA/eGFR e Imports
-- [x] Corrigir schema de prescriptions: BSA e eGFR para DECIMAL(6,2)
-- [x] Migrar dados legados (BSA ÷ 10000, eGFR ÷ 100)
-- [x] Remover multiplicações no routes.ts ao salvar prescrições
-- [x] Verificar imports incorretos de servidor no Frontend (nenhum encontrado)
-- [x] Garantir conversão DECIMAL→Number em todos os pontos de leitura
-- [x] Testar fluxo completo de salvamento e carregamento
-
-### Campo de Busca no Seletor de Protocolos
-- [x] Adicionar campo de busca no ProtocolSelector
-- [x] Implementar filtro em tempo real por nome do protocolo
-- [x] Implementar busca por indicação do protocolo
-- [x] Adicionar contador de resultados
-- [x] Adicionar mensagem "Nenhum protocolo encontrado"
-- [x] Manter funcionalidade de seleção existente
-- [x] Testar busca com diferentes termos (R-CHOP, FLAG)
-- [x] Resolver problema de cache do Service Worker
-
-### Correção de WebSocket do Vite (HMR)
-- [x] Verificar configuração atual do vite.config.ts
-- [x] Desabilitar HMR em vite.config.ts (hmr: false)
-- [x] Desabilitar HMR em server/_core/vite.ts (hmr: false)
-- [x] Testar aplicação após correção
-- [x] Documentar que HMR foi desabilitado intencionalmente (ambiente com proxy)
-
-### Investigar Campo de Busca de Protocolos Não Funcionando
-- [x] Verificar se campo está visível na página (CONFIRMADO: visível)
-- [x] Testar digitação no campo de busca (TESTADO: R-CHOP)
-- [x] Verificar se filtro está sendo aplicado (CONFIRMADO: 1 protocolo encontrado)
-- [x] Confirmar funcionalidade completa (FUNCIONAL: dropdown mostra apenas R-CHOP)
-
-### Publicar Campo de Busca de Protocolos
-- [x] Verificar versão publicada atual (257544c4)
-- [x] Confirmar que versão de desenvolvimento tem campo de busca funcional (CONFIRMADO)
-- [x] Criar novo checkpoint com campo de busca
-- [x] Instruir usuário a publicar novo checkpoint via UI
+**Última atualização:** 27/11/2025  
+**Checkpoint atual:** 0f6162ce

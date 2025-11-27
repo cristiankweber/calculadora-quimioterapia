@@ -8,9 +8,10 @@ import type { PatientData } from '@/types/calculator';
 interface PatientFormProps {
   data: PatientData;
   onChange: (data: PatientData) => void;
+  validationErrors?: Set<keyof PatientData>;
 }
 
-function PatientForm({ data, onChange }: PatientFormProps) {
+function PatientForm({ data, onChange, validationErrors }: PatientFormProps) {
   const handleChange = (field: keyof PatientData, value: string | number) => {
     onChange({ ...data, [field]: value });
   };
@@ -72,7 +73,11 @@ function PatientForm({ data, onChange }: PatientFormProps) {
               value={data.weight || ''}
               onChange={(e) => handleChange('weight', parseFloat(e.target.value) || 0)}
               placeholder="Ex: 70.5"
+              className={validationErrors?.has('weight') ? 'border-destructive' : ''}
             />
+            {validationErrors?.has('weight') && (
+              <p className="text-xs text-destructive">Peso é obrigatório</p>
+            )}
           </div>
           <div className="space-y-2">
             <Label htmlFor="height">Altura (cm)</Label>
@@ -83,7 +88,11 @@ function PatientForm({ data, onChange }: PatientFormProps) {
               value={data.height || ''}
               onChange={(e) => handleChange('height', parseFloat(e.target.value) || 0)}
               placeholder="Ex: 170"
+              className={validationErrors?.has('height') ? 'border-destructive' : ''}
             />
+            {validationErrors?.has('height') && (
+              <p className="text-xs text-destructive">Altura é obrigatória</p>
+            )}
           </div>
         </div>
 
@@ -98,7 +107,11 @@ function PatientForm({ data, onChange }: PatientFormProps) {
               value={data.creatinine || ''}
               onChange={(e) => handleChange('creatinine', parseFloat(e.target.value) || 0)}
               placeholder="Ex: 1.2"
+              className={validationErrors?.has('creatinine') ? 'border-destructive' : ''}
             />
+            {validationErrors?.has('creatinine') && (
+              <p className="text-xs text-destructive">Creatinina é obrigatória</p>
+            )}
           </div>
           <div className="space-y-2">
             <Label htmlFor="bilirubin">Bilirrubina Total (mg/dL)</Label>

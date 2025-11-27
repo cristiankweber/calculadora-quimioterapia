@@ -63,6 +63,14 @@ export default function Calculator() {
       }
       return prev;
     });
+    // Limpar erros de validação quando campos forem preenchidos
+    setValidationErrors(prev => {
+      const newErrors = new Set(prev);
+      if (newData.weight > 0) newErrors.delete('weight');
+      if (newData.height > 0) newErrors.delete('height');
+      if (newData.creatinine > 0) newErrors.delete('creatinine');
+      return newErrors;
+    });
   }, []);
 
   /** ESTADOS DA CALCULADORA */
@@ -74,6 +82,7 @@ export default function Calculator() {
   const [prescriptionId, setPrescriptionId] = useState<string>('');
   const [showPrint, setShowPrint] = useState(false);
   const [showEmergency, setShowEmergency] = useState(false);
+  const [validationErrors, setValidationErrors] = useState<Set<keyof PatientData>>(new Set());
 
   /** CONFIGURAÇÕES */
   const { data: institutionSettings } = trpc.settings.get.useQuery();
@@ -96,6 +105,24 @@ export default function Calculator() {
       height: patientData.height,
       creatinine: patientData.creatinine
     };
+
+    // Validar campos obrigatórios
+    const errors = new Set<keyof PatientData>();
+    if (!core.weight || core.weight <= 0) errors.add('weight');
+    if (!core.height || core.height <= 0) errors.add('height');
+    if (!core.creatinine || core.creatinine <= 0) errors.add('creatinine');
+
+    if (errors.size > 0) {
+      setValidationErrors(errors);
+      // Não calcular se houver erros
+      if (calculatedValues) {
+        setCalculatedValues(null);
+      }
+      return;
+    }
+
+    // Limpar erros se tudo estiver OK
+    setValidationErrors(new Set());
 
     if (
       core.age > 0 &&
@@ -377,7 +404,11 @@ export default function Calculator() {
 
           {/** COLUNA 1 */}
           <div className="space-y-6 lg:col-span-1">
-            <PatientForm data={patientData} onChange={handlePatientChange} />
+            <PatientForm 
+              data={patientData} 
+              onChange={handlePatientChange} 
+              validationErrors={validationErrors}
+            />
 
             <ProtocolSelector
               selectedProtocol={selectedProtocol}

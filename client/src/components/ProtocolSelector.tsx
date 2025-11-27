@@ -5,7 +5,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { protocols } from '@/data/protocols';
 import type { Protocol } from '@/types/calculator';
 import { Search } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 interface ProtocolSelectorProps {
   selectedProtocol: Protocol | null;
@@ -21,6 +21,21 @@ export default function ProtocolSelector({
   onCycleChange,
 }: ProtocolSelectorProps) {
   const [searchTerm, setSearchTerm] = useState('');
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  // Atalho Ctrl+K (ou Cmd+K no Mac) para focar no campo de busca
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+        searchInputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   // Memoizar lista de protocolos para evitar recriar objetos
   const protocolList = useMemo(() => protocols, []);
@@ -53,6 +68,7 @@ export default function ProtocolSelector({
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
+              ref={searchInputRef}
               id="search"
               type="text"
               placeholder="Digite o nome do protocolo (ex: R-CHOP, FLAG-Ida)..."

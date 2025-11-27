@@ -9,6 +9,7 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { Search } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import type { PatientData } from '@/types/calculator';
@@ -41,6 +42,7 @@ export default function PatientHistoryDB({ onLoadPatient }: PatientHistoryDBProp
     },
   });
 
+  // Filtrar por nome
   const filteredPatients = patients.filter((p) =>
     p.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -130,14 +132,24 @@ export default function PatientHistoryDB({ onLoadPatient }: PatientHistoryDBProp
         </DialogHeader>
 
         <div className="space-y-4">
-          <div>
+          <div className="space-y-2">
             <Label htmlFor="search">Buscar Paciente</Label>
-            <Input
-              id="search"
-              placeholder="Digite o nome do paciente..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                id="search"
+                type="text"
+                placeholder="Digite o nome do paciente..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+            {searchTerm && (
+              <p className="text-xs text-muted-foreground">
+                {filteredPatients.length} paciente(s) encontrado(s)
+              </p>
+            )}
           </div>
 
           {isLoading ? (
