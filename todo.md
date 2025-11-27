@@ -260,3 +260,139 @@
 - [x] Adicionar script para desregistrar Service Worker no carregamento da página
 - [x] Verificar se desregistrar Service Worker resolve o problema
 - [x] Testar atualizações (102 testes passando)
+
+
+---
+
+## 🚨 PLANO DE APRIMORAMENTO: MODO EMERGÊNCIA
+
+### Status Atual (Revisão Completa)
+
+**Implementação Existente:**
+- ✅ Modal dedicado com 4 protocolos de emergência
+- ✅ Tabs para navegação entre protocolos (Síndrome de Lise Tumoral, LMA Hiperleucocitária, Mieloma com LRA, Neutropenia Febril)
+- ✅ Estrutura organizada: Critérios Diagnósticos → Manejo → Monitorização → Alertas
+- ✅ Medicações detalhadas com doses, vias, frequências e notas clínicas
+- ✅ Design visual com cores diferenciadas por seção (laranja para diagnóstico, azul para manejo, verde para medicações, roxo para monitorização, vermelho para alertas)
+- ✅ Ícones visuais para cada protocolo (⚡ 🔴 🔵 🌡️)
+
+**Pontos Fortes:**
+- Conteúdo clínico robusto e baseado em guidelines
+- Interface limpa e organizada
+- Acesso rápido via botão vermelho proeminente no header
+
+---
+
+### Gaps Identificados e Oportunidades de Melhoria
+
+#### 1. **Falta de Integração com Calculadora Principal**
+- ❌ Modo emergência é **isolado** - não interage com dados do paciente
+- ❌ Não há cálculo automático de doses baseado em peso/SC do paciente
+- ❌ Não permite salvar prescrição de emergência no histórico
+
+#### 2. **Ausência de Protocolos Críticos**
+- ❌ Falta **LMA M3 (Promielocítica Aguda)** - emergência hematológica mais comum
+- ❌ Falta **Reação Transfusional Grave** (TRALI, sobrecarga hídrica)
+- ❌ Falta **Hipercalcemia Maligna** (comum em mieloma)
+- ❌ Falta **Compressão Medular** (oncológica)
+- ❌ Falta **Síndrome de Hiperviscosidade** (Waldenström, mieloma)
+
+#### 3. **Limitações de Usabilidade**
+- ❌ Não há campo de busca para localizar rapidamente um protocolo
+- ❌ Tabs horizontais ocupam muito espaço em telas pequenas
+- ❌ Não há impressão rápida de protocolo específico
+- ❌ Não há checklist interativo para seguir passos do protocolo
+
+#### 4. **Falta de Recursos Educacionais**
+- ❌ Não há referências bibliográficas ou guidelines citados
+- ❌ Não há vídeos ou imagens ilustrativas (ex: ECG em hipercalemia)
+- ❌ Não há calculadoras auxiliares (ex: Clearance de Creatinina, Índice de Risco MASCC)
+
+#### 5. **Ausência de Funcionalidades Avançadas**
+- ❌ Não há timer/cronômetro para monitorização temporal
+- ❌ Não há notificações de exames pendentes
+- ❌ Não há integração com laboratório para receber resultados críticos
+- ❌ Não há modo offline (PWA) para uso em áreas sem internet
+
+---
+
+### Plano de Aprimoramento (Priorizado)
+
+#### **FASE 1: Integração com Calculadora (Alta Prioridade)** - PARCIALMENTE CONCLUÍDA
+- [x] Adicionar botão "Usar dados do paciente" no modo emergência
+- [x] Exibir dados do paciente (nome, idade, peso, SC, eGFR) no modal de emergência
+- [x] Adicionar campo "Situação Clínica" para documentar contexto da emergência
+- [ ] Calcular automaticamente doses baseadas em peso/SC/eGFR do paciente atual (PENDENTE)
+- [ ] Permitir salvar prescrição de emergência no histórico do paciente (PENDENTE)
+
+#### **FASE 2: Novos Protocolos Críticos (Alta Prioridade)**
+- [ ] **LMA M3 (Promielocítica Aguda)**: ATRA + Arsenico, manejo de CIVD
+- [ ] **Hipercalcemia Maligna**: Hidratação, bifosfonatos, calcitonina, denosumabe
+- [ ] **Síndrome de Hiperviscosidade**: Plasmaférese, citorredução
+- [ ] **Compressão Medular**: Dexametasona, RT emergência, cirurgia
+- [ ] **Reação Transfusional Grave**: TRALI, sobrecarga hídrica, reação hemolítica
+
+#### **FASE 3: Melhorias de Usabilidade (Média Prioridade)**
+- [ ] Adicionar campo de busca no modal de emergência
+- [ ] Implementar layout responsivo com tabs verticais em mobile
+- [ ] Adicionar botão "Imprimir Protocolo" para cada tab
+- [ ] Criar checklist interativo com checkboxes para marcar passos concluídos
+- [ ] Adicionar atalho de teclado (Ctrl+E ou Ctrl+Shift+E) para abrir modo emergência
+
+#### **FASE 4: Recursos Educacionais (Média Prioridade)**
+- [ ] Adicionar seção "Referências" com links para guidelines (NCCN, ASH, ESMO)
+- [ ] Incluir imagens ilustrativas (ECG, radiografias, fluxogramas)
+- [ ] Adicionar vídeos curtos (2-3 min) explicando cada protocolo
+- [ ] Criar glossário de termos técnicos com tooltips
+
+#### **FASE 5: Calculadoras Auxiliares (Média Prioridade)**
+- [ ] **MASCC Score** (Risco em Neutropenia Febril)
+- [ ] **Clearance de Creatinina** (Cockcroft-Gault)
+- [ ] **Dose de Rasburicase** baseada em peso
+- [ ] **Correção de Cálcio** (cálcio corrigido por albumina)
+- [ ] **Índice de Leucostase** (risco de complicações)
+
+#### **FASE 6: Funcionalidades Avançadas (Baixa Prioridade)**
+- [ ] Timer/cronômetro para monitorização temporal (ex: "Próximo eletrólito em 4h")
+- [ ] Notificações push de exames pendentes
+- [ ] Integração com sistema laboratorial (receber resultados críticos)
+- [ ] Modo offline (PWA) com cache de protocolos
+- [ ] Exportação de protocolo para PDF com QR code
+- [ ] Sistema de alertas baseado em IA (ex: "Paciente com risco alto de SLT")
+
+---
+
+### Métricas de Sucesso
+
+**Indicadores de Impacto:**
+- Tempo médio para acessar protocolo de emergência < 10 segundos
+- Taxa de uso do modo emergência > 15% das sessões
+- Feedback de usuários: NPS > 8/10 para modo emergência
+- Redução de erros em prescrições de emergência (auditoria clínica)
+
+**Indicadores de Qualidade:**
+- 100% dos protocolos baseados em guidelines atualizados (< 2 anos)
+- Referências bibliográficas em todos os protocolos
+- Revisão clínica por hematologista a cada 6 meses
+
+---
+
+### Cronograma Sugerido
+
+- **Fase 1 (Integração)**: 1-2 semanas
+- **Fase 2 (Novos Protocolos)**: 2-3 semanas
+- **Fase 3 (Usabilidade)**: 1 semana
+- **Fase 4 (Educacional)**: 2-3 semanas
+- **Fase 5 (Calculadoras)**: 1-2 semanas
+- **Fase 6 (Avançado)**: 3-4 semanas
+
+**Total estimado**: 10-15 semanas para implementação completa
+
+---
+
+### Próximos Passos Imediatos
+
+1. **Validar prioridades** com usuário final (hematologista)
+2. **Implementar Fase 1** (integração com calculadora) - maior impacto clínico
+3. **Adicionar LMA M3** (Fase 2) - emergência mais comum em hematologia
+4. **Testar usabilidade** com médicos residentes e plantonistas

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -10,15 +10,34 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { emergencyProtocols, type EmergencyProtocol } from '@/data/emergencyProtocols';
-import { AlertTriangle, Pill, Activity, Droplet } from 'lucide-react';
+import { AlertTriangle, Pill, Activity, Droplet, User, Save } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { toast } from 'sonner';
+
+export interface EmergencyPatientData {
+  name: string;
+  age: number;
+  sex: string;
+  weight: number;
+  height: number;
+  bsa: number;
+  egfr: number;
+  creatinine: number;
+}
 
 interface EmergencyModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  patientData?: EmergencyPatientData | null;
+  onSaveEmergencyPrescription?: (protocol: string, clinicalSituation: string, medications: any[]) => void;
 }
 
-export default function EmergencyModal({ open, onOpenChange }: EmergencyModalProps) {
+export default function EmergencyModal({ open, onOpenChange, patientData, onSaveEmergencyPrescription }: EmergencyModalProps) {
   const [selectedProtocol, setSelectedProtocol] = useState<string>(emergencyProtocols[0]?.id || '');
+  const [usePatientData, setUsePatientData] = useState(false);
+  const [clinicalSituation, setClinicalSituation] = useState('');
 
   const currentProtocol = emergencyProtocols.find(p => p.id === selectedProtocol);
 
@@ -34,6 +53,47 @@ export default function EmergencyModal({ open, onOpenChange }: EmergencyModalPro
             Acesso rápido a protocolos de situações críticas em hematologia
           </p>
         </DialogHeader>
+
+        {/* Integração com Dados do Paciente */}
+        {patientData && (
+          <div className="space-y-3 p-4 bg-blue-50 dark:bg-blue-950 rounded-lg border border-blue-200 dark:border-blue-800">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <User className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                <div>
+                  <p className="font-semibold text-blue-900 dark:text-blue-300">
+                    {patientData.name || 'Paciente Atual'} - {patientData.age} anos - {patientData.sex}
+                  </p>
+                  <p className="text-sm text-blue-700 dark:text-blue-400">
+                    Peso: {patientData.weight}kg | SC: {patientData.bsa.toFixed(2)}m² | eGFR: {patientData.egfr.toFixed(0)} mL/min
+                  </p>
+                </div>
+              </div>
+              <Button
+                variant={usePatientData ? "default" : "outline"}
+                size="sm"
+                onClick={() => setUsePatientData(!usePatientData)}
+                className={usePatientData ? "bg-blue-600 hover:bg-blue-700" : ""}
+              >
+                {usePatientData ? '✓ Usando Dados' : 'Usar Dados do Paciente'}
+              </Button>
+            </div>
+
+            {/* Campo Situação Clínica */}
+            <div className="space-y-2">
+              <Label htmlFor="clinical-situation" className="text-blue-900 dark:text-blue-300">
+                Situação Clínica (Contexto da Emergência)
+              </Label>
+              <Input
+                id="clinical-situation"
+                placeholder="Ex: Paciente com LLA em indução, leucometria 250.000, dispneia progressiva..."
+                value={clinicalSituation}
+                onChange={(e) => setClinicalSituation(e.target.value)}
+                className="bg-white dark:bg-gray-900"
+              />
+            </div>
+          </div>
+        )}
 
         <Tabs value={selectedProtocol} onValueChange={setSelectedProtocol} className="w-full">
           <TabsList className="grid w-full grid-cols-4 mb-4">

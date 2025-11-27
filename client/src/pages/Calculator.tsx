@@ -11,7 +11,7 @@ import DilutionInfo from '@/components/DilutionInfo';
 import ToxicityAssessment from '@/components/ToxicityAssessment';
 import { ToxicityPredictionWithMetrics } from '@/components/ToxicityPrediction';
 import PatientHistoryDB from '@/components/PatientHistoryDB';
-import EmergencyModal from '@/components/EmergencyModal';
+import EmergencyModal, { type EmergencyPatientData } from '@/components/EmergencyModal';
 
 // Lazy load PrintablePrescription para evitar travamento ao selecionar protocolo
 const PrintablePrescription = lazy(() => import('@/components/PrintablePrescription'));
@@ -467,7 +467,20 @@ export default function Calculator() {
       )}
 
       {/** MODAL DE EMERGÊNCIA */}
-      <EmergencyModal open={showEmergency} onOpenChange={setShowEmergency} />
+      <EmergencyModal 
+        open={showEmergency} 
+        onOpenChange={setShowEmergency}
+        patientData={calculatedValues ? {
+          name: patientData.name,
+          age: patientData.age,
+          sex: patientData.sex,
+          weight: patientData.weight,
+          height: patientData.height,
+          bsa: calculatedValues.bsa,
+          egfr: calculatedValues.egfr,
+          creatinine: patientData.creatinine
+        } : null}
+      />
     </div>
   );
 }
