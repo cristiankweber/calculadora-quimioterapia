@@ -301,75 +301,6 @@ export default function Calculator() {
     }
   };
 
-  /** SALVAR PRESCRIÇÃO DE EMERGÊNCIA */
-  const handleSaveEmergencyPrescription = async (protocol: string, clinicalSituation: string, medications: any[]) => {
-    if (!patientData.name || !calculatedValues) {
-      toast.error('Dados do paciente não disponíveis');
-      return;
-    }
-
-    try {
-      // Criar/atualizar paciente
-      const patient = await createPatientMutation.mutateAsync({
-        name: patientData.name,
-        age: patientData.age,
-        sex: patientData.sex,
-        weight: patientData.weight,
-        height: patientData.height,
-        creatinine: patientData.creatinine,
-        bilirubin: patientData.bilirubin,
-        ecog: patientData.ecog,
-        comorbidities: patientData.comorbidities || undefined,
-      });
-
-      // Salvar prescrição de emergência
-      await savePrescriptionMutation.mutateAsync({
-        patientId: patient.id,
-        patientName: patientData.name,
-        protocolName: `🚨 EMERGÊNCIA: ${protocol}`,
-        cycle: 1,
-        bsa: calculatedValues.bsa,
-        egfr: calculatedValues.egfr,
-        renalStatus: calculatedValues.renalStatus,
-        prescriptionData: {
-          patientData,
-          protocol: {
-            name: `🚨 EMERGÊNCIA: ${protocol}`,
-            indication: clinicalSituation,
-            cycles: 1,
-            drugs: medications.map(med => ({
-              name: med.name,
-              dose: med.dose,
-              route: med.route,
-              days: '1',
-              notes: med.notes || ''
-            }))
-          },
-          cycle: 1,
-          calculatedValues,
-          calculatedDrugs: medications.map(med => ({
-            name: med.name,
-            baseDose: med.dose,
-            calculatedDose: parseFloat(med.dose) || 0,
-            route: med.route,
-            days: '1',
-            adjustmentReason: med.calculation || 'Dose calculada automaticamente',
-            notes: med.notes || ''
-          })),
-          antiemetics: null,
-          toxicities: {},
-          adjustmentFactor: 1.0,
-          clinicalSituation // Adicionar situação clínica
-        },
-      });
-
-      toast.success('Prescrição de emergência salva no histórico!');
-    } catch (err) {
-      console.error(err);
-      toast.error('Erro ao salvar prescrição de emergência');
-    }
-  };
-
   /** COPY PRESCRIPTION (texto) */
   const handleCopyPrescription = () => {
     if (!selectedProtocol || !calculatedValues) {
@@ -549,7 +480,6 @@ export default function Calculator() {
           egfr: calculatedValues.egfr,
           creatinine: patientData.creatinine
         } : null}
-        onSaveEmergencyPrescription={handleSaveEmergencyPrescription}
       />
     </div>
   );

@@ -334,27 +334,19 @@
 - [x] Props para receber dados do paciente no EmergencyModal
 - [x] Integração no Calculator.tsx (passa patientData para modal)
 
-**✅ Implementado (Interface/UX):**
-- [x] Card sempre visível com dados do paciente (ou mensagem se não houver)
-- [x] Botão "Usar Dados do Paciente" no header do card (desabilitado se sem dados)
-- [x] Exibição de dados do paciente (nome, idade, sexo, peso, SC, eGFR)
-- [x] Campo "Situação Clínica" para documentar contexto
-- [x] Doses calculadas exibidas nas medicações (com fórmula de cálculo)
-- [x] Botão "Salvar no Histórico" no footer do modal
-- [x] Função handleSaveEmergencyPrescription integrada
-
-**❌ Pendente (Testes):**
-- [ ] Testar fluxo completo end-to-end em ambiente limpo
-- [ ] Validar hot reload do navegador
-- [ ] Verificar salvamento no banco de dados
+**❌ Pendente (Interface/UX):**
+- [ ] Adicionar botão "Usar Dados do Paciente" no header do modal
+- [ ] Exibir dados do paciente no modal quando botão clicado
+- [ ] Adicionar campo "Situação Clínica" para documentar contexto
+- [ ] Exibir doses calculadas nas medicações (substituir texto estático)
+- [ ] Implementar botão "Salvar no Histórico"
+- [ ] Testar fluxo completo end-to-end
 
 **📝 Notas Técnicas:**
-- Implementação completa de backend e frontend
-- Card de dados do paciente sempre visível (com fallback se não houver dados)
-- Botão "Usar Dados" desabilitado quando patientData é null
-- Doses calculadas exibidas dinamicamente nas medicações
-- Função de salvamento integrada com tRPC mutations existentes
-- Pendente: testes end-to-end para validar fluxo completo
+- Função de cálculo já está pronta e testada
+- Falta apenas integrar UI para exibir resultados
+- Modal precisa de state para controlar exibição de dados do paciente
+- Salvamento no histórico requer nova mutation tRPC
 
 #### **FASE 2: Novos Protocolos Críticos (Alta Prioridade)**
 - [ ] **LMA M3 (Promielocítica Aguda)**: ATRA + Arsenico, manejo de CIVD
@@ -427,18 +419,3 @@
 2. **Implementar Fase 1** (integração com calculadora) - maior impacto clínico
 3. **Adicionar LMA M3** (Fase 2) - emergência mais comum em hematologia
 4. **Testar usabilidade** com médicos residentes e plantonistas
-
-
----
-
-## 🚨 Implementação UI Modo Emergência (Sessão Atual)
-
-### Tarefas Específicas
-- [ ] Adicionar state para controlar exibição de dados do paciente no EmergencyModal
-- [ ] Adicionar botão "Usar Dados do Paciente" no header do modal
-- [ ] Criar card com dados do paciente (nome, idade, peso, SC, eGFR)
-- [ ] Adicionar campo textarea "Situação Clínica"
-- [ ] Modificar exibição de medicações para mostrar doses calculadas
-- [ ] Adicionar botão "Salvar no Histórico"
-- [ ] Criar mutation tRPC para salvar prescrição de emergência
-- [ ] Testar fluxo: preencher paciente → abrir emergência → usar dados → ver doses → salvar → verificar histórico
