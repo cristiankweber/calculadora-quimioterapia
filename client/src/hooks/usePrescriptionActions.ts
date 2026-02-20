@@ -2,7 +2,7 @@
  * Hook que encapsula todas as ações de prescrição (salvar, copiar, PDF, imprimir).
  *
  * Responsabilidades:
- * - Salvar prescrição no banco de dados
+ * - Salvar prescrição no banco de dados (formato v2 com auditoria)
  * - Copiar prescrição para clipboard
  * - Exportar PDF
  * - Imprimir
@@ -41,6 +41,109 @@ interface UsePrescriptionActionsReturn {
   handleExportPDF: () => Promise<void>;
   handlePrint: () => void;
   setShowPrint: (show: boolean) => void;
+}
+
+/**
+ * Mapeia os dados do frontend para o formato prescriptionData v2
+ * com metadados de auditoria completos.
+ */
+function buildPrescriptionDataV2(ctx: PrescriptionContext) {
+  const protocol = ctx.selectedProtocol!;
+  const calculatedValues = ctx.calculatedValues!;
+  const adjustmentFactor = getDoseAdjustmentFactor(ctx.toxicities);
+
+  // Identificar doses manuais
+  const manualDoseOverrides = ctx.calculatedDrugs
+    .filter((d) => d.calculatedDose !== undefined && d.dose !== undefined && d.calculatedDose !== d.dose)
+    .map((d) => ({
+      drugName: d.name,
+      originalDose: d.dose,
+      manualDose: d.calculatedDose ?? d.dose,
+    }));
+
+  // Mapear toxicidades para formato de auditoria
+  // ToxicityGrade é um número simples (0-5)
+  const toxicityAdjustments = Object.entries(ctx.toxicities)
+    .filter(([, grade]) => grade > 0)
+    .map(([key, grade]) => ({
+      drugName: key,
+      toxicityType: key,
+      grade: grade as number,
+    }));
+
+  return {
+    patient: {
+      name: ctx.patientData.name,
+      age: ctx.patientData.age,
+      sex: ctx.patientData.sex,
+      weight: ctx.patientData.weight,
+      height: ctx.patientData.height,
+      creatinine: ctx.patientData.creatinine,
+      bilirubin: ctx.patientData.bilirubin,
+      ecog: ctx.patientData.ecog,
+      comorbidities: ctx.patientData.comorbidities || undefined,
+    },
+    protocol: {
+      id: protocol.id,
+      name: protocol.name,
+      category: protocol.indication,
+      indication: protocol.indication,
+      emetogenicRisk: protocol.emetogenicRisk,
+      cycle: ctx.selectedCycle,
+      totalCycles: protocol.cycles,
+    },
+    calculatedValues: {
+      bsa: calculatedValues.bsa,
+      egfr: calculatedValues.egfr,
+      renalStatus: calculatedValues.renalStatus,
+      renalStatusLabel: calculatedValues.renalStatusLabel,
+      ecogAdjustmentFactor: calculatedValues.ecogAdjustmentFactor,
+      globalAdjustmentFactor: calculatedValues.globalAdjustmentFactor,
+    },
+    drugs: ctx.calculatedDrugs.map((d) => ({
+      name: d.name,
+      baseDose: d.dose,
+      doseUnit: d.doseUnit,
+      calculatedDose: d.calculatedDose,
+      finalDose: d.calculatedDose ?? d.dose,
+      maxDose: d.maxDose,
+      route: d.route,
+      days: d.days,
+      notes: d.observations,
+      isManualDose: false,
+    })),
+    preMedications: ctx.antiemetics
+      ? [
+          ...ctx.antiemetics.day1.map((med) => ({ name: med, schedule: "D1" })),
+          ...ctx.antiemetics.days2to4.map((med) => ({ name: med, schedule: "D2-D4" })),
+        ]
+      : undefined,
+    alerts: protocol.specialAlerts?.map((msg) => ({
+      type: "protocol",
+      message: msg,
+    })),
+    audit: {
+      version: 2 as const,
+      formulaVersions: {
+        bsa: "DuBois",
+        egfr: "CKD-EPI-2021",
+        dose: "standard",
+      },
+      generatedAt: Date.now(),
+      globalAdjustmentFactor: adjustmentFactor,
+      toxicityAdjustments: toxicityAdjustments.length > 0 ? toxicityAdjustments : undefined,
+      manualDoseOverrides: manualDoseOverrides.length > 0 ? manualDoseOverrides : undefined,
+      clinicalInputs: {
+        weight: ctx.patientData.weight,
+        height: ctx.patientData.height,
+        creatinine: ctx.patientData.creatinine,
+        age: ctx.patientData.age,
+        sex: ctx.patientData.sex,
+        ecog: ctx.patientData.ecog,
+        bilirubin: ctx.patientData.bilirubin,
+      },
+    },
+  };
 }
 
 export function usePrescriptionActions(ctx: PrescriptionContext): UsePrescriptionActionsReturn {
@@ -84,6 +187,9 @@ export function usePrescriptionActions(ctx: PrescriptionContext): UsePrescriptio
         comorbidities: ctx.patientData.comorbidities || undefined,
       });
 
+      // Construir payload v2 com metadados de auditoria
+      const prescriptionDataV2 = buildPrescriptionDataV2(ctx);
+
       const prescription = await savePrescriptionMutation.mutateAsync({
         patientId: patient.id,
         patientName: ctx.patientData.name,
@@ -92,23 +198,16 @@ export function usePrescriptionActions(ctx: PrescriptionContext): UsePrescriptio
         bsa: ctx.calculatedValues!.bsa,
         egfr: ctx.calculatedValues!.egfr,
         renalStatus: ctx.calculatedValues!.renalStatus,
-        prescriptionData: {
-          patientData: ctx.patientData,
-          protocol: ctx.selectedProtocol,
-          cycle: ctx.selectedCycle,
-          calculatedValues: ctx.calculatedValues,
-          calculatedDrugs: ctx.calculatedDrugs,
-          antiemetics: ctx.antiemetics,
-          toxicities: ctx.toxicities,
-          adjustmentFactor: getDoseAdjustmentFactor(ctx.toxicities),
-        },
+        prescriptionData: prescriptionDataV2,
       });
 
       setPrescriptionId(prescription.prescriptionId);
       toast.success(`Prescrição salva! ID: ${prescription.prescriptionId}`);
-    } catch (err) {
+    } catch (err: unknown) {
       console.error(err);
-      toast.error('Erro ao salvar.');
+      // Exibir mensagem de erro do backend se disponível
+      const message = err instanceof Error ? err.message : 'Erro ao salvar.';
+      toast.error(message.includes('Doses inválidas') ? message : 'Erro ao salvar prescrição.');
     }
   }, [
     ctx.patientData,

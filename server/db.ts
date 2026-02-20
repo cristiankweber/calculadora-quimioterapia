@@ -1,10 +1,10 @@
 import { eq, desc } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { 
-  InsertUser, 
-  users, 
-  patients, 
-  InsertPatient, 
+import {
+  InsertUser,
+  users,
+  patients,
+  InsertPatient,
   Patient,
   prescriptions,
   InsertPrescription,
@@ -13,24 +13,45 @@ import {
   InsertProtocolUsage,
   institutionSettings,
   InsertInstitutionSettings,
-  InstitutionSettings
+  InstitutionSettings,
 } from "../drizzle/schema";
-import { ENV } from './_core/env';
+import { ENV } from "./_core/env";
+
+// ─── Conexão com o banco ────────────────────────────────────────────────────
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
-// Lazily create the drizzle instance so local tooling can run without a DB.
+/**
+ * Obtém instância do Drizzle, criando-a sob demanda.
+ * Em caso de falha, loga e retorna null (graceful degradation).
+ */
 export async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
     try {
       _db = drizzle(process.env.DATABASE_URL);
     } catch (error) {
-      console.warn("[Database] Failed to connect:", error);
+      console.error("[Database] Falha ao conectar:", error);
       _db = null;
     }
   }
   return _db;
 }
+
+/**
+ * Obtém instância do Drizzle ou lança exceção.
+ * Usar em operações de escrita onde falha silenciosa é inaceitável.
+ */
+async function requireDb(): Promise<ReturnType<typeof drizzle>> {
+  const db = await getDb();
+  if (!db) {
+    throw new Error(
+      "[Database] Banco de dados indisponível. Verifique DATABASE_URL."
+    );
+  }
+  return db;
+}
+
+// ─── Usuários ───────────────────────────────────────────────────────────────
 
 export async function upsertUser(user: InsertUser): Promise<void> {
   if (!user.openId) {
@@ -70,8 +91,8 @@ export async function upsertUser(user: InsertUser): Promise<void> {
       values.role = user.role;
       updateSet.role = user.role;
     } else if (user.openId === ENV.ownerOpenId) {
-      values.role = 'admin';
-      updateSet.role = 'admin';
+      values.role = "admin";
+      updateSet.role = "admin";
     }
 
     if (!values.lastSignedIn) {
@@ -98,193 +119,228 @@ export async function getUserByOpenId(openId: string) {
     return undefined;
   }
 
-  const result = await db.select().from(users).where(eq(users.openId, openId)).limit(1);
+  const result = await db
+    .select()
+    .from(users)
+    .where(eq(users.openId, openId))
+    .limit(1);
 
   return result.length > 0 ? result[0] : undefined;
 }
 
-// ===== Funções de Pacientes =====
+// ─── Pacientes ──────────────────────────────────────────────────────────────
 
-export async function createPatient(patient: InsertPatient): Promise<Patient> {
-  const db = await getDb();
-  if (!db) {
-    throw new Error("Database not available");
-  }
+export async function createPatient(
+  patient: InsertPatient
+): Promise<Patient> {
+  const db = await requireDb();
 
   const result = await db.insert(patients).values(patient);
   const insertedId = result[0].insertId;
-  
-  const inserted = await db.select().from(patients).where(eq(patients.id, insertedId)).limit(1);
+
+  const inserted = await db
+    .select()
+    .from(patients)
+    .where(eq(patients.id, insertedId))
+    .limit(1);
   return inserted[0]!;
 }
 
-export async function getPatientsByUserId(userId: number): Promise<Patient[]> {
+export async function getPatientsByUserId(
+  userId: number
+): Promise<Patient[]> {
   const db = await getDb();
-  if (!db) {
-    return [];
-  }
+  if (!db) return [];
 
-  return await db.select().from(patients).where(eq(patients.userId, userId)).orderBy(desc(patients.updatedAt));
+  return await db
+    .select()
+    .from(patients)
+    .where(eq(patients.userId, userId))
+    .orderBy(desc(patients.updatedAt));
 }
 
-export async function getPatientById(id: number): Promise<Patient | undefined> {
+export async function getPatientById(
+  id: number
+): Promise<Patient | undefined> {
   const db = await getDb();
-  if (!db) {
-    return undefined;
-  }
+  if (!db) return undefined;
 
-  const result = await db.select().from(patients).where(eq(patients.id, id)).limit(1);
+  const result = await db
+    .select()
+    .from(patients)
+    .where(eq(patients.id, id))
+    .limit(1);
   return result[0];
 }
 
-export async function updatePatient(id: number, data: Partial<InsertPatient>): Promise<void> {
-  const db = await getDb();
-  if (!db) {
-    throw new Error("Database not available");
-  }
-
+export async function updatePatient(
+  id: number,
+  data: Partial<InsertPatient>
+): Promise<void> {
+  const db = await requireDb();
   await db.update(patients).set(data).where(eq(patients.id, id));
 }
 
 export async function deletePatient(id: number): Promise<void> {
-  const db = await getDb();
-  if (!db) {
-    throw new Error("Database not available");
-  }
-
+  const db = await requireDb();
   await db.delete(patients).where(eq(patients.id, id));
 }
 
-// ===== Funções de Prescrições =====
+// ─── Prescrições ────────────────────────────────────────────────────────────
 
-export async function createPrescription(prescription: InsertPrescription): Promise<Prescription> {
-  const db = await getDb();
-  if (!db) {
-    throw new Error("Database not available");
-  }
+export async function createPrescription(
+  prescription: InsertPrescription
+): Promise<Prescription> {
+  const db = await requireDb();
 
   const result = await db.insert(prescriptions).values(prescription);
   const insertedId = result[0].insertId;
-  
-  const inserted = await db.select().from(prescriptions).where(eq(prescriptions.id, insertedId)).limit(1);
+
+  const inserted = await db
+    .select()
+    .from(prescriptions)
+    .where(eq(prescriptions.id, insertedId))
+    .limit(1);
   return inserted[0]!;
 }
 
-export async function getPrescriptionsByUserId(userId: number, limit = 50): Promise<Prescription[]> {
+export async function getPrescriptionsByUserId(
+  userId: number,
+  limit = 50
+): Promise<Prescription[]> {
   const db = await getDb();
-  if (!db) {
-    return [];
-  }
+  if (!db) return [];
 
-  return await db.select().from(prescriptions).where(eq(prescriptions.userId, userId)).orderBy(desc(prescriptions.createdAt)).limit(limit);
+  return await db
+    .select()
+    .from(prescriptions)
+    .where(eq(prescriptions.userId, userId))
+    .orderBy(desc(prescriptions.createdAt))
+    .limit(limit);
 }
 
-export async function getPrescriptionsByPatientId(patientId: number): Promise<Prescription[]> {
+export async function getPrescriptionsByPatientId(
+  patientId: number
+): Promise<Prescription[]> {
   const db = await getDb();
-  if (!db) {
-    return [];
-  }
+  if (!db) return [];
 
-  return await db.select().from(prescriptions).where(eq(prescriptions.patientId, patientId)).orderBy(desc(prescriptions.createdAt));
+  return await db
+    .select()
+    .from(prescriptions)
+    .where(eq(prescriptions.patientId, patientId))
+    .orderBy(desc(prescriptions.createdAt));
 }
 
-export async function getPrescriptionById(id: number): Promise<Prescription | undefined> {
+export async function getPrescriptionById(
+  id: number
+): Promise<Prescription | undefined> {
   const db = await getDb();
-  if (!db) {
-    return undefined;
-  }
+  if (!db) return undefined;
 
-  const result = await db.select().from(prescriptions).where(eq(prescriptions.id, id)).limit(1);
+  const result = await db
+    .select()
+    .from(prescriptions)
+    .where(eq(prescriptions.id, id))
+    .limit(1);
   return result[0];
 }
 
-export async function getPrescriptionByPrescriptionId(prescriptionId: string): Promise<Prescription | undefined> {
+export async function getPrescriptionByPrescriptionId(
+  prescriptionId: string
+): Promise<Prescription | undefined> {
   const db = await getDb();
-  if (!db) {
-    return undefined;
-  }
+  if (!db) return undefined;
 
-  const result = await db.select().from(prescriptions).where(eq(prescriptions.prescriptionId, prescriptionId)).limit(1);
+  const result = await db
+    .select()
+    .from(prescriptions)
+    .where(eq(prescriptions.prescriptionId, prescriptionId))
+    .limit(1);
   return result[0];
 }
 
-// ===== Funções de Estatísticas =====
+// ─── Estatísticas ───────────────────────────────────────────────────────────
 
-export async function recordProtocolUsage(usage: InsertProtocolUsage): Promise<void> {
+export async function recordProtocolUsage(
+  usage: InsertProtocolUsage
+): Promise<void> {
   const db = await getDb();
-  if (!db) {
-    return;
-  }
+  if (!db) return;
 
   await db.insert(protocolUsage).values(usage);
 }
 
 export async function getProtocolUsageStats(userId?: number) {
   const db = await getDb();
-  if (!db) {
-    return [];
-  }
+  if (!db) return [];
 
-  // Retorna estatísticas agregadas de uso de protocolos
-  // Se userId for fornecido, filtra por usuário
   let query = db.select().from(protocolUsage);
-  
+
   if (userId) {
     query = query.where(eq(protocolUsage.userId, userId)) as any;
   }
 
-  const results = await query.orderBy(desc(protocolUsage.usedAt)).limit(100);
+  const results = await query
+    .orderBy(desc(protocolUsage.usedAt))
+    .limit(100);
   return results;
 }
 
-// ===== Funções de Configurações Institucionais =====
+// ─── Configurações Institucionais ───────────────────────────────────────────
 
-export async function getInstitutionSettings(userId: number): Promise<InstitutionSettings | undefined> {
+export async function getInstitutionSettings(
+  userId: number
+): Promise<InstitutionSettings | undefined> {
   const db = await getDb();
-  if (!db) {
-    return undefined;
-  }
+  if (!db) return undefined;
 
-  const result = await db.select().from(institutionSettings).where(eq(institutionSettings.userId, userId)).limit(1);
+  const result = await db
+    .select()
+    .from(institutionSettings)
+    .where(eq(institutionSettings.userId, userId))
+    .limit(1);
   return result[0];
 }
 
-export async function upsertInstitutionSettings(userId: number, settings: Partial<InsertInstitutionSettings>): Promise<void> {
-  const db = await getDb();
-  if (!db) {
-    throw new Error("Database not available");
-  }
+export async function upsertInstitutionSettings(
+  userId: number,
+  settings: Partial<InsertInstitutionSettings>
+): Promise<void> {
+  const db = await requireDb();
 
   const values: InsertInstitutionSettings = {
     userId,
     ...settings,
   };
 
-  await db.insert(institutionSettings).values(values).onDuplicateKeyUpdate({
-    set: settings,
-  });
+  await db
+    .insert(institutionSettings)
+    .values(values)
+    .onDuplicateKeyUpdate({
+      set: settings,
+    });
 }
 
-// ===== Funções de Estatísticas Avançadas =====
+// ─── Estatísticas Avançadas ─────────────────────────────────────────────────
 
 export async function getTopProtocols(userId: number, limit = 10) {
   const db = await getDb();
-  if (!db) {
-    return [];
-  }
+  if (!db) return [];
 
-  // Agrupa protocolos por nome e conta quantas vezes foram usados
   const results = await db
     .select()
     .from(protocolUsage)
     .where(eq(protocolUsage.userId, userId))
     .orderBy(desc(protocolUsage.usedAt));
 
-  // Agregar manualmente (Drizzle não tem GROUP BY nativo em todos os dialetos)
   const counts = new Map<string, { name: string; count: number }>();
-  
+
   for (const usage of results) {
-    const current = counts.get(usage.protocolId) || { name: usage.protocolName, count: 0 };
+    const current = counts.get(usage.protocolId) || {
+      name: usage.protocolName,
+      count: 0,
+    };
     current.count++;
     counts.set(usage.protocolId, current);
   }
@@ -296,9 +352,7 @@ export async function getTopProtocols(userId: number, limit = 10) {
 
 export async function getProtocolsByIndication(userId: number) {
   const db = await getDb();
-  if (!db) {
-    return [];
-  }
+  if (!db) return [];
 
   const results = await db
     .select()
@@ -306,9 +360,8 @@ export async function getProtocolsByIndication(userId: number) {
     .where(eq(protocolUsage.userId, userId))
     .orderBy(desc(protocolUsage.usedAt));
 
-  // Agregar por indicação
   const byIndication = new Map<string, number>();
-  
+
   for (const usage of results) {
     const indication = usage.indication || "Não especificada";
     byIndication.set(indication, (byIndication.get(indication) || 0) + 1);
@@ -322,22 +375,16 @@ export async function getProtocolsByIndication(userId: number) {
 
 export async function getToxicityStats(userId: number) {
   const db = await getDb();
-  if (!db) {
-    return [];
-  }
+  if (!db) return [];
 
-  // Por enquanto retorna array vazio - será implementado quando toxicidades forem registradas
-  // No futuro, buscar da tabela toxicityAlerts
+  // Será implementado quando toxicidades forem registradas
   return [];
 }
 
 export async function getPrescriptionTrends(userId: number, days = 30) {
   const db = await getDb();
-  if (!db) {
-    return [];
-  }
+  if (!db) return [];
 
-  // Buscar prescrições dos últimos N dias
   const cutoffDate = new Date();
   cutoffDate.setDate(cutoffDate.getDate() - days);
 
@@ -347,13 +394,12 @@ export async function getPrescriptionTrends(userId: number, days = 30) {
     .where(eq(prescriptions.userId, userId))
     .orderBy(desc(prescriptions.createdAt));
 
-  // Filtrar por data e agregar por dia
   const byDay = new Map<string, number>();
-  
+
   for (const prescription of results) {
     if (prescription.createdAt < cutoffDate) continue;
-    
-    const dateKey = prescription.createdAt.toISOString().split('T')[0];
+
+    const dateKey = prescription.createdAt.toISOString().split("T")[0];
     byDay.set(dateKey, (byDay.get(dateKey) || 0) + 1);
   }
 
@@ -379,16 +425,14 @@ export async function getStatsOverview(userId: number) {
     db.select().from(protocolUsage).where(eq(protocolUsage.userId, userId)),
   ]);
 
-  // Contar atividade recente (últimos 7 dias)
   const sevenDaysAgo = new Date();
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-  
+
   const recentActivity = prescriptionsList.filter(
-    p => p.createdAt >= sevenDaysAgo
+    (p) => p.createdAt >= sevenDaysAgo
   ).length;
 
-  // Contar protocolos únicos
-  const uniqueProtocols = new Set(protocolsList.map(p => p.protocolId));
+  const uniqueProtocols = new Set(protocolsList.map((p) => p.protocolId));
 
   return {
     totalPrescriptions: prescriptionsList.length,

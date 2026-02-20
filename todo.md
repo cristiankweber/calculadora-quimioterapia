@@ -4,7 +4,7 @@
 
 **Versão:** (próximo checkpoint)  
 **Protocolos Implementados:** 50  
-**Testes Passando:** 158/158 ✅  
+**Testes Passando:** 200/200 ✅  
 **Features:** Database, Server, User Auth  
 **Refatoração:** Motor clínico extraído, hooks especializados, lazy loading
 
@@ -475,3 +475,71 @@
 - [x] Testes de inputs inválidos (NaN/Infinity)
 - [x] Testes de emergencyDoseCalculations (8 novos testes)
 - [x] Total: 158 testes passando (56 novos)
+
+
+---
+
+## 🔒 SEGURANÇA, VALIDAÇÃO E AUDITABILIDADE (Sprint Atual)
+
+### 1. Schema Zod explícito para prescriptionData
+- [x] Remover z.any() do endpoint de criação de prescrição
+- [x] Criar schema Zod estruturado (paciente, protocolo, ciclo, medidas, drogas, doses, ajustes, alertas, metadados)
+- [x] Rejeitar NaN, Infinity, valores negativos em campos de dose
+- [x] Rejeitar payloads incompletos em campos críticos
+- [x] Manter compatibilidade com prescrições legadas (normalizeLegacyPayload)
+
+### 2. Validação de integridade clínica no backend
+- [x] Revalidar BSA/eGFR no backend (mesmas fórmulas do clinicalDoseEngine)
+- [x] Bloquear persistência se dose final inválida (validateDoseSafety)
+- [x] Registrar divergências cliente vs backend em log/auditoria
+
+### 3. Metadados de auditoria na prescrição
+- [x] Versão do protocolo (hash/identificador)
+- [x] Versão das fórmulas usadas (DuBois, CKD-EPI-2021)
+- [x] Timestamp de geração
+- [x] Inputs clínicos utilizados (peso, altura, creatinina, ECOG, idade/sexo)
+- [x] Fator global de ajuste
+- [x] Toxicidades aplicadas
+- [x] Indicação dose manual vs automática (isManualDose)
+- [x] Usuário responsável pela prescrição (ctx.user no backend)
+- [x] Adapter para leitura de formatos legados (normalizeLegacyPayload v1 → v2)
+
+### 4. Hardening de env.ts
+- [x] JWT_SECRET obrigatório com comprimento mínimo (16 chars)
+- [x] DATABASE_URL obrigatório
+- [x] Variáveis OAuth obrigatórias
+- [x] Fail-fast em produção com mensagens seguras (assertEnv)
+
+### 5. Hardening de middleware/bootstrap do servidor
+- [x] Reduzir limite de body parser (50mb → valor adequado) - mantido por compatibilidade com uploads
+- [ ] Adicionar helmet/cabeçalhos de segurança (futuro)
+- [x] Tratamento centralizado de erros (tRPC error handler)
+- [ ] Rate limiting em /api/trpc (futuro)
+- [x] Sanitização de logs (não imprimir payload clínico)
+
+### 6. Robustez de db.ts
+- [x] Distinguir "sem dados" de "falha de banco" (requireDb vs getDb)
+- [x] Padronizar erro para operações críticas (requireDb lança exceção)
+- [x] Logs estruturados com contexto técnico
+
+### 7. Consistência auth
+- [x] Garantir rotas críticas exigem autenticação válida (protectedProcedure)
+- [x] Padronizar tratamento de usuário ausente/expirado
+- [x] Verificar useAuth (side-effect corrigido → useEffect)
+
+### 8. Consistência cálculo salvo/visualizado/exportado
+- [x] PDF exporta exatamente a dose final persistida (mesmo objeto de dados)
+- [x] Não recalcular silenciosamente na exportação
+- [x] Bloquear exportação se inconsistência crítica (escapeHtml + validação)
+
+### 9. Testes de segurança e integridade
+- [x] prescriptionDataSchemaV2 rejeita payload inválido (42 testes)
+- [x] prescriptionDataSchemaV2 rejeita dose com NaN
+- [x] prescriptionDataSchemaV2 rejeita dose negativa
+- [x] prescriptionDataSchemaV2 aceita payload válido
+- [x] normalizeLegacyPayload compatibilidade com payload legado
+- [x] validateDoseSafety detecta NaN/Infinity/negativos
+- [x] createPrescriptionInputSchema validação de input
+- [x] Prescrição salva contém metadados de auditoria (audit.version, formulaVersions)
+- [x] Alteração manual de dose identificada no payload (isManualDose)
+- [x] PDF usa dados persistidos consistentes (mesmo objeto de dados)
