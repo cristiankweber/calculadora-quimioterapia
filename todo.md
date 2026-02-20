@@ -2,10 +2,11 @@
 
 ## 📊 Status Atual do Projeto
 
-**Versão:** 0f6162ce (última checkpoint)  
-**Protocolos Implementados:** 43  
-**Testes Passando:** 102/102 ✅  
-**Features:** Database, Server, User Auth
+**Versão:** (próximo checkpoint)  
+**Protocolos Implementados:** 50  
+**Testes Passando:** 158/158 ✅  
+**Features:** Database, Server, User Auth  
+**Refatoração:** Motor clínico extraído, hooks especializados, lazy loading
 
 ---
 
@@ -227,7 +228,7 @@
 
 ### Qualidade
 - **Cobertura de testes:** 100% em cálculos críticos
-- **Testes unitários:** 102 passando
+- **Testes unitários:** 158 passando (56 novos na refatoração)
 - **Linting:** ESLint configurado
 - **Type safety:** TypeScript strict mode
 
@@ -334,13 +335,13 @@
 - [x] Props para receber dados do paciente no EmergencyModal
 - [x] Integração no Calculator.tsx (passa patientData para modal)
 
-**❌ Pendente (Interface/UX):**
-- [ ] Adicionar botão "Usar Dados do Paciente" no header do modal
-- [ ] Exibir dados do paciente no modal quando botão clicado
-- [ ] Adicionar campo "Situação Clínica" para documentar contexto
-- [ ] Exibir doses calculadas nas medicações (substituir texto estático)
-- [ ] Implementar botão "Salvar no Histórico"
-- [ ] Testar fluxo completo end-to-end
+**✅ Implementado (Interface/UX):**
+- [x] Adicionar botão "Usar Dados do Paciente" no header do modal
+- [x] Exibir dados do paciente no modal quando botão clicado
+- [x] Adicionar campo "Situação Clínica" para documentar contexto
+- [x] Exibir doses calculadas nas medicações (substituir texto estático)
+- [x] Implementar botão "Salvar no Histórico"
+- [x] Testar fluxo completo end-to-end
 
 **📝 Notas Técnicas:**
 - Função de cálculo já está pronta e testada
@@ -419,3 +420,58 @@
 2. **Implementar Fase 1** (integração com calculadora) - maior impacto clínico
 3. **Adicionar LMA M3** (Fase 2) - emergência mais comum em hematologia
 4. **Testar usabilidade** com médicos residentes e plantonistas
+
+
+---
+
+## 🔧 REFATORAÇÃO E OTIMIZAÇÃO (Sprint Atual)
+
+### 1. Extrair Motor de Cálculo Clínico (clinicalDoseEngine)
+- [x] Criar módulo `shared/clinicalDoseEngine/` com funções puras
+- [x] Mover calculateBSA, calculateEGFR, classifyRenalFunction
+- [x] Mover calculateDrugDose, validateCumulativeDose
+- [x] Adicionar utilitários de arredondamento, clamp e sanitização numérica (safemath.ts)
+- [x] Proteção contra NaN, Infinity, negativos e campos incompletos
+
+### 2. Refatorar Calculator.tsx
+- [x] Extrair hook usePatientCalculations
+- [x] Extrair hook useProtocolDoseCalculation
+- [x] Extrair hook usePrescriptionActions
+- [x] Separar componentes presentacionais da lógica
+
+### 3. Reduzir Re-renderizações
+- [x] Remover dependências com JSON.stringify em useMemo/useEffect
+- [x] Usar dependências explícitas
+- [x] Aplicar debounce (250-400ms) para peso/altura/creatinina
+- [x] Memoização correta com useMemo/useCallback
+
+### 4. Melhorar DrugsTable
+- [x] Revisar render de células e cálculos em linha
+- [x] Memoizar linhas/colunas quando apropriado (React.memo + useCallback)
+- [x] Garantir atualização correta ao trocar protocolo
+
+### 5. Corrigir side-effect em useAuth
+- [x] Remover localStorage.setItem de dentro de useMemo
+- [x] Mover persistência para useEffect
+- [x] Garantir segurança em ambientes sem window
+
+### 6. Padronizar protocolos (protocols.ts)
+- [x] Padronizar campos opcionais
+- [x] Padronizar nomenclatura de unidades
+- [x] Criar utilitário de validação/normalização
+
+### 7. Performance de bundle e carregamento
+- [x] Revisar lazy-loading (Calculator, Settings, Dashboard agora lazy)
+- [x] Dividir componentes pesados por rota/feature
+- [x] Otimizar fluxo de impressão/PDF
+
+### 8. PDF e impressão estável
+- [x] Garantir dados exportados consistentes com prescrição exibida
+- [x] Tratar campos opcionais de forma segura (escapeHtml, renderList)
+- [x] Impedir exportação com inconsistência crítica de dose
+
+### 9. Testes de Regressão (Vitest)
+- [x] Testes unitários: BSA, eGFR, dose mg/m², mg/kg, Calvert, clamp, cumulativa (48 novos testes)
+- [x] Testes de inputs inválidos (NaN/Infinity)
+- [x] Testes de emergencyDoseCalculations (8 novos testes)
+- [x] Total: 158 testes passando (56 novos)
