@@ -54,6 +54,11 @@ const DrugRow = memo(function DrugRow({
             Calvert
           </Badge>
         )}
+        {drug.doseUnit === 'cGy' && (
+          <Badge variant="outline" className="ml-2 text-xs bg-purple-50 text-purple-700 border-purple-300">
+            Procedimento
+          </Badge>
+        )}
       </TableCell>
       <TableCell className="font-bold text-primary">
         {isEditing ? (
@@ -74,7 +79,7 @@ const DrugRow = memo(function DrugRow({
               className="hover:bg-muted px-2 py-1 rounded transition-colors cursor-pointer"
               title="Clique para ajustar manualmente"
             >
-              {(drug.calculatedDose || 0).toFixed(1)} mg
+              {(drug.calculatedDose || 0).toFixed(1)} {drug.doseUnit === 'mcg/kg' ? 'mcg' : drug.doseUnit === 'cGy' ? 'cGy' : 'mg'}
             </button>
             {drug.maxDose && drug.calculatedDose && drug.calculatedDose >= drug.maxDose && (
               <Badge variant="outline" className="text-xs bg-yellow-50 text-yellow-700 border-yellow-300">

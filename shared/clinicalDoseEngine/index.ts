@@ -16,7 +16,7 @@ import { isPositiveFinite, safeRound, clamp } from './safemath';
 export type Sex = 'M' | 'F';
 export type ECOGScore = 0 | 1 | 2 | 3 | 4;
 export type RenalStatus = 'green' | 'yellow' | 'red';
-export type DoseUnit = 'mg/m²' | 'mg/kg' | 'mg' | 'AUC';
+export type DoseUnit = 'mg/m²' | 'mg/kg' | 'mg' | 'AUC' | 'mcg/kg' | 'cGy';
 export type CumulativeAlertLevel = 'safe' | 'warning' | 'near-limit' | 'exceeded';
 
 export interface PatientMetrics {
@@ -204,6 +204,13 @@ export function calculateDrugDose(input: DrugDoseInput): number {
       break;
     case 'mg':
       // Dose fixa, sem cálculo
+      break;
+    case 'mcg/kg':
+      if (!isPositiveFinite(weight)) return 0;
+      calculatedDose = baseDose * weight; // resultado em mcg
+      break;
+    case 'cGy':
+      // Procedimento de radioterapia — dose fixa, sem cálculo
       break;
     default:
       return 0;

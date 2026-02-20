@@ -3462,6 +3462,153 @@ export const protocols: Protocol[] = [
     ],
     emetogenicRisk: 'low',
   },
+  // ═══════════════════════════════════════════════════════════════════════════
+  // TCTH — Condicionamento Haploidêntico Não Mieloablativo
+  // ═══════════════════════════════════════════════════════════════════════════
+  {
+    id: 'flucytbi-haplo',
+    name: 'FluCyTBI Haplo (Condicionamento NMA + PTCy)',
+    indication: 'TCTH haploidêntico não mieloablativo — LLA, Linfoma de Hodgkin, Anemia Aplásica e outras indicações de transplante haplo com ciclofosfamida pós',
+    cycles: 1,
+    cycleLength: 12, // D-6 a D+5
+    drugs: [
+      // ── Condicionamento (pré-TMO) ──────────────────────────────────────────
+      {
+        name: 'Fludarabina',
+        dose: 30,
+        doseUnit: 'mg/m²',
+        calculatedDose: 0,
+        route: 'IV em 30 min',
+        days: 'D-6, D-5, D-4, D-3, D-2',
+        observations: '5 doses. Ajuste renal: CCr 46–60 → 24 mg/m²; CCr 31–45 → 22,5 mg/m²; CCr 21–30 → 19,5 mg/m²; CCr <20 → 15 mg/m²',
+        renalAdjustment: 'Ajuste obrigatório se ClCr < 61 mL/min (ver observações)',
+        emetogenicRisk: 'low',
+      },
+      {
+        name: 'Ciclofosfamida (pré-TMO)',
+        dose: 14.5,
+        doseUnit: 'mg/kg',
+        calculatedDose: 0,
+        route: 'IV em 1-2h',
+        days: 'D-6, D-5',
+        observations: 'Calcular por peso real. Se obesidade: considerar peso ajustado. Hidratação vigorosa obrigatória.',
+        emetogenicRisk: 'high',
+      },
+      {
+        name: 'TBI (Irradiação Corporal Total)',
+        dose: 200,
+        doseUnit: 'cGy',
+        calculatedDose: 200,
+        route: 'Radioterapia',
+        days: 'D-1',
+        observations: 'PROCEDIMENTO: 200 cGy em dose única. Não é baseado em BSA/peso. Coordenar com serviço de radioterapia.',
+        emetogenicRisk: 'high',
+      },
+      // ── D0: Infusão de CTH ──────────────────────────────────────────────────
+      // (evento do transplante, não é droga)
+      // ── Pós-transplante / Profilaxia DECH ──────────────────────────────────
+      {
+        name: 'Ciclofosfamida PTCy (pós-TMO)',
+        dose: 50,
+        doseUnit: 'mg/kg',
+        calculatedDose: 0,
+        route: 'IV em 1-2h',
+        days: 'D+3, D+4',
+        observations: 'Profilaxia DECH. Hidratação vigorosa + Mesna obrigatórios. NÃO iniciar imunossupressores antes de 24h após última dose.',
+        emetogenicRisk: 'high',
+      },
+      {
+        name: 'Mesna (com PTCy)',
+        dose: 0, // calculada como 125% da dose diária de PTCy
+        doseUnit: 'mg',
+        calculatedDose: 0,
+        route: 'IV contínuo',
+        days: 'D+3, D+4',
+        observations: 'Dose = 125% da dose diária de Ciclofosfamida PTCy. Iniciar 30 min antes da Cy + infusão contínua por 24h. Calculada automaticamente.',
+        emetogenicRisk: 'minimal',
+      },
+      // ── Suporte / Manutenção (D+5 em diante) ────────────────────────────────
+      {
+        name: 'Tacrolimus (TAK)',
+        dose: 0.015,
+        doseUnit: 'mg/kg',
+        calculatedDose: 0,
+        route: 'IV contínuo 24h',
+        days: 'D+5 (até D+180)',
+        observations: 'Meta de nível sérico: 5–10 ng/mL. Monitorar níveis a cada 48-72h. Duração padrão até D+180 (ou conforme DECH). Conversão para VO quando tolerância oral.',
+        emetogenicRisk: 'minimal',
+      },
+      {
+        name: 'Micofenolato Mofetil (MMF)',
+        dose: 15,
+        doseUnit: 'mg/kg',
+        maxDose: 1000, // máximo por dose (1g TID = 3g/dia)
+        calculatedDose: 0,
+        route: 'VO 3x/dia (TID)',
+        days: 'D+5 (até D+35)',
+        observations: 'Dose máxima: 1g por tomada (3g/dia total). Duração padrão até D+35 (configurável: D+60 ou D+90 conforme instituição).',
+        emetogenicRisk: 'minimal',
+      },
+      {
+        name: 'Filgrastim (G-CSF)',
+        dose: 5,
+        doseUnit: 'mcg/kg',
+        calculatedDose: 0,
+        route: 'SC',
+        days: 'D+5 (até ANC > 1.000)',
+        observations: 'Manter até ANC > 1.000/mm³ por 3 dias consecutivos. Arredondar para apresentação/frasco mais próximo.',
+        emetogenicRisk: 'minimal',
+      },
+    ],
+    renalAdjustments: [
+      'Fludarabina: ajuste obrigatório se ClCr < 61 mL/min (Cockcroft-Gault)',
+      'CCr 46–60 mL/min → Fludarabina 24 mg/m²',
+      'CCr 31–45 mL/min → Fludarabina 22,5 mg/m²',
+      'CCr 21–30 mL/min → Fludarabina 19,5 mg/m²',
+      'CCr < 20 mL/min → Fludarabina 15 mg/m²',
+      'Ciclofosfamida: sem ajuste renal específico (monitorar toxicidade)',
+      'Tacrolimus: monitorar níveis séricos rigorosamente em insuficiência renal',
+    ],
+    hepaticAdjustments: [
+      'Ciclofosfamida: cautela em hepatopatia grave',
+      'Tacrolimus: reduzir dose se bilirrubina > 2× LSN',
+      'MMF: monitorar função hepática',
+    ],
+    hematologicAdjustments: [
+      'Não aplicável — protocolo de condicionamento para TCTH (mielossupressor por definição)',
+    ],
+    prophylaxis: [
+      'Aciclovir 400 mg 12/12h (profilaxia HSV/VZV)',
+      'SMX-TMP 800/160 mg 3x/semana (profilaxia PCP — iniciar após pega)',
+      'Fluconazol 400 mg/dia ou Posaconazol (profilaxia antifúngica)',
+      'Levofloxacino 500 mg/dia (profilaxia antibacteriana durante neutropenia)',
+      'Hidratação vigorosa nos dias de Ciclofosfamida (pré e pós-TMO)',
+      'Mesna obrigatória com PTCy (D+3 e D+4)',
+      'Irrigação vesícal se necessário (cistite hemorrágica)',
+    ],
+    nursingCare: [
+      'Monitorar sinais vitais rigorosamente durante condicionamento',
+      'Controle hídrico rigoroso (balanço hídrico a cada 6h)',
+      'Monitorar débito urinário (meta > 100 mL/h durante Cy e PTCy)',
+      'Monitorar nível sérico de tacrolimus a cada 48-72h',
+      'Vigilância para sinais de DECH aguda (pele, fígado, TGI)',
+      'Vigilância para cistite hemorrágica (hematuria)',
+      'Cuidados com cateter venoso central',
+    ],
+    specialAlerts: [
+      '⚠️ CRONOGRAMA: D-6 a D-2 (condicionamento) → D-1 (TBI) → D0 (infusão CTH) → D+3/D+4 (PTCy) → D+5 (TAK+MMF+G-CSF)',
+      '🛑 NÃO iniciar Tacrolimus, MMF ou Filgrastim antes de 24h após última dose de PTCy (D+4)',
+      '💧 Hidratação vigorosa + Mesna obrigatórios em TODOS os dias de Ciclofosfamida',
+      '🔬 Monitorar nível sérico de Tacrolimus: meta 5–10 ng/mL',
+      '⚠️ Ajuste renal de Fludarabina: verificar ClCr antes de iniciar',
+      '🏥 TBI: coordenar com serviço de radioterapia para D-1',
+      '📊 Mesna: dose = 125% da dose diária de Ciclofosfamida PTCy',
+      '📅 MMF: duração padrão até D+35 (configurável por instituição: D+60 ou D+90)',
+      '📅 Tacrolimus: duração padrão até D+180 (ajustar conforme DECH)',
+      '🩸 Filgrastim: manter até ANC > 1.000/mm³ por 3 dias consecutivos',
+    ],
+    emetogenicRisk: 'high',
+  },
 ];
 
 export function getProtocolById(id: string): Protocol | undefined {

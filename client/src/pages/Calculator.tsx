@@ -83,6 +83,9 @@ export default function Calculator() {
     calculatedValues,
     weight: patientData.weight,
     toxicities,
+    patientAge: patientData.age,
+    patientSex: patientData.sex,
+    patientCreatinine: patientData.creatinine,
   });
 
   // ── Antieméticos ────────────────────────────────────────────────────────

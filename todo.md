@@ -3,8 +3,8 @@
 ## 📊 Status Atual do Projeto
 
 **Versão:** (próximo checkpoint)  
-**Protocolos Implementados:** 50  
-**Testes Passando:** 200/200 ✅  
+**Protocolos Implementados:** 51 (incluindo FluCyTBI Haplo)  
+**Testes Passando:** 268/268 ✅  
 **Features:** Database, Server, User Auth  
 **Refatoração:** Motor clínico extraído, hooks especializados, lazy loading
 
@@ -543,3 +543,47 @@
 - [x] Prescrição salva contém metadados de auditoria (audit.version, formulaVersions)
 - [x] Alteração manual de dose identificada no payload (isManualDose)
 - [x] PDF usa dados persistidos consistentes (mesmo objeto de dados)
+
+
+---
+
+## 🧬 PROTOCOLO FluCyTBI Haplo (TCTH Haploidêntico NMA)
+
+### Cadastro do Protocolo
+- [x] Adicionar FluCyTBI em protocols.ts com categoria TCTH/Haploidêntico/NMA
+- [x] Cronograma D-6 a D+5: Fludarabina, Ciclofosfamida, TBI, PTCy, Tacrolimus, MMF, Filgrastim
+- [x] TBI como procedimento fixo (200 cGy, D-1) com badge "Procedimento" e unidade cGy
+- [x] PTCy separado da Ciclofosfamida pré-TMO
+- [x] Alias de busca: FluCyTBI, haplo, haploidêntico, NMA
+
+### Regras de Cálculo
+- [x] Fludarabina 30 mg/m² (D-6 a D-2, 5 doses) → 57.0 mg para SC 1.90
+- [x] Ajuste renal Fludarabina por faixas de clearance (flucytbiRules.ts)
+- [x] Ciclofosfamida pré-TMO 14.5 mg/kg (D-6, D-5) → 1087.5 mg para 75kg
+- [x] PTCy 50 mg/kg (D+3, D+4) → 3750.0 mg para 75kg
+- [x] Mesna 125% da dose diária de PTCy → 4687.5 mg (calculado automaticamente)
+- [x] Tacrolimus 0.015 mg/kg/24h IV (D+5) → 1.1 mg para 75kg
+- [x] MMF 15 mg/kg VO TID (D+5) com cap 1000mg (badge "Máx")
+- [x] Filgrastim 5 mcg/kg/dia (D+5) → 375.0 mcg (unidade mcg)
+
+### Alertas Clínicos
+- [x] Não iniciar imunossupressores antes de 24h após PTCy
+- [x] Hidratação e Mesna com PTCy
+- [x] Monitorização de nível sérico do tacrolimus (meta 5-10 ng/mL)
+- [x] Ajuste renal da fludarabina quando clearance reduzido
+- [x] Cronograma completo D-6 a D+5 exibido
+- [x] TBI: coordenar com radioterapia
+- [x] MMF/Tacrolimus: duração padrão configurável
+- [x] Filgrastim: manter até ANC > 1.000/mm³
+
+### Testes Unitários
+- [x] Cronograma completo D-6 a D+5 (68 testes em flucytbiRules.test.ts)
+- [x] Fludarabina 30 mg/m² por BSA
+- [x] Ajuste renal Fludarabina por faixas (CCr <61, <46, <31, <20)
+- [x] Cy 14.5 mg/kg (pré) e PTCy 50 mg/kg (pós)
+- [x] MMF 15 mg/kg TID com cap 1000mg
+- [x] Filgrastim 5 mcg/kg
+- [x] TBI como procedimento fixo em D-1
+- [x] Alertas clínicos obrigatórios presentes
+- [x] Mesna = 125% da PTCy
+- [x] Validação visual no navegador: TODAS as doses corretas
