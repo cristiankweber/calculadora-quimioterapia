@@ -703,3 +703,42 @@
 - [x] Testes de validação de importação JSON
 - [x] Testes de exportação
 - [x] Verificar migração dos protocolos no banco
+
+---
+
+## Calculadora de Hidratação e Suporte
+
+### Hidratação Pré/Pós-QT
+- [x] Lógica de cálculo de volume de hidratação baseado em peso e protocolo
+- [x] Esquemas de hidratação para protocolos nefrotóxicos (Cisplatina, HD-MTX, Ifosfamida)
+- [x] Esquema de hidratação padrão (SF 0,9% e SG 5%)
+- [x] Cálculo de velocidade de infusão (mL/h) baseado em peso e função renal
+- [x] Alertas para pacientes com ICC ou sobrecarga hídrica
+
+### Reposição de Eletrólitos
+- [x] Cálculo de reposição de Potássio (KCl) baseado no nível sérico
+- [x] Cálculo de reposição de Magnésio (MgSO4) baseado no nível sérico
+- [x] Cálculo de reposição de Cálcio (Gluconato de Cálcio) baseado no CaI
+- [x] Cálculo de reposição de Fósforo baseado no nível sérico
+- [x] Cálculo de reposição de Sódio (NaCl 3%) para hiponatremia
+- [x] Alertas de velocidade máxima de infusão e compatibilidade
+
+### Suporte Transfusional
+- [x] Indicação de transfusão de concentrado de hemácias (Hb < 7 ou sintomática)
+- [x] Indicação de transfusão de plaquetas (Plaq < 10.000 ou < 20.000 com sangramento)
+- [x] Cálculo de volume de concentrado de hemácias
+- [x] Cálculo de volume de plaquetas (aférese vs pool)
+- [x] Indicação de hemácias irradiadas e filtradas (TMO, imunossuprimidos)
+- [x] Alertas de reações transfusionais e pré-medicação
+
+### Interface e Integração
+- [x] Componente HydrationCalculator com tabs (Hidratação, Eletrólitos, Transfusão)
+- [x] Integração com dados do paciente da calculadora principal
+- [x] Botão de acesso rápido na calculadora principal
+- [x] Geração de prescrição formatada para copiar/imprimir
+
+### Testes
+- [x] Testes de cálculos de hidratação
+- [x] Testes de reposição de eletrólitos
+- [x] Testes de suporte transfusional
+- [x] Testes de alertas e limites de segurança

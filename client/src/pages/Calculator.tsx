@@ -12,6 +12,7 @@ import ToxicityAssessment from '@/components/ToxicityAssessment';
 import { ToxicityPredictionWithMetrics } from '@/components/ToxicityPrediction';
 import PatientHistoryDB from '@/components/PatientHistoryDB';
 import EmergencyModal, { type EmergencyPatientData } from '@/components/EmergencyModal';
+import HydrationCalculator from '@/components/HydrationCalculator';
 
 // Lazy load PrintablePrescription para evitar travamento ao selecionar protocolo
 const PrintablePrescription = lazy(() => import('@/components/PrintablePrescription'));
@@ -34,7 +35,8 @@ import {
   Printer,
   Settings as SettingsIcon,
   BarChart3,
-  AlertCircle
+  AlertCircle,
+  Droplets
 } from 'lucide-react';
 
 export default function Calculator() {
@@ -229,6 +231,12 @@ export default function Calculator() {
             <ProphylaxisAlerts protocol={selectedProtocol} antiemetics={antiemetics} />
 
             <DilutionInfo drugs={calculatedDrugs} />
+
+            <HydrationCalculator
+              patientData={patientData}
+              calculatedValues={calculatedValues}
+              selectedProtocol={selectedProtocol}
+            />
 
             <ToxicityAssessment
               toxicities={toxicities}
