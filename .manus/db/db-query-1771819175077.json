@@ -1,0 +1,73 @@
+{
+  "query": "SHOW TABLES LIKE 'custom_protocols'; DESCRIBE custom_protocols;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4m4AkPjJWYg27Fa.d556ac6be38d --database 8PZyG2h8ofbVu5oCJdRJFb --execute SHOW TABLES LIKE 'custom_protocols'; DESCRIBE custom_protocols;",
+  "rows": [
+    {
+      "Tables_in_8PZyG2h8ofbVu5oCJdRJFb (custom_protocols)": "custom_protocols"
+    },
+    {
+      "Tables_in_8PZyG2h8ofbVu5oCJdRJFb (custom_protocols)": "Field\tType\tNull\tKey\tDefault\tExtra"
+    },
+    {
+      "Tables_in_8PZyG2h8ofbVu5oCJdRJFb (custom_protocols)": "id\tint(11)\tNO\tPRI\tNULL\tauto_increment"
+    },
+    {
+      "Tables_in_8PZyG2h8ofbVu5oCJdRJFb (custom_protocols)": "userId\tint(11)\tNO\t\tNULL\t"
+    },
+    {
+      "Tables_in_8PZyG2h8ofbVu5oCJdRJFb (custom_protocols)": "protocolId\tvarchar(128)\tNO\tUNI\tNULL\t"
+    },
+    {
+      "Tables_in_8PZyG2h8ofbVu5oCJdRJFb (custom_protocols)": "name\tvarchar(255)\tNO\t\tNULL\t"
+    },
+    {
+      "Tables_in_8PZyG2h8ofbVu5oCJdRJFb (custom_protocols)": "indication\tvarchar(512)\tNO\t\tNULL\t"
+    },
+    {
+      "Tables_in_8PZyG2h8ofbVu5oCJdRJFb (custom_protocols)": "cycles\tint(11)\tNO\t\t1\t"
+    },
+    {
+      "Tables_in_8PZyG2h8ofbVu5oCJdRJFb (custom_protocols)": "cycleLength\tint(11)\tNO\t\t21\t"
+    },
+    {
+      "Tables_in_8PZyG2h8ofbVu5oCJdRJFb (custom_protocols)": "emetogenicRisk\tenum('high','moderate','low','minimal')\tNO\t\tmoderate\t"
+    },
+    {
+      "Tables_in_8PZyG2h8ofbVu5oCJdRJFb (custom_protocols)": "drugs\tjson\tNO\t\tNULL\t"
+    },
+    {
+      "Tables_in_8PZyG2h8ofbVu5oCJdRJFb (custom_protocols)": "specialAlerts\tjson\tYES\t\tNULL\t"
+    },
+    {
+      "Tables_in_8PZyG2h8ofbVu5oCJdRJFb (custom_protocols)": "prophylaxis\tjson\tYES\t\tNULL\t"
+    },
+    {
+      "Tables_in_8PZyG2h8ofbVu5oCJdRJFb (custom_protocols)": "nursingCare\tjson\tYES\t\tNULL\t"
+    },
+    {
+      "Tables_in_8PZyG2h8ofbVu5oCJdRJFb (custom_protocols)": "renalAdjustments\tjson\tYES\t\tNULL\t"
+    },
+    {
+      "Tables_in_8PZyG2h8ofbVu5oCJdRJFb (custom_protocols)": "hepaticAdjustments\tjson\tYES\t\tNULL\t"
+    },
+    {
+      "Tables_in_8PZyG2h8ofbVu5oCJdRJFb (custom_protocols)": "hematologicAdjustments\tjson\tYES\t\tNULL\t"
+    },
+    {
+      "Tables_in_8PZyG2h8ofbVu5oCJdRJFb (custom_protocols)": "dilutionInfo\tjson\tYES\t\tNULL\t"
+    },
+    {
+      "Tables_in_8PZyG2h8ofbVu5oCJdRJFb (custom_protocols)": "isActive\tint(11)\tNO\t\t1\t"
+    },
+    {
+      "Tables_in_8PZyG2h8ofbVu5oCJdRJFb (custom_protocols)": "createdAt\ttimestamp\tNO\t\tCURRENT_TIMESTAMP\t"
+    },
+    {
+      "Tables_in_8PZyG2h8ofbVu5oCJdRJFb (custom_protocols)": "updatedAt\ttimestamp\tNO\t\tCURRENT_TIMESTAMP\tDEFAULT_GENERATED on update CURRENT_TIMESTAMP"
+    }
+  ],
+  "messages": [],
+  "stdout": "Tables_in_8PZyG2h8ofbVu5oCJdRJFb (custom_protocols)\ncustom_protocols\nField\tType\tNull\tKey\tDefault\tExtra\nid\tint(11)\tNO\tPRI\tNULL\tauto_increment\nuserId\tint(11)\tNO\t\tNULL\t\nprotocolId\tvarchar(128)\tNO\tUNI\tNULL\t\nname\tvarchar(255)\tNO\t\tNULL\t\nindication\tvarchar(512)\tNO\t\tNULL\t\ncycles\tint(11)\tNO\t\t1\t\ncycleLength\tint(11)\tNO\t\t21\t\nemetogenicRisk\tenum('high','moderate','low','minimal')\tNO\t\tmoderate\t\ndrugs\tjson\tNO\t\tNULL\t\nspecialAlerts\tjson\tYES\t\tNULL\t\nprophylaxis\tjson\tYES\t\tNULL\t\nnursingCare\tjson\tYES\t\tNULL\t\nrenalAdjustments\tjson\tYES\t\tNULL\t\nhepaticAdjustments\tjson\tYES\t\tNULL\t\nhematologicAdjustments\tjson\tYES\t\tNULL\t\ndilutionInfo\tjson\tYES\t\tNULL\t\nisActive\tint(11)\tNO\t\t1\t\ncreatedAt\ttimestamp\tNO\t\tCURRENT_TIMESTAMP\t\nupdatedAt\ttimestamp\tNO\t\tCURRENT_TIMESTAMP\tDEFAULT_GENERATED on update CURRENT_TIMESTAMP\n",
+  "stderr": "",
+  "execution_time_ms": 87
+}

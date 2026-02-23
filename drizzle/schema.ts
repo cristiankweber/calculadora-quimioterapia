@@ -130,3 +130,49 @@ export const institutionSettings = mysqlTable("institution_settings", {
 
 export type InstitutionSettings = typeof institutionSettings.$inferSelect;
 export type InsertInstitutionSettings = typeof institutionSettings.$inferInsert;
+
+/**
+ * Tabela de protocolos customizados
+ * Permite que usuários criem, editem e excluam seus próprios protocolos
+ */
+export const customProtocols = mysqlTable("custom_protocols", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  /** Identificador único do protocolo (slug) */
+  protocolId: varchar("protocolId", { length: 128 }).notNull().unique(),
+  name: varchar("name", { length: 255 }).notNull(),
+  indication: varchar("indication", { length: 512 }).notNull(),
+  cycles: int("cycles").notNull().default(1),
+  cycleLength: int("cycleLength").notNull().default(21), // dias
+  emetogenicRisk: mysqlEnum("emetogenicRisk", ["high", "moderate", "low", "minimal"]).default("moderate").notNull(),
+  /** Drogas do protocolo (JSON array de DrugDefinition) */
+  drugs: json("drugs").notNull(),
+  /** Alertas especiais (JSON array de strings) */
+  specialAlerts: json("specialAlerts").$type<string[]>(),
+  /** Profilaxias recomendadas (JSON array de strings) */
+  prophylaxis: json("prophylaxis").$type<string[]>(),
+  /** Cuidados de enfermagem (JSON array de strings) */
+  nursingCare: json("nursingCare").$type<string[]>(),
+  /** Ajustes renais (JSON array de strings) */
+  renalAdjustments: json("renalAdjustments").$type<string[]>(),
+  /** Ajustes hepáticos (JSON array de strings) */
+  hepaticAdjustments: json("hepaticAdjustments").$type<string[]>(),
+  /** Ajustes hematológicos (JSON array de strings) */
+  hematologicAdjustments: json("hematologicAdjustments").$type<string[]>(),
+  /** Informações de diluição e administração (JSON array de objetos) */
+  dilutionInfo: json("dilutionInfo").$type<Array<{
+    drugName: string;
+    diluent: string;
+    volume: string;
+    infusionTime: string;
+    stability: string;
+    specialInstructions: string;
+  }>>(),
+  /** Se o protocolo está ativo (soft delete) */
+  isActive: int("isActive").notNull().default(1),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type CustomProtocol = typeof customProtocols.$inferSelect;
+export type InsertCustomProtocol = typeof customProtocols.$inferInsert;

@@ -1,0 +1,23 @@
+CREATE TABLE `custom_protocols` (
+	`id` int AUTO_INCREMENT NOT NULL,
+	`userId` int NOT NULL,
+	`protocolId` varchar(128) NOT NULL,
+	`name` varchar(255) NOT NULL,
+	`indication` varchar(512) NOT NULL,
+	`cycles` int NOT NULL DEFAULT 1,
+	`cycleLength` int NOT NULL DEFAULT 21,
+	`emetogenicRisk` enum('high','moderate','low','minimal') NOT NULL DEFAULT 'moderate',
+	`drugs` json NOT NULL,
+	`specialAlerts` json,
+	`prophylaxis` json,
+	`nursingCare` json,
+	`renalAdjustments` json,
+	`hepaticAdjustments` json,
+	`hematologicAdjustments` json,
+	`dilutionInfo` json,
+	`isActive` int NOT NULL DEFAULT 1,
+	`createdAt` timestamp NOT NULL DEFAULT (now()),
+	`updatedAt` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,
+	CONSTRAINT `custom_protocols_id` PRIMARY KEY(`id`),
+	CONSTRAINT `custom_protocols_protocolId_unique` UNIQUE(`protocolId`)
+);

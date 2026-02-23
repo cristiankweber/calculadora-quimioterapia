@@ -411,7 +411,180 @@ export const appRouter = router({
       }),
   }),
 
-  // ─── Predição de Toxicidade com ML ──────────────────────────────────────
+  // ─── Protocolos Customizados ─────────────────────────────────────────
+  customProtocols: router({
+    list: protectedProcedure.query(async ({ ctx }) => {
+      return await db.getCustomProtocolsByUserId(ctx.user.id);
+    }),
+
+    listActive: protectedProcedure.query(async ({ ctx }) => {
+      return await db.getActiveCustomProtocolsByUserId(ctx.user.id);
+    }),
+
+    get: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .query(async ({ input }) => {
+        return await db.getCustomProtocolById(input.id);
+      }),
+
+    create: protectedProcedure
+      .input(
+        z.object({
+          name: z.string().min(1, "Nome é obrigatório").max(255),
+          indication: z.string().min(1, "Indicação é obrigatória").max(512),
+          cycles: z.number().int().min(1).default(1),
+          cycleLength: z.number().int().min(1).default(21),
+          emetogenicRisk: z.enum(["high", "moderate", "low", "minimal"]).default("moderate"),
+          drugs: z.array(
+            z.object({
+              name: z.string().min(1),
+              dose: z.number().min(0),
+              doseUnit: z.enum(["mg/m²", "mg/kg", "mg", "AUC", "mcg/kg", "cGy"]),
+              maxDose: z.number().optional(),
+              route: z.string().min(1),
+              days: z.string().min(1),
+              observations: z.string().optional(),
+              emetogenicRisk: z.enum(["high", "moderate", "low", "minimal"]).optional(),
+              renalAdjustment: z.string().optional(),
+              hepaticAdjustment: z.string().optional(),
+            })
+          ).min(1, "Pelo menos uma droga é obrigatória"),
+          specialAlerts: z.array(z.string()).optional(),
+          prophylaxis: z.array(z.string()).optional(),
+          nursingCare: z.array(z.string()).optional(),
+          renalAdjustments: z.array(z.string()).optional(),
+          hepaticAdjustments: z.array(z.string()).optional(),
+          hematologicAdjustments: z.array(z.string()).optional(),
+          dilutionInfo: z.array(
+            z.object({
+              drugName: z.string(),
+              diluent: z.string(),
+              volume: z.string(),
+              infusionTime: z.string(),
+              stability: z.string(),
+              specialInstructions: z.string(),
+            })
+          ).optional(),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        // Gerar protocolId único baseado no nome
+        const slug = input.name
+          .toLowerCase()
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "")
+          .replace(/[^a-z0-9]+/g, "-")
+          .replace(/^-|-$/g, "");
+        const protocolId = `custom-${slug}-${Date.now().toString(36)}`;
+
+        const record = {
+          userId: ctx.user.id,
+          protocolId,
+          name: input.name,
+          indication: input.indication,
+          cycles: input.cycles,
+          cycleLength: input.cycleLength,
+          emetogenicRisk: input.emetogenicRisk,
+          drugs: input.drugs,
+          specialAlerts: input.specialAlerts ?? [],
+          prophylaxis: input.prophylaxis ?? [],
+          nursingCare: input.nursingCare ?? [],
+          renalAdjustments: input.renalAdjustments ?? [],
+          hepaticAdjustments: input.hepaticAdjustments ?? [],
+          hematologicAdjustments: input.hematologicAdjustments ?? [],
+          dilutionInfo: input.dilutionInfo ?? [],
+          isActive: 1,
+        };
+
+        return await db.createCustomProtocol(record as any);
+      }),
+
+    update: protectedProcedure
+      .input(
+        z.object({
+          id: z.number(),
+          name: z.string().min(1).max(255).optional(),
+          indication: z.string().min(1).max(512).optional(),
+          cycles: z.number().int().min(1).optional(),
+          cycleLength: z.number().int().min(1).optional(),
+          emetogenicRisk: z.enum(["high", "moderate", "low", "minimal"]).optional(),
+          drugs: z.array(
+            z.object({
+              name: z.string().min(1),
+              dose: z.number().min(0),
+              doseUnit: z.enum(["mg/m²", "mg/kg", "mg", "AUC", "mcg/kg", "cGy"]),
+              maxDose: z.number().optional(),
+              route: z.string().min(1),
+              days: z.string().min(1),
+              observations: z.string().optional(),
+              emetogenicRisk: z.enum(["high", "moderate", "low", "minimal"]).optional(),
+              renalAdjustment: z.string().optional(),
+              hepaticAdjustment: z.string().optional(),
+            })
+          ).optional(),
+          specialAlerts: z.array(z.string()).optional(),
+          prophylaxis: z.array(z.string()).optional(),
+          nursingCare: z.array(z.string()).optional(),
+          renalAdjustments: z.array(z.string()).optional(),
+          hepaticAdjustments: z.array(z.string()).optional(),
+          hematologicAdjustments: z.array(z.string()).optional(),
+          dilutionInfo: z.array(
+            z.object({
+              drugName: z.string(),
+              diluent: z.string(),
+              volume: z.string(),
+              infusionTime: z.string(),
+              stability: z.string(),
+              specialInstructions: z.string(),
+            })
+          ).optional(),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        // Verificar se o protocolo pertence ao usuário
+        const existing = await db.getCustomProtocolById(input.id);
+        if (!existing || existing.userId !== ctx.user.id) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Protocolo não encontrado ou sem permissão.",
+          });
+        }
+
+        const { id, ...data } = input;
+        await db.updateCustomProtocol(id, data as any);
+        return { success: true };
+      }),
+
+    delete: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        const existing = await db.getCustomProtocolById(input.id);
+        if (!existing || existing.userId !== ctx.user.id) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Protocolo não encontrado ou sem permissão.",
+          });
+        }
+        await db.deleteCustomProtocol(input.id);
+        return { success: true };
+      }),
+
+    restore: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        const existing = await db.getCustomProtocolById(input.id);
+        if (!existing || existing.userId !== ctx.user.id) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Protocolo não encontrado ou sem permissão.",
+          });
+        }
+        await db.updateCustomProtocol(input.id, { isActive: 1 });
+        return { success: true };
+      }),
+  }),
+
+  // ─── Predição de Toxicidade com ML ────────────────────────────────────────
   toxicity: router({
     predict: publicProcedure
       .input(

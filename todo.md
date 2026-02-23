@@ -587,3 +587,96 @@
 - [x] Alertas clínicos obrigatórios presentes
 - [x] Mesna = 125% da PTCy
 - [x] Validação visual no navegador: TODAS as doses corretas
+
+
+---
+
+## 📋 MÓDULO DE GERENCIAMENTO DE PROTOCOLOS (Dashboard)
+
+### Schema de Banco de Dados
+- [ ] Criar tabela `custom_protocols` com todos os campos clínicos
+- [ ] Criar tabela `custom_protocol_drugs` para drogas do protocolo
+- [ ] Executar migração com `pnpm db:push`
+
+### Backend (tRPC)
+- [ ] Endpoint `customProtocols.list` - listar protocolos do usuário
+- [ ] Endpoint `customProtocols.get` - obter protocolo por ID
+- [ ] Endpoint `customProtocols.create` - criar protocolo com validação Zod
+- [ ] Endpoint `customProtocols.update` - editar protocolo existente
+- [ ] Endpoint `customProtocols.delete` - excluir protocolo
+- [ ] Endpoint `customProtocols.duplicate` - duplicar protocolo existente
+
+### Frontend - Página de Listagem
+- [ ] Aba "Protocolos" no Dashboard com navegação por tabs
+- [ ] Tabela de protocolos com nome, indicação, nº drogas, data de criação
+- [ ] Botões de ação: Editar, Duplicar, Excluir
+- [ ] Botão "Novo Protocolo" com formulário
+- [ ] Busca/filtro por nome ou indicação
+
+### Frontend - Formulário de Criação/Edição
+- [ ] Campos básicos: nome, indicação, ciclos, duração do ciclo, risco emético
+- [ ] Seção de Drogas: nome, dose, unidade, via, dias, dose máxima, observações
+- [ ] Seção de Diluição e Administração: volume, diluente, tempo de infusão, estabilidade
+- [ ] Seção de Alertas Especiais: lista editável de alertas
+- [ ] Seção de Profilaxias: lista editável de profilaxias recomendadas
+- [ ] Seção de Informações para Enfermagem: cuidados, monitorização, sinais vitais
+- [ ] Seção de Ajuste de Doses: ajuste renal, hepático, hematológico
+- [ ] Validação de formulário antes de salvar
+
+### Integração com Calculadora
+- [ ] Mesclar protocolos customizados com protocolos built-in no ProtocolSelector
+- [ ] Badge "Customizado" para diferenciar protocolos do usuário
+- [ ] Protocolos customizados calculam doses normalmente
+
+### Testes
+- [ ] Testes unitários para CRUD de protocolos
+- [ ] Testes de validação de schema
+
+---
+
+## Módulo de Protocolos Personalizados (CRUD)
+
+### Schema e Banco de Dados
+- [x] Criar tabela custom_protocols no schema Drizzle
+- [x] Campos: nome, indicação, ciclos, duração, risco emetogênico
+- [x] Campos JSON: drogas, alertas, profilaxias, cuidados enfermagem, ajustes de dose, diluição
+- [x] Migração executada com sucesso
+
+### Backend (tRPC Endpoints)
+- [x] Endpoint list: listar protocolos do usuário
+- [x] Endpoint listActive: listar apenas protocolos ativos
+- [x] Endpoint get: buscar protocolo por ID
+- [x] Endpoint create: criar novo protocolo com validação Zod
+- [x] Endpoint update: atualizar protocolo (parcial) com verificação de permissão
+- [x] Endpoint delete: soft delete com verificação de permissão
+- [x] Endpoint restore: restaurar protocolo excluído
+- [x] Funções de banco de dados (db.ts) para CRUD
+
+### Frontend (ProtocolManager)
+- [x] Componente ProtocolManager com formulário completo
+- [x] Seção de drogas com campos: nome, dose, unidade, dose máxima, via, dias, observações, risco emético
+- [x] Seção de alertas especiais (lista dinâmica com +/-)
+- [x] Seção de profilaxias (lista dinâmica com +/-)
+- [x] Seção de cuidados de enfermagem (lista dinâmica com +/-)
+- [x] Seção de ajustes de dose: renais, hepáticos, hematológicos (listas dinâmicas)
+- [x] Seção de diluição e administração: droga, diluente, volume, tempo infusão, estabilidade, instruções
+- [x] Listagem de protocolos com busca e filtro
+- [x] Edição de protocolo existente
+- [x] Exclusão com confirmação (soft delete)
+- [x] Restauração de protocolo excluído
+
+### Dashboard Integration
+- [x] Aba "Protocolos Personalizados" no Dashboard
+- [x] Navegação por tabs (Estatísticas / Protocolos)
+
+### Integração com Calculadora
+- [x] ProtocolSelector modificado para incluir protocolos customizados do banco
+- [x] Protocolos customizados aparecem em seção separada no seletor
+
+### Testes
+- [x] Testes de validação de input (nome vazio, drogas vazias, dose negativa, unidade inválida)
+- [x] Testes de autorização (endpoints protegidos requerem autenticação)
+- [x] Testes de validação de dilutionInfo
+- [x] Testes de ajustes de dose
+- [x] Testes de atualização parcial
+- [x] 18 testes passando (286 total no projeto)

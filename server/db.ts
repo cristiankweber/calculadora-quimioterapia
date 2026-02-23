@@ -14,6 +14,9 @@ import {
   institutionSettings,
   InsertInstitutionSettings,
   InstitutionSettings,
+  customProtocols,
+  CustomProtocol,
+  InsertCustomProtocol,
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 
@@ -406,6 +409,82 @@ export async function getPrescriptionTrends(userId: number, days = 30) {
   return Array.from(byDay.entries())
     .map(([date, count]) => ({ date, count }))
     .sort((a, b) => a.date.localeCompare(b.date));
+}
+
+// ─── Protocolos Customizados ───────────────────────────────────────────────
+
+export async function createCustomProtocol(
+  data: InsertCustomProtocol
+): Promise<CustomProtocol> {
+  const db = await requireDb();
+  const result = await db.insert(customProtocols).values(data);
+  const insertedId = result[0].insertId;
+  const inserted = await db
+    .select()
+    .from(customProtocols)
+    .where(eq(customProtocols.id, insertedId))
+    .limit(1);
+  return inserted[0]!;
+}
+
+export async function getCustomProtocolsByUserId(
+  userId: number
+): Promise<CustomProtocol[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return await db
+    .select()
+    .from(customProtocols)
+    .where(eq(customProtocols.userId, userId))
+    .orderBy(desc(customProtocols.updatedAt));
+}
+
+export async function getCustomProtocolById(
+  id: number
+): Promise<CustomProtocol | undefined> {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db
+    .select()
+    .from(customProtocols)
+    .where(eq(customProtocols.id, id))
+    .limit(1);
+  return result[0];
+}
+
+export async function getActiveCustomProtocolsByUserId(
+  userId: number
+): Promise<CustomProtocol[]> {
+  const db = await getDb();
+  if (!db) return [];
+  const all = await db
+    .select()
+    .from(customProtocols)
+    .where(eq(customProtocols.userId, userId))
+    .orderBy(desc(customProtocols.updatedAt));
+  return all.filter((p) => p.isActive === 1);
+}
+
+export async function updateCustomProtocol(
+  id: number,
+  data: Partial<InsertCustomProtocol>
+): Promise<void> {
+  const db = await requireDb();
+  await db.update(customProtocols).set(data).where(eq(customProtocols.id, id));
+}
+
+export async function deleteCustomProtocol(id: number): Promise<void> {
+  const db = await requireDb();
+  // Soft delete
+  await db
+    .update(customProtocols)
+    .set({ isActive: 0 })
+    .where(eq(customProtocols.id, id));
+}
+
+export async function hardDeleteCustomProtocol(id: number): Promise<void> {
+  const db = await requireDb();
+  await db.delete(customProtocols).where(eq(customProtocols.id, id));
 }
 
 export async function getStatsOverview(userId: number) {

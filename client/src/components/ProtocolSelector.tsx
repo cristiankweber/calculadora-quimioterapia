@@ -8,6 +8,8 @@ import { Search, ChevronDown } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Badge } from '@/components/ui/badge';
+import { trpc } from '@/lib/trpc';
 
 interface ProtocolSelectorProps {
   selectedProtocol: Protocol | null;
@@ -40,8 +42,51 @@ export default function ProtocolSelector({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  // Memoizar lista de protocolos para evitar recriar objetos
-  const protocolList = useMemo(() => protocols, []);
+  // Buscar protocolos customizados do banco de dados
+  const { data: customProtocolsRaw } = trpc.customProtocols.listActive.useQuery(undefined, {
+    staleTime: 30_000, // Cache por 30s para evitar re-fetches
+  });
+
+  // Converter protocolos customizados para o formato Protocol
+  const customProtocolsMapped = useMemo<Protocol[]>(() => {
+    if (!customProtocolsRaw) return [];
+    return customProtocolsRaw.map((cp) => {
+      const drugs = (cp.drugs as any[]) || [];
+      return {
+        id: cp.protocolId,
+        name: `★ ${cp.name}`,
+        indication: cp.indication,
+        cycles: cp.cycles,
+        cycleLength: cp.cycleLength,
+        emetogenicRisk: cp.emetogenicRisk as Protocol['emetogenicRisk'],
+        drugs: drugs.map((d: any) => ({
+          name: d.name || '',
+          dose: d.dose || 0,
+          doseUnit: d.doseUnit || 'mg/m²',
+          maxDose: d.maxDose,
+          calculatedDose: 0,
+          route: d.route || 'IV',
+          days: d.days || '1',
+          observations: d.observations,
+          emetogenicRisk: d.emetogenicRisk,
+          renalAdjustment: d.renalAdjustment,
+          hepaticAdjustment: d.hepaticAdjustment,
+        })),
+        renalAdjustments: (cp.renalAdjustments as string[]) || [],
+        hepaticAdjustments: (cp.hepaticAdjustments as string[]) || [],
+        hematologicAdjustments: (cp.hematologicAdjustments as string[]) || [],
+        prophylaxis: (cp.prophylaxis as string[]) || [],
+        nursingCare: (cp.nursingCare as string[]) || [],
+        specialAlerts: (cp.specialAlerts as string[]) || [],
+      };
+    });
+  }, [customProtocolsRaw]);
+
+  // Memoizar lista combinada de protocolos (customizados primeiro, depois built-in)
+  const protocolList = useMemo(() => [
+    ...customProtocolsMapped,
+    ...protocols,
+  ], [customProtocolsMapped]);
 
   // Filtrar protocolos baseado no termo de busca
   const filteredProtocols = useMemo(() => {
