@@ -1,6 +1,7 @@
 import type { PatientData, Protocol, Drug, CalculatedValues } from '@/types/calculator';
 import type { AntiemeticProphylaxis } from '@/types/calculator';
 import type { HydrationResult, ElectrolyteReplacement, TransfusionRecommendation } from '@/lib/hydrationSupport';
+import type { PdfSections } from '@/components/PdfPreviewModal';
 
 interface PrescriptionData {
   patient: PatientData;
@@ -12,6 +13,7 @@ interface PrescriptionData {
   hydration?: HydrationResult | null;
   electrolytes?: ElectrolyteReplacement[];
   transfusion?: TransfusionRecommendation[];
+  sections?: PdfSections;
 }
 
 // ── Sanitização HTML para evitar XSS ──────────────────────────────────────
@@ -274,7 +276,14 @@ function buildTransfusionSection(transfusion?: TransfusionRecommendation[]): str
 }
 
 export async function generatePrescriptionPDF(data: PrescriptionData): Promise<void> {
-  const { patient, calculatedValues, protocol, cycle, drugs, antiemetics } = data;
+  const { patient, calculatedValues, protocol, cycle, drugs, antiemetics, sections } = data;
+
+  // Se sections não for fornecido, incluir tudo (comportamento padrão)
+  const s = sections ?? {
+    patientData: true, calculatedValues: true, protocol: true, drugs: true,
+    specialAlerts: true, prophylaxis: true, antiemetics: true, nursingCare: true,
+    doseAdjustments: true, hydration: true, electrolytes: true, transfusion: true,
+  };
 
   const now = new Date();
   const dateStr = now.toLocaleDateString('pt-BR');
@@ -348,7 +357,7 @@ export async function generatePrescriptionPDF(data: PrescriptionData): Promise<v
     <p>Data de Emissão: ${dateStr} às ${timeStr}</p>
   </div>
 
-  <div class="section">
+  ${s.patientData ? `<div class="section">
     <div class="section-title">DADOS DO PACIENTE</div>
     <div class="info-grid">
       <div class="info-item"><span class="info-label">Nome/Identificador:</span> ${escapeHtml(patient.name) || 'Não informado'}</div>
@@ -361,9 +370,9 @@ export async function generatePrescriptionPDF(data: PrescriptionData): Promise<v
       <div class="info-item"><span class="info-label">Bilirrubina:</span> ${escapeHtml(patient.bilirubin)} mg/dL</div>
     </div>
     ${patient.comorbidities ? `<div class="info-item"><span class="info-label">Comorbidades:</span> ${escapeHtml(patient.comorbidities)}</div>` : ''}
-  </div>
+  </div>` : ''}
 
-  <div class="section">
+  ${s.calculatedValues ? `<div class="section">
     <div class="section-title">VALORES CALCULADOS</div>
     <div class="info-grid">
       <div class="info-item"><span class="info-label">Superfície Corporal (SC):</span> <span class="calculated-badge">${calculatedValues.bsa.toFixed(2)} m²</span></div>
@@ -371,16 +380,16 @@ export async function generatePrescriptionPDF(data: PrescriptionData): Promise<v
       <div class="info-item"><span class="info-label">Função Renal:</span> <span class="${renalStatusClass(calculatedValues.renalStatus)}">${escapeHtml(calculatedValues.renalStatusLabel)}</span></div>
       <div class="info-item"><span class="info-label">Fator de Ajuste Global:</span> <span class="calculated-badge">${(calculatedValues.globalAdjustmentFactor * 100).toFixed(0)}%</span></div>
     </div>
-  </div>
+  </div>` : ''}
 
-  <div class="section">
+  ${s.protocol ? `<div class="section">
     <div class="section-title">PROTOCOLO QUIMIOTERÁPICO</div>
     <div class="info-item"><span class="info-label">Protocolo:</span> ${escapeHtml(protocol.name)} - Ciclo ${escapeHtml(cycle)}/${escapeHtml(protocol.cycles)}</div>
     <div class="info-item"><span class="info-label">Indicação:</span> ${escapeHtml(protocol.indication)}</div>
     <div class="info-item"><span class="info-label">Duração do Ciclo:</span> ${escapeHtml(protocol.cycleLength)} dias</div>
-  </div>
+  </div>` : ''}
 
-  <div class="section">
+  ${s.drugs ? `<div class="section">
     <div class="section-title">DROGAS PRESCRITAS</div>
     <table>
       <thead>
@@ -388,16 +397,16 @@ export async function generatePrescriptionPDF(data: PrescriptionData): Promise<v
       </thead>
       <tbody>${drugsRows}</tbody>
     </table>
-  </div>
+  </div>` : ''}
 
-  ${specialAlertsSection}
+  ${s.specialAlerts ? specialAlertsSection : ''}
 
-  <div class="section">
+  ${s.prophylaxis ? `<div class="section">
     <div class="section-title">PROFILAXIAS OBRIGATÓRIAS/RECOMENDADAS</div>
     <ul class="prophylaxis-list">${renderList(protocol.prophylaxis)}</ul>
-  </div>
+  </div>` : ''}
 
-  <div class="section">
+  ${s.antiemetics ? `<div class="section">
     <div class="section-title">PROFILAXIA ANTIEMÉTICA (Risco ${antiemeticRiskLabel})</div>
     <div style="margin-bottom: 15px;">
       <strong>Dia 1 (Pré-QT):</strong>
@@ -411,20 +420,20 @@ export async function generatePrescriptionPDF(data: PrescriptionData): Promise<v
       <strong>Medicações de Resgate:</strong>
       <ul class="prophylaxis-list">${renderList(antiemetics.rescue)}</ul>
     </div>
-  </div>
+  </div>` : ''}
 
-  <div class="section">
+  ${s.nursingCare ? `<div class="section">
     <div class="section-title">CUIDADOS DE ENFERMAGEM</div>
     <ul class="prophylaxis-list">${renderList(protocol.nursingCare)}</ul>
-  </div>
+  </div>` : ''}
 
-  ${adjustmentsSection}
+  ${s.doseAdjustments ? adjustmentsSection : ''}
 
-  ${buildHydrationSection(data.hydration)}
+  ${s.hydration ? buildHydrationSection(data.hydration) : ''}
 
-  ${buildElectrolytesSection(data.electrolytes)}
+  ${s.electrolytes ? buildElectrolytesSection(data.electrolytes) : ''}
 
-  ${buildTransfusionSection(data.transfusion)}
+  ${s.transfusion ? buildTransfusionSection(data.transfusion) : ''}
 
   <div class="footer">
     <p><strong>Calculadora de Prescrição Quimioterápica</strong></p>

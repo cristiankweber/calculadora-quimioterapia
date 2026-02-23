@@ -17,6 +17,7 @@ import { getDoseAdjustmentFactor } from '@/data/ctcae';
 import { generatePrescriptionPDF } from '@/lib/pdfGenerator';
 import { trpc } from '@/lib/trpc';
 import type { HydrationSupportData } from '@/components/HydrationCalculator';
+import type { PdfSections } from '@/components/PdfPreviewModal';
 
 interface PrescriptionContext {
   patientData: PatientData;
@@ -40,9 +41,10 @@ interface UsePrescriptionActionsReturn {
   showPrint: boolean;
   handleSaveToHistory: () => Promise<void>;
   handleCopyPrescription: () => void;
-  handleExportPDF: () => Promise<void>;
-  handlePrint: () => void;
+  handleExportPDF: (sections?: PdfSections) => Promise<void>;
+  handlePrint: (sections?: PdfSections) => void;
   setShowPrint: (show: boolean) => void;
+  validateBeforeAction: (actionName: string) => boolean;
 }
 
 /**
@@ -247,7 +249,7 @@ export function usePrescriptionActions(ctx: PrescriptionContext): UsePrescriptio
     toast.success('Prescrição copiada!');
   }, [ctx, validateBeforeAction]);
 
-  const handleExportPDF = useCallback(async () => {
+  const handleExportPDF = useCallback(async (sections?: PdfSections) => {
     if (!validateBeforeAction('exportar o PDF')) return;
     warnIfNoInstitution();
 
@@ -262,6 +264,7 @@ export function usePrescriptionActions(ctx: PrescriptionContext): UsePrescriptio
         hydration: ctx.hydrationSupportData?.hydration ?? null,
         electrolytes: ctx.hydrationSupportData?.electrolytes ?? [],
         transfusion: ctx.hydrationSupportData?.transfusion ?? [],
+        sections,
       });
       toast.success('PDF gerado com sucesso!');
     } catch (error) {
@@ -270,7 +273,7 @@ export function usePrescriptionActions(ctx: PrescriptionContext): UsePrescriptio
     }
   }, [ctx, validateBeforeAction, warnIfNoInstitution]);
 
-  const handlePrint = useCallback(() => {
+  const handlePrint = useCallback((sections?: PdfSections) => {
     if (!validateBeforeAction('imprimir')) return;
     warnIfNoInstitution();
     setShowPrint(true);
@@ -285,5 +288,6 @@ export function usePrescriptionActions(ctx: PrescriptionContext): UsePrescriptio
     handleExportPDF,
     handlePrint,
     setShowPrint,
+    validateBeforeAction,
   };
 }

@@ -754,3 +754,16 @@
 - [x] Conectar dados calculados de hidratação ao fluxo de exportação PDF
 - [x] Incluir alertas e monitorização no PDF
 - [x] Testar geração do PDF com as novas seções
+
+---
+
+## Preview do PDF antes de Gerar
+
+- [x] Analisar fluxo atual de geração de PDF (pdfGenerator.ts, usePrescriptionActions)
+- [x] Criar componente PdfPreviewModal com renderização visual do documento
+- [x] Incluir todas as seções no preview: dados do paciente, doses, profilaxias, hidratação, eletrólitos, transfusão
+- [x] Permitir personalizar quais seções incluir no PDF (checkboxes de seções)
+- [x] Botão "Confirmar e Gerar PDF" no modal de preview
+- [x] Botão "Imprimir" direto do modal de preview
+- [x] Integrar modal ao botão PDF do Calculator.tsx
+- [x] Testar renderização do preview com dados completos

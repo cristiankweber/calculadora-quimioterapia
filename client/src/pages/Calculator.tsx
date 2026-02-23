@@ -13,6 +13,7 @@ import { ToxicityPredictionWithMetrics } from '@/components/ToxicityPrediction';
 import PatientHistoryDB from '@/components/PatientHistoryDB';
 import EmergencyModal, { type EmergencyPatientData } from '@/components/EmergencyModal';
 import HydrationCalculator, { type HydrationSupportData } from '@/components/HydrationCalculator';
+import PdfPreviewModal, { type PdfSections } from '@/components/PdfPreviewModal';
 
 // Lazy load PrintablePrescription para evitar travamento ao selecionar protocolo
 const PrintablePrescription = lazy(() => import('@/components/PrintablePrescription'));
@@ -36,7 +37,8 @@ import {
   Settings as SettingsIcon,
   BarChart3,
   AlertCircle,
-  Droplets
+  Droplets,
+  Eye,
 } from 'lucide-react';
 
 export default function Calculator() {
@@ -77,6 +79,7 @@ export default function Calculator() {
 
   // ── Dados de Hidratação/Eletrólitos/Transfusão (para PDF) ────────────────
   const [hydrationSupportData, setHydrationSupportData] = useState<HydrationSupportData | null>(null);
+  const [showPdfPreview, setShowPdfPreview] = useState(false);
   const handleHydrationDataChange = useCallback((data: HydrationSupportData) => {
     setHydrationSupportData(data);
   }, []);
@@ -114,6 +117,7 @@ export default function Calculator() {
     handleExportPDF,
     handlePrint,
     setShowPrint,
+    validateBeforeAction,
   } = usePrescriptionActions({
     patientData,
     calculatedValues,
@@ -193,11 +197,10 @@ export default function Calculator() {
               <Button variant="outline" onClick={() => setLocation('/dashboard')}>
                 <BarChart3 className="h-4 w-4 mr-2" /> Dashboard
               </Button>
-              <Button variant="outline" onClick={handlePrint}>
-                <Printer className="h-4 w-4 mr-2" /> Imprimir
-              </Button>
-              <Button variant="outline" onClick={handleExportPDF}>
-                <FileDown className="h-4 w-4 mr-2" /> PDF
+              <Button variant="outline" onClick={() => {
+                if (validateBeforeAction('visualizar preview')) setShowPdfPreview(true);
+              }}>
+                <Eye className="h-4 w-4 mr-2" /> Preview / PDF
               </Button>
               <Button onClick={handleCopyPrescription}>
                 <Copy className="h-4 w-4 mr-2" /> Copiar
@@ -291,6 +294,36 @@ export default function Calculator() {
         onOpenChange={setShowEmergency}
         patientData={emergencyPatientData}
       />
+
+      {/* MODAL DE PREVIEW DO PDF */}
+      {selectedProtocol && calculatedValues && antiemetics && (
+        <PdfPreviewModal
+          open={showPdfPreview}
+          onOpenChange={setShowPdfPreview}
+          patient={patientData}
+          calculatedValues={calculatedValues}
+          protocol={selectedProtocol}
+          cycle={selectedCycle}
+          drugs={calculatedDrugs}
+          antiemetics={antiemetics}
+          prescriptionId={prescriptionId}
+          institutionName={institutionSettings?.institutionName ?? undefined}
+          institutionLogo={institutionSettings?.institutionLogo ?? undefined}
+          prescriberName={institutionSettings?.prescriberName ?? undefined}
+          prescriberCRM={institutionSettings?.prescriberCRM ?? undefined}
+          hydration={hydrationSupportData?.hydration}
+          electrolytes={hydrationSupportData?.electrolytes}
+          transfusion={hydrationSupportData?.transfusion}
+          onConfirmPdf={async (sections) => {
+            setShowPdfPreview(false);
+            await handleExportPDF(sections);
+          }}
+          onConfirmPrint={(sections) => {
+            setShowPdfPreview(false);
+            handlePrint(sections);
+          }}
+        />
+      )}
     </div>
   );
 }
