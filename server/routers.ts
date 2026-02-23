@@ -7,6 +7,12 @@ import { TRPCError } from "@trpc/server";
 import * as db from "./db";
 import { predictToxicity, getModelMetrics } from "./toxicityModel";
 import {
+  convertAllProtocols,
+  validateImportFormat,
+  convertImportToDbRecords,
+  type ProtocolExportFormat,
+} from "./seedSystemProtocols";
+import {
   createPrescriptionInputSchema,
   validateDoseSafety,
   normalizeLegacyPayload,
@@ -582,6 +588,147 @@ export const appRouter = router({
         await db.updateCustomProtocol(input.id, { isActive: 1 });
         return { success: true };
       }),
+
+    // ── Exportar protocolos selecionados como JSON ─────────────────────
+    export: protectedProcedure
+      .input(z.object({ ids: z.array(z.number()).min(1) }))
+      .mutation(async ({ ctx, input }) => {
+        const protocols = await db.getCustomProtocolsByIds(input.ids);
+        // Verificar que todos pertencem ao usuário
+        const owned = protocols.filter((p) => p.userId === ctx.user.id);
+        if (owned.length === 0) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Nenhum protocolo encontrado.",
+          });
+        }
+
+        const exportData: ProtocolExportFormat = {
+          version: "1.0",
+          exportedAt: new Date().toISOString(),
+          protocols: owned.map((p) => ({
+            name: p.name,
+            indication: p.indication,
+            cycles: p.cycles,
+            cycleLength: p.cycleLength,
+            emetogenicRisk: p.emetogenicRisk,
+            drugs: (p.drugs as any[]).map((d: any) => ({
+              name: d.name,
+              dose: d.dose,
+              doseUnit: d.doseUnit,
+              ...(d.maxDose ? { maxDose: d.maxDose } : {}),
+              route: d.route,
+              days: d.days,
+              ...(d.observations ? { observations: d.observations } : {}),
+              ...(d.emetogenicRisk ? { emetogenicRisk: d.emetogenicRisk } : {}),
+              ...(d.renalAdjustment ? { renalAdjustment: d.renalAdjustment } : {}),
+              ...(d.hepaticAdjustment ? { hepaticAdjustment: d.hepaticAdjustment } : {}),
+            })),
+            specialAlerts: (p.specialAlerts as string[]) || [],
+            prophylaxis: (p.prophylaxis as string[]) || [],
+            nursingCare: (p.nursingCare as string[]) || [],
+            renalAdjustments: (p.renalAdjustments as string[]) || [],
+            hepaticAdjustments: (p.hepaticAdjustments as string[]) || [],
+            hematologicAdjustments: (p.hematologicAdjustments as string[]) || [],
+            dilutionInfo: (p.dilutionInfo as any[]) || [],
+          })),
+        };
+
+        return exportData;
+      }),
+
+    // ── Exportar todos os protocolos do usuário ───────────────────────
+    exportAll: protectedProcedure.mutation(async ({ ctx }) => {
+      const protocols = await db.getCustomProtocolsByUserId(ctx.user.id);
+      const active = protocols.filter((p) => p.isActive === 1);
+
+      const exportData: ProtocolExportFormat = {
+        version: "1.0",
+        exportedAt: new Date().toISOString(),
+        protocols: active.map((p) => ({
+          name: p.name,
+          indication: p.indication,
+          cycles: p.cycles,
+          cycleLength: p.cycleLength,
+          emetogenicRisk: p.emetogenicRisk,
+          drugs: (p.drugs as any[]).map((d: any) => ({
+            name: d.name,
+            dose: d.dose,
+            doseUnit: d.doseUnit,
+            ...(d.maxDose ? { maxDose: d.maxDose } : {}),
+            route: d.route,
+            days: d.days,
+            ...(d.observations ? { observations: d.observations } : {}),
+            ...(d.emetogenicRisk ? { emetogenicRisk: d.emetogenicRisk } : {}),
+            ...(d.renalAdjustment ? { renalAdjustment: d.renalAdjustment } : {}),
+            ...(d.hepaticAdjustment ? { hepaticAdjustment: d.hepaticAdjustment } : {}),
+          })),
+          specialAlerts: (p.specialAlerts as string[]) || [],
+          prophylaxis: (p.prophylaxis as string[]) || [],
+          nursingCare: (p.nursingCare as string[]) || [],
+          renalAdjustments: (p.renalAdjustments as string[]) || [],
+          hepaticAdjustments: (p.hepaticAdjustments as string[]) || [],
+          hematologicAdjustments: (p.hematologicAdjustments as string[]) || [],
+          dilutionInfo: (p.dilutionInfo as any[]) || [],
+        })),
+      };
+
+      return exportData;
+    }),
+
+    // ── Importar protocolos de JSON ───────────────────────────────────
+    import: protectedProcedure
+      .input(z.object({ jsonData: z.string() }))
+      .mutation(async ({ ctx, input }) => {
+        let parsed: unknown;
+        try {
+          parsed = JSON.parse(input.jsonData);
+        } catch {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "JSON inválido. Verifique o formato do arquivo.",
+          });
+        }
+
+        const errors = validateImportFormat(parsed);
+        if (errors.length > 0) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: `Erros de validação: ${errors.join("; ")}`,
+          });
+        }
+
+        const records = convertImportToDbRecords(
+          parsed as ProtocolExportFormat,
+          ctx.user.id
+        );
+        const count = await db.bulkCreateCustomProtocols(records);
+        return { imported: count };
+      }),
+
+    // ── Popular banco com protocolos do sistema ──────────────────────
+    seedSystem: protectedProcedure.mutation(async ({ ctx }) => {
+      // Importar protocolos do arquivo estático
+      const { protocols } = await import("../client/src/data/protocols");
+
+      // Verificar se já existem protocolos do sistema para este usuário
+      const existing = await db.getAllSystemProtocols(ctx.user.id);
+      const existingIds = new Set(existing.map((p) => p.protocolId));
+
+      // Filtrar apenas os que ainda não existem
+      const records = convertAllProtocols(protocols, ctx.user.id);
+      const newRecords = records.filter((r) => !existingIds.has(r.protocolId));
+
+      if (newRecords.length === 0) {
+        return { imported: 0, message: "Todos os protocolos do sistema já estão cadastrados." };
+      }
+
+      const count = await db.bulkCreateCustomProtocols(newRecords);
+      return {
+        imported: count,
+        message: `${count} protocolo(s) do sistema importado(s) com sucesso.`,
+      };
+    }),
   }),
 
   // ─── Predição de Toxicidade com ML ────────────────────────────────────────

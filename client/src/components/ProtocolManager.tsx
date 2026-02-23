@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from "react";
+import React, { useState, useCallback, useMemo, useRef } from "react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import {
@@ -64,6 +64,12 @@ import {
   Copy,
   Save,
   Loader2,
+  Download,
+  Upload,
+  Database,
+  FileJson,
+  CheckSquare,
+  Square,
 } from "lucide-react";
 
 // ─── Tipos ─────────────────────────────────────────────────────────────────
@@ -308,6 +314,67 @@ export default function ProtocolManager() {
     },
   });
 
+  const exportMutation = trpc.customProtocols.export.useMutation({
+    onSuccess: (data) => {
+      const blob = new Blob([JSON.stringify(data, null, 2)], {
+        type: "application/json",
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `protocolos-export-${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success(`${data.protocols.length} protocolo(s) exportado(s)!`);
+      setSelectedIds(new Set());
+    },
+    onError: (err) => {
+      toast.error(`Erro ao exportar: ${err.message}`);
+    },
+  });
+
+  const exportAllMutation = trpc.customProtocols.exportAll.useMutation({
+    onSuccess: (data) => {
+      const blob = new Blob([JSON.stringify(data, null, 2)], {
+        type: "application/json",
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `protocolos-todos-${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success(`${data.protocols.length} protocolo(s) exportado(s)!`);
+    },
+    onError: (err) => {
+      toast.error(`Erro ao exportar: ${err.message}`);
+    },
+  });
+
+  const importMutation = trpc.customProtocols.import.useMutation({
+    onSuccess: (data) => {
+      utils.customProtocols.list.invalidate();
+      utils.customProtocols.listActive.invalidate();
+      toast.success(`${data.imported} protocolo(s) importado(s) com sucesso!`);
+      setImportDialogOpen(false);
+    },
+    onError: (err) => {
+      toast.error(`Erro na importação: ${err.message}`);
+    },
+  });
+
+  const seedMutation = trpc.customProtocols.seedSystem.useMutation({
+    onSuccess: (data) => {
+      utils.customProtocols.list.invalidate();
+      utils.customProtocols.listActive.invalidate();
+      toast.success(data.message);
+      setSeedDialogOpen(false);
+    },
+    onError: (err) => {
+      toast.error(`Erro ao importar protocolos do sistema: ${err.message}`);
+    },
+  });
+
   // State
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -320,6 +387,11 @@ export default function ProtocolManager() {
   const [formData, setFormData] = useState<ProtocolFormData>({
     ...emptyForm,
   });
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [seedDialogOpen, setSeedDialogOpen] = useState(false);
+  const [importJsonText, setImportJsonText] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // ── Helpers ────────────────────────────────────────────────────────────
 
@@ -537,24 +609,143 @@ export default function ProtocolManager() {
 
   const isSaving = createMutation.isPending || updateMutation.isPending;
 
+  // ── Selection & Import/Export ──────────────────────────────────────────
+
+  const toggleSelect = useCallback((id: number) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const toggleSelectAll = useCallback(() => {
+    if (!customProtocols) return;
+    const activeIds = customProtocols
+      .filter((p) => p.isActive === 1)
+      .map((p) => p.id);
+    setSelectedIds((prev) => {
+      if (prev.size === activeIds.length) return new Set();
+      return new Set(activeIds);
+    });
+  }, [customProtocols]);
+
+  const handleFileImport = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const text = ev.target?.result as string;
+        setImportJsonText(text);
+        setImportDialogOpen(true);
+      };
+      reader.readAsText(file);
+      // Reset input so same file can be selected again
+      e.target.value = "";
+    },
+    []
+  );
+
+  const handleImportSubmit = useCallback(() => {
+    if (!importJsonText.trim()) {
+      toast.error("Nenhum conteúdo JSON fornecido.");
+      return;
+    }
+    importMutation.mutate({ jsonData: importJsonText });
+  }, [importJsonText, importMutation]);
+
+  const handleExportSelected = useCallback(() => {
+    if (selectedIds.size === 0) {
+      toast.error("Selecione pelo menos um protocolo para exportar.");
+      return;
+    }
+    exportMutation.mutate({ ids: Array.from(selectedIds) });
+  }, [selectedIds, exportMutation]);
+
   // ── Render ─────────────────────────────────────────────────────────────
 
   return (
     <div className="space-y-6">
+      {/* Hidden file input for import */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".json"
+        onChange={handleFileImport}
+        className="hidden"
+      />
+
       {/* Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-xl font-bold text-slate-900">
-            Gerenciamento de Protocolos
-          </h2>
-          <p className="text-sm text-slate-600 mt-1">
-            Crie, edite e gerencie seus protocolos personalizados
-          </p>
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div>
+            <h2 className="text-xl font-bold text-slate-900">
+              Gerenciamento de Protocolos
+            </h2>
+            <p className="text-sm text-slate-600 mt-1">
+              Crie, edite e gerencie seus protocolos personalizados
+            </p>
+          </div>
+          <Button onClick={openCreateDialog} className="gap-2">
+            <Plus className="h-4 w-4" />
+            Novo Protocolo
+          </Button>
         </div>
-        <Button onClick={openCreateDialog} className="gap-2">
-          <Plus className="h-4 w-4" />
-          Novo Protocolo
-        </Button>
+
+        {/* Action Bar */}
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setSeedDialogOpen(true)}
+            className="gap-2"
+          >
+            <Database className="h-4 w-4" />
+            Importar Protocolos do Sistema
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => fileInputRef.current?.click()}
+            className="gap-2"
+          >
+            <Upload className="h-4 w-4" />
+            Importar JSON
+          </Button>
+          {selectedIds.size > 0 ? (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleExportSelected}
+              disabled={exportMutation.isPending}
+              className="gap-2"
+            >
+              {exportMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Download className="h-4 w-4" />
+              )}
+              Exportar Selecionados ({selectedIds.size})
+            </Button>
+          ) : (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => exportAllMutation.mutate()}
+              disabled={exportAllMutation.isPending || !customProtocols?.length}
+              className="gap-2"
+            >
+              {exportAllMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Download className="h-4 w-4" />
+              )}
+              Exportar Todos
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Search */}
@@ -597,18 +788,60 @@ export default function ProtocolManager() {
         </Card>
       ) : (
         <div className="grid gap-4">
+          {/* Select All toggle */}
+          {filteredProtocols.filter((p) => p.isActive === 1).length > 0 && (
+            <div className="flex items-center gap-2 px-1">
+              <button
+                type="button"
+                onClick={toggleSelectAll}
+                className="flex items-center gap-2 text-sm text-slate-600 hover:text-slate-900 transition-colors"
+              >
+                {selectedIds.size ===
+                filteredProtocols.filter((p) => p.isActive === 1).length ? (
+                  <CheckSquare className="h-4 w-4 text-primary" />
+                ) : (
+                  <Square className="h-4 w-4" />
+                )}
+                Selecionar todos
+              </button>
+              {selectedIds.size > 0 && (
+                <span className="text-xs text-slate-500">
+                  ({selectedIds.size} selecionado{selectedIds.size > 1 ? "s" : ""})
+                </span>
+              )}
+            </div>
+          )}
           {filteredProtocols.map((protocol) => (
             <Card
               key={protocol.id}
-              className={`transition-all ${protocol.isActive === 0 ? "opacity-60 border-dashed" : ""}`}
+              className={`transition-all ${protocol.isActive === 0 ? "opacity-60 border-dashed" : ""} ${selectedIds.has(protocol.id) ? "ring-2 ring-primary/50" : ""}`}
             >
               <CardContent className="py-4">
                 <div className="flex items-start justify-between gap-4">
+                  {/* Checkbox */}
+                  {protocol.isActive === 1 && (
+                    <button
+                      type="button"
+                      onClick={() => toggleSelect(protocol.id)}
+                      className="mt-1 shrink-0"
+                    >
+                      {selectedIds.has(protocol.id) ? (
+                        <CheckSquare className="h-5 w-5 text-primary" />
+                      ) : (
+                        <Square className="h-5 w-5 text-slate-400 hover:text-slate-600" />
+                      )}
+                    </button>
+                  )}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
                       <h3 className="font-semibold text-slate-900 truncate">
                         {protocol.name}
                       </h3>
+                      {(protocol as any).isSystem === 1 && (
+                        <Badge variant="outline" className="text-xs shrink-0 border-blue-300 text-blue-700">
+                          Sistema
+                        </Badge>
+                      )}
                       <Badge
                         variant={
                           protocol.emetogenicRisk === "high"
@@ -1242,6 +1475,108 @@ export default function ProtocolManager() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Import JSON Dialog */}
+      <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileJson className="h-5 w-5" />
+              Importar Protocolos de JSON
+            </DialogTitle>
+            <DialogDescription>
+              Cole o conteúdo JSON ou selecione um arquivo exportado anteriormente.
+              Os protocolos serão adicionados à sua lista.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>Conteúdo JSON</Label>
+              <Textarea
+                value={importJsonText}
+                onChange={(e) => setImportJsonText(e.target.value)}
+                placeholder='{\n  "version": "1.0",\n  "protocols": [...]\n}'
+                className="font-mono text-xs min-h-[200px]"
+              />
+            </div>
+            {importJsonText && (() => {
+              try {
+                const parsed = JSON.parse(importJsonText);
+                const count = parsed?.protocols?.length || 0;
+                return (
+                  <div className="flex items-center gap-2 text-sm text-green-700 bg-green-50 px-3 py-2 rounded-md">
+                    <CheckSquare className="h-4 w-4" />
+                    JSON válido — {count} protocolo(s) encontrado(s)
+                  </div>
+                );
+              } catch {
+                return (
+                  <div className="flex items-center gap-2 text-sm text-red-700 bg-red-50 px-3 py-2 rounded-md">
+                    <AlertTriangle className="h-4 w-4" />
+                    JSON inválido — verifique o formato
+                  </div>
+                );
+              }
+            })()}
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setImportDialogOpen(false);
+                setImportJsonText("");
+              }}
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleImportSubmit}
+              disabled={importMutation.isPending || !importJsonText.trim()}
+              className="gap-2"
+            >
+              {importMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Upload className="h-4 w-4" />
+              )}
+              Importar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Seed System Protocols Dialog */}
+      <AlertDialog open={seedDialogOpen} onOpenChange={setSeedDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <Database className="h-5 w-5" />
+              Importar Protocolos do Sistema
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação importará os 51 protocolos pré-cadastrados (R-CHOP, ABVD,
+              HiDAC, etc.) para sua lista de protocolos personalizados. Protocolos
+              já importados anteriormente não serão duplicados. Você poderá
+              editá-los livremente após a importação.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => seedMutation.mutate()}
+              disabled={seedMutation.isPending}
+              className="gap-2"
+            >
+              {seedMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Database className="h-4 w-4" />
+              )}
+              Importar Protocolos
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Delete Confirmation */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>

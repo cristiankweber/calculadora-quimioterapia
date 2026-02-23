@@ -1,4 +1,4 @@
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, and, inArray } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import {
   InsertUser,
@@ -485,6 +485,63 @@ export async function deleteCustomProtocol(id: number): Promise<void> {
 export async function hardDeleteCustomProtocol(id: number): Promise<void> {
   const db = await requireDb();
   await db.delete(customProtocols).where(eq(customProtocols.id, id));
+}
+
+export async function bulkCreateCustomProtocols(
+  records: InsertCustomProtocol[]
+): Promise<number> {
+  if (records.length === 0) return 0;
+  const db = await requireDb();
+  // Insert in batches of 10 to avoid query size limits
+  let inserted = 0;
+  for (let i = 0; i < records.length; i += 10) {
+    const batch = records.slice(i, i + 10);
+    await db.insert(customProtocols).values(batch);
+    inserted += batch.length;
+  }
+  return inserted;
+}
+
+export async function getCustomProtocolByProtocolId(
+  protocolId: string
+): Promise<CustomProtocol | undefined> {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db
+    .select()
+    .from(customProtocols)
+    .where(eq(customProtocols.protocolId, protocolId))
+    .limit(1);
+  return result[0];
+}
+
+export async function getCustomProtocolsByIds(
+  ids: number[]
+): Promise<CustomProtocol[]> {
+  if (ids.length === 0) return [];
+  const db = await getDb();
+  if (!db) return [];
+  return await db
+    .select()
+    .from(customProtocols)
+    .where(inArray(customProtocols.id, ids));
+}
+
+export async function getAllSystemProtocols(
+  userId: number
+): Promise<CustomProtocol[]> {
+  const db = await getDb();
+  if (!db) return [];
+  const all = await db
+    .select()
+    .from(customProtocols)
+    .where(
+      and(
+        eq(customProtocols.userId, userId),
+        eq(customProtocols.isActive, 1)
+      )
+    );
+  return all.filter((p) => p.protocolId.startsWith("system-"));
 }
 
 export async function getStatsOverview(userId: number) {

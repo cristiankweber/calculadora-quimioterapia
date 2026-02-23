@@ -1,0 +1,1 @@
+ALTER TABLE `custom_protocols` ADD `isSystem` int DEFAULT 0 NOT NULL;

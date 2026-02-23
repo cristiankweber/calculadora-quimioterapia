@@ -680,3 +680,26 @@
 - [x] Testes de ajustes de dose
 - [x] Testes de atualização parcial
 - [x] 18 testes passando (286 total no projeto)
+
+---
+
+## Importação/Exportação de Protocolos e Migração
+
+### Migração de Protocolos Pré-cadastrados
+- [x] Analisar estrutura dos 51 protocolos existentes em data/protocols.ts
+- [x] Criar script de migração para converter protocolos para formato custom_protocols
+- [x] Executar migração inserindo todos os protocolos no banco de dados
+- [x] Marcar protocolos migrados como "sistema" (não editáveis pelo usuário comum)
+
+### Importação/Exportação JSON
+- [x] Endpoint tRPC para exportar protocolos selecionados como JSON
+- [x] Endpoint tRPC para importar protocolos a partir de JSON
+- [x] Validação de formato JSON na importação
+- [x] Botão de exportar protocolo(s) no ProtocolManager
+- [x] Botão de importar protocolo(s) no ProtocolManager
+- [x] Feedback visual de sucesso/erro na importação
+
+### Testes
+- [x] Testes de validação de importação JSON
+- [x] Testes de exportação
+- [x] Verificar migração dos protocolos no banco

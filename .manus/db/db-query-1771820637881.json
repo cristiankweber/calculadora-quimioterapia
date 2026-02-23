@@ -1,0 +1,170 @@
+{
+  "query": "DESCRIBE custom_protocols;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4m4AkPjJWYg27Fa.d556ac6be38d --database 8PZyG2h8ofbVu5oCJdRJFb --execute DESCRIBE custom_protocols;",
+  "rows": [
+    {
+      "Field": "id",
+      "Type": "int(11)",
+      "Null": "NO",
+      "Key": "PRI",
+      "Default": "NULL",
+      "Extra": "auto_increment"
+    },
+    {
+      "Field": "userId",
+      "Type": "int(11)",
+      "Null": "NO",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "protocolId",
+      "Type": "varchar(128)",
+      "Null": "NO",
+      "Key": "UNI",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "name",
+      "Type": "varchar(255)",
+      "Null": "NO",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "indication",
+      "Type": "varchar(512)",
+      "Null": "NO",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "cycles",
+      "Type": "int(11)",
+      "Null": "NO",
+      "Key": "",
+      "Default": "1",
+      "Extra": ""
+    },
+    {
+      "Field": "cycleLength",
+      "Type": "int(11)",
+      "Null": "NO",
+      "Key": "",
+      "Default": "21",
+      "Extra": ""
+    },
+    {
+      "Field": "emetogenicRisk",
+      "Type": "enum('high','moderate','low','minimal')",
+      "Null": "NO",
+      "Key": "",
+      "Default": "moderate",
+      "Extra": ""
+    },
+    {
+      "Field": "drugs",
+      "Type": "json",
+      "Null": "NO",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "specialAlerts",
+      "Type": "json",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "prophylaxis",
+      "Type": "json",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "nursingCare",
+      "Type": "json",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "renalAdjustments",
+      "Type": "json",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "hepaticAdjustments",
+      "Type": "json",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "hematologicAdjustments",
+      "Type": "json",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "dilutionInfo",
+      "Type": "json",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "isActive",
+      "Type": "int(11)",
+      "Null": "NO",
+      "Key": "",
+      "Default": "1",
+      "Extra": ""
+    },
+    {
+      "Field": "createdAt",
+      "Type": "timestamp",
+      "Null": "NO",
+      "Key": "",
+      "Default": "CURRENT_TIMESTAMP",
+      "Extra": ""
+    },
+    {
+      "Field": "updatedAt",
+      "Type": "timestamp",
+      "Null": "NO",
+      "Key": "",
+      "Default": "CURRENT_TIMESTAMP",
+      "Extra": "DEFAULT_GENERATED on update CURRENT_TIMESTAMP"
+    },
+    {
+      "Field": "isSystem",
+      "Type": "int(11)",
+      "Null": "NO",
+      "Key": "",
+      "Default": "0",
+      "Extra": ""
+    }
+  ],
+  "messages": [],
+  "stdout": "Field\tType\tNull\tKey\tDefault\tExtra\nid\tint(11)\tNO\tPRI\tNULL\tauto_increment\nuserId\tint(11)\tNO\t\tNULL\t\nprotocolId\tvarchar(128)\tNO\tUNI\tNULL\t\nname\tvarchar(255)\tNO\t\tNULL\t\nindication\tvarchar(512)\tNO\t\tNULL\t\ncycles\tint(11)\tNO\t\t1\t\ncycleLength\tint(11)\tNO\t\t21\t\nemetogenicRisk\tenum('high','moderate','low','minimal')\tNO\t\tmoderate\t\ndrugs\tjson\tNO\t\tNULL\t\nspecialAlerts\tjson\tYES\t\tNULL\t\nprophylaxis\tjson\tYES\t\tNULL\t\nnursingCare\tjson\tYES\t\tNULL\t\nrenalAdjustments\tjson\tYES\t\tNULL\t\nhepaticAdjustments\tjson\tYES\t\tNULL\t\nhematologicAdjustments\tjson\tYES\t\tNULL\t\ndilutionInfo\tjson\tYES\t\tNULL\t\nisActive\tint(11)\tNO\t\t1\t\ncreatedAt\ttimestamp\tNO\t\tCURRENT_TIMESTAMP\t\nupdatedAt\ttimestamp\tNO\t\tCURRENT_TIMESTAMP\tDEFAULT_GENERATED on update CURRENT_TIMESTAMP\nisSystem\tint(11)\tNO\t\t0\t\n",
+  "stderr": "",
+  "execution_time_ms": 58
+}

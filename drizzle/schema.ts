@@ -170,6 +170,8 @@ export const customProtocols = mysqlTable("custom_protocols", {
   }>>(),
   /** Se o protocolo está ativo (soft delete) */
   isActive: int("isActive").notNull().default(1),
+  /** Se é um protocolo do sistema (pré-cadastrado, não pode ser excluído permanentemente) */
+  isSystem: int("isSystem").notNull().default(0),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
