@@ -16,6 +16,7 @@ import type { ToxicityGrade } from '@/data/ctcae';
 import { getDoseAdjustmentFactor } from '@/data/ctcae';
 import { generatePrescriptionPDF } from '@/lib/pdfGenerator';
 import { trpc } from '@/lib/trpc';
+import type { HydrationSupportData } from '@/components/HydrationCalculator';
 
 interface PrescriptionContext {
   patientData: PatientData;
@@ -31,6 +32,7 @@ interface PrescriptionContext {
     prescriberName?: string | null;
     prescriberCRM?: string | null;
   } | null;
+  hydrationSupportData?: HydrationSupportData | null;
 }
 
 interface UsePrescriptionActionsReturn {
@@ -257,6 +259,9 @@ export function usePrescriptionActions(ctx: PrescriptionContext): UsePrescriptio
         cycle: ctx.selectedCycle,
         drugs: ctx.calculatedDrugs,
         antiemetics: ctx.antiemetics!,
+        hydration: ctx.hydrationSupportData?.hydration ?? null,
+        electrolytes: ctx.hydrationSupportData?.electrolytes ?? [],
+        transfusion: ctx.hydrationSupportData?.transfusion ?? [],
       });
       toast.success('PDF gerado com sucesso!');
     } catch (error) {

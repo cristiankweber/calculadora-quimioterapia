@@ -1,5 +1,6 @@
 import type { PatientData, Protocol, Drug, CalculatedValues } from '@/types/calculator';
 import type { AntiemeticProphylaxis } from '@/types/calculator';
+import type { HydrationResult, ElectrolyteReplacement, TransfusionRecommendation } from '@/lib/hydrationSupport';
 
 interface PrescriptionData {
   patient: PatientData;
@@ -8,6 +9,9 @@ interface PrescriptionData {
   cycle: number;
   drugs: Drug[];
   antiemetics: AntiemeticProphylaxis;
+  hydration?: HydrationResult | null;
+  electrolytes?: ElectrolyteReplacement[];
+  transfusion?: TransfusionRecommendation[];
 }
 
 // ── Sanitização HTML para evitar XSS ──────────────────────────────────────
@@ -59,7 +63,215 @@ const PDF_STYLES = `
   .status-green { color: #16a34a; font-weight: bold; }
   .status-yellow { color: #ca8a04; font-weight: bold; }
   .status-red { color: #dc2626; font-weight: bold; }
+  .hydration-scheme { border-left: 4px solid #2563eb; padding: 8px 12px; margin-bottom: 10px; background: #f8fafc; }
+  .hydration-scheme.pre { border-left-color: #3b82f6; }
+  .hydration-scheme.concurrent { border-left-color: #8b5cf6; }
+  .hydration-scheme.post { border-left-color: #22c55e; }
+  .hydration-scheme h4 { margin: 0 0 5px 0; font-size: 11pt; }
+  .hydration-badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 9pt; font-weight: bold; }
+  .badge-danger { background: #fee2e2; color: #991b1b; }
+  .badge-warning { background: #fef3c7; color: #92400e; }
+  .badge-info { background: #dbeafe; color: #1e40af; }
+  .badge-success { background: #dcfce7; color: #166534; }
+  .badge-critical { background: #fee2e2; color: #991b1b; }
+  .badge-low { background: #fef3c7; color: #92400e; }
+  .badge-normal { background: #dcfce7; color: #166534; }
+  .badge-high { background: #fef3c7; color: #92400e; }
+  .badge-critical_high { background: #fee2e2; color: #991b1b; }
+  .elec-card { border: 1px solid #e2e8f0; border-radius: 6px; padding: 10px; margin-bottom: 10px; }
+  .transfusion-card { border-left: 4px solid #e2e8f0; padding: 8px 12px; margin-bottom: 10px; background: #f8fafc; }
+  .transfusion-card.immediate { border-left-color: #dc2626; }
+  .transfusion-card.routine { border-left-color: #f59e0b; }
+  .transfusion-card.not_indicated { border-left-color: #22c55e; }
+  .monitoring-list { margin-left: 15px; font-size: 10pt; color: #475569; }
+  .monitoring-list li { margin-bottom: 3px; }
 `;
+
+// ── Seção de Hidratação para PDF ──────────────────────────────────────────
+function buildHydrationSection(hydration?: HydrationResult | null): string {
+  if (!hydration || hydration.protocolType === 'none' || hydration.schemes.length === 0) return '';
+
+  const alertsHtml = hydration.alerts.length > 0 ? hydration.alerts.map(a => `
+    <div class="alert-box" style="border-left-color: ${a.type === 'danger' ? '#dc2626' : a.type === 'warning' ? '#f59e0b' : '#3b82f6'};">
+      <div class="alert-title" style="color: ${a.type === 'danger' ? '#dc2626' : a.type === 'warning' ? '#92400e' : '#1e40af'};">
+        ${a.type === 'danger' ? 'PERIGO' : a.type === 'warning' ? 'ATENÇÃO' : 'INFO'}
+      </div>
+      <div>${escapeHtml(a.message)}</div>
+    </div>
+  `).join('') : '';
+
+  const schemesHtml = hydration.schemes.map(s => `
+    <div class="hydration-scheme ${s.phase}">
+      <h4>${escapeHtml(s.phaseLabel)}</h4>
+      <table style="margin-bottom: 5px;">
+        <tr>
+          <td style="width: 35%;"><strong>Solução:</strong> ${escapeHtml(s.solution)}</td>
+          <td style="width: 20%;"><strong>Volume:</strong> ${s.volume} mL</td>
+          <td style="width: 20%;"><strong>Velocidade:</strong> ${s.rate} mL/h</td>
+          <td style="width: 25%;"><strong>Duração:</strong> ${s.duration}h</td>
+        </tr>
+      </table>
+      ${s.additives && s.additives.length > 0 ? `<div style="font-size: 10pt;"><strong>Aditivos:</strong> ${s.additives.map(a => escapeHtml(a)).join(', ')}</div>` : ''}
+      ${s.notes && s.notes.length > 0 ? `<div style="font-size: 10pt; color: #475569;"><strong>Notas:</strong> ${s.notes.map(n => escapeHtml(n)).join('; ')}</div>` : ''}
+    </div>
+  `).join('');
+
+  const monitoringHtml = hydration.monitoring.length > 0 ? `
+    <div style="margin-top: 10px;">
+      <strong>Monitorização:</strong>
+      <ul class="monitoring-list">${hydration.monitoring.map(m => `<li>${escapeHtml(m)}</li>`).join('')}</ul>
+    </div>
+  ` : '';
+
+  return `
+    <div class="section">
+      <div class="section-title">💧 ESQUEMA DE HIDRATAÇÃO — ${escapeHtml(hydration.protocolLabel)}</div>
+      <div class="info-item" style="margin-bottom: 10px;"><span class="info-label">Volume Total:</span> <span class="calculated-badge">${hydration.totalVolume} mL</span></div>
+      ${alertsHtml}
+      ${schemesHtml}
+      ${monitoringHtml}
+    </div>
+  `;
+}
+
+// ── Seção de Eletrólitos para PDF ────────────────────────────────────────
+function buildElectrolytesSection(electrolytes?: ElectrolyteReplacement[]): string {
+  if (!electrolytes || electrolytes.length === 0) return '';
+
+  // Filtrar apenas eletrólitos que precisam de reposição (não normais)
+  const abnormal = electrolytes.filter(e => e.status !== 'normal');
+  if (abnormal.length === 0) return '';
+
+  const cardsHtml = abnormal.map(e => {
+    const replacementsHtml = e.replacements.length > 0 ? `
+      <table style="margin-top: 8px;">
+        <thead>
+          <tr>
+            <th>Solução</th>
+            <th>Dose</th>
+            <th>Via</th>
+            <th>Velocidade</th>
+            <th>Duração</th>
+            <th>Frequência</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${e.replacements.map(r => `
+            <tr>
+              <td>${escapeHtml(r.solution)}</td>
+              <td><strong>${escapeHtml(r.dose)}</strong></td>
+              <td>${escapeHtml(r.route)}</td>
+              <td>${escapeHtml(r.rate)}</td>
+              <td>${escapeHtml(r.duration)}</td>
+              <td>${escapeHtml(r.frequency)}</td>
+            </tr>
+            ${r.notes ? `<tr><td colspan="6" style="font-size: 9pt; color: #475569; border-top: none;">📋 ${escapeHtml(r.notes)}</td></tr>` : ''}
+          `).join('')}
+        </tbody>
+      </table>
+    ` : '';
+
+    const alertsHtml = e.alerts.length > 0 ? e.alerts.map(a => `
+      <div class="alert-box" style="margin-top: 8px;">
+        <div>${escapeHtml(a)}</div>
+      </div>
+    `).join('') : '';
+
+    const monitoringHtml = e.monitoring.length > 0 ? `
+      <div style="margin-top: 5px;">
+        <strong style="font-size: 10pt;">Monitorização:</strong>
+        <ul class="monitoring-list">${e.monitoring.map(m => `<li>${escapeHtml(m)}</li>`).join('')}</ul>
+      </div>
+    ` : '';
+
+    return `
+      <div class="elec-card">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+          <strong style="font-size: 12pt;">${escapeHtml(e.electrolyte)}</strong>
+          <span class="hydration-badge badge-${e.status}">${escapeHtml(e.statusLabel)}</span>
+        </div>
+        <div class="info-grid" style="margin-bottom: 5px;">
+          <div class="info-item"><span class="info-label">Valor Atual:</span> ${e.currentValue} ${escapeHtml(e.unit)}</div>
+          <div class="info-item"><span class="info-label">Faixa Normal:</span> ${escapeHtml(e.normalRange)}</div>
+        </div>
+        ${alertsHtml}
+        ${replacementsHtml}
+        ${monitoringHtml}
+      </div>
+    `;
+  }).join('');
+
+  return `
+    <div class="section">
+      <div class="section-title">⚡ REPOSIÇÃO DE ELETRÓLITOS</div>
+      ${cardsHtml}
+    </div>
+  `;
+}
+
+// ── Seção de Transfusão para PDF ─────────────────────────────────────────
+function buildTransfusionSection(transfusion?: TransfusionRecommendation[]): string {
+  if (!transfusion || transfusion.length === 0) return '';
+
+  // Filtrar apenas produtos indicados
+  const indicated = transfusion.filter(t => t.indicated);
+  if (indicated.length === 0) return '';
+
+  const cardsHtml = indicated.map(t => {
+    const reqsHtml = t.specialRequirements.length > 0 ? `
+      <div style="margin-top: 5px;">
+        <strong>Requisitos Especiais:</strong>
+        <ul class="prophylaxis-list">${t.specialRequirements.map(r => `<li>${escapeHtml(r)}</li>`).join('')}</ul>
+      </div>
+    ` : '';
+
+    const premedHtml = t.premedication.length > 0 ? `
+      <div style="margin-top: 5px;">
+        <strong>Pré-Medicação:</strong>
+        <ul class="prophylaxis-list">${t.premedication.map(p => `<li>${escapeHtml(p)}</li>`).join('')}</ul>
+      </div>
+    ` : '';
+
+    const alertsHtml = t.alerts.length > 0 ? t.alerts.map(a => `
+      <div class="alert-box" style="margin-top: 5px;">
+        <div>${escapeHtml(a)}</div>
+      </div>
+    `).join('') : '';
+
+    const monitoringHtml = t.monitoring.length > 0 ? `
+      <div style="margin-top: 5px;">
+        <strong style="font-size: 10pt;">Monitorização:</strong>
+        <ul class="monitoring-list">${t.monitoring.map(m => `<li>${escapeHtml(m)}</li>`).join('')}</ul>
+      </div>
+    ` : '';
+
+    return `
+      <div class="transfusion-card ${t.urgency}">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+          <strong style="font-size: 12pt;">${escapeHtml(t.productLabel)}</strong>
+          <span class="hydration-badge ${t.urgency === 'immediate' ? 'badge-danger' : 'badge-warning'}">${escapeHtml(t.urgencyLabel)}</span>
+        </div>
+        <div class="info-grid">
+          <div class="info-item"><span class="info-label">Valor Atual:</span> ${t.currentValue} ${escapeHtml(t.unit)}</div>
+          <div class="info-item"><span class="info-label">Threshold:</span> ${t.threshold} ${escapeHtml(t.unit)}</div>
+          <div class="info-item"><span class="info-label">Volume:</span> ${escapeHtml(t.volume)}</div>
+          <div class="info-item"><span class="info-label">Incremento Esperado:</span> ${escapeHtml(t.expectedIncrement)}</div>
+        </div>
+        ${reqsHtml}
+        ${premedHtml}
+        ${alertsHtml}
+        ${monitoringHtml}
+      </div>
+    `;
+  }).join('');
+
+  return `
+    <div class="section">
+      <div class="section-title">🩸 SUPORTE TRANSFUSIONAL</div>
+      ${cardsHtml}
+    </div>
+  `;
+}
 
 export async function generatePrescriptionPDF(data: PrescriptionData): Promise<void> {
   const { patient, calculatedValues, protocol, cycle, drugs, antiemetics } = data;
@@ -207,6 +419,12 @@ export async function generatePrescriptionPDF(data: PrescriptionData): Promise<v
   </div>
 
   ${adjustmentsSection}
+
+  ${buildHydrationSection(data.hydration)}
+
+  ${buildElectrolytesSection(data.electrolytes)}
+
+  ${buildTransfusionSection(data.transfusion)}
 
   <div class="footer">
     <p><strong>Calculadora de Prescrição Quimioterápica</strong></p>

@@ -742,3 +742,15 @@
 - [x] Testes de reposição de eletrólitos
 - [x] Testes de suporte transfusional
 - [x] Testes de alertas e limites de segurança
+
+---
+
+## Exportação de Hidratação/Eletrólitos no PDF
+
+- [x] Analisar componente PrintablePrescription e fluxo de geração de PDF
+- [x] Adicionar seção de esquema de hidratação no componente de impressão
+- [x] Adicionar seção de reposição de eletrólitos no componente de impressão
+- [x] Adicionar seção de suporte transfusional no componente de impressão
+- [x] Conectar dados calculados de hidratação ao fluxo de exportação PDF
+- [x] Incluir alertas e monitorização no PDF
+- [x] Testar geração do PDF com as novas seções

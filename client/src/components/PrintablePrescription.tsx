@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import QRCode from 'qrcode';
 import type { PatientData, Protocol, Drug, CalculatedValues, AntiemeticProphylaxis } from '@/types/calculator';
+import type { HydrationResult, ElectrolyteReplacement, TransfusionRecommendation } from '@/lib/hydrationSupport';
 
 interface PrintablePrescriptionProps {
   patient: PatientData;
@@ -15,6 +16,9 @@ interface PrintablePrescriptionProps {
   prescriberId?: string;
   prescriberName?: string;
   prescriberCRM?: string;
+  hydration?: HydrationResult | null;
+  electrolytes?: ElectrolyteReplacement[];
+  transfusion?: TransfusionRecommendation[];
 }
 
 export default function PrintablePrescription({
@@ -30,6 +34,9 @@ export default function PrintablePrescription({
   prescriberId = 'SYSTEM',
   prescriberName = 'Médico Responsável',
   prescriberCRM = 'CRM XXXXX',
+  hydration,
+  electrolytes,
+  transfusion,
 }: PrintablePrescriptionProps) {
   const [qrCodeUrl, setQrCodeUrl] = useState<string>('');
   // Usar ID do banco se disponível, caso contrário gerar temporário
@@ -224,6 +231,171 @@ export default function PrintablePrescription({
               </li>
             ))}
           </ul>
+        </div>
+      )}
+
+      {/* Hidratação */}
+      {hydration && hydration.protocolType !== 'none' && hydration.schemes.length > 0 && (
+        <div className="mb-6">
+          <h2 className="text-lg font-semibold mb-3 text-gray-900">
+            💧 Esquema de Hidratação — {hydration.protocolLabel}
+          </h2>
+          <p className="text-sm mb-2"><span className="font-medium">Volume Total:</span> {hydration.totalVolume} mL</p>
+          {hydration.alerts.length > 0 && (
+            <div className="mb-3">
+              {hydration.alerts.map((a, i) => (
+                <div key={i} className={`text-sm p-2 mb-1 rounded border-l-4 ${
+                  a.type === 'danger' ? 'bg-red-50 border-red-500 text-red-800' :
+                  a.type === 'warning' ? 'bg-yellow-50 border-yellow-500 text-yellow-800' :
+                  'bg-blue-50 border-blue-500 text-blue-800'
+                }`}>
+                  <strong>{a.type === 'danger' ? 'PERIGO' : a.type === 'warning' ? 'ATENÇÃO' : 'INFO'}:</strong> {a.message}
+                </div>
+              ))}
+            </div>
+          )}
+          {hydration.schemes.map((s, i) => (
+            <div key={i} className={`mb-2 p-3 rounded border-l-4 bg-gray-50 ${
+              s.phase === 'pre' ? 'border-blue-500' :
+              s.phase === 'concurrent' ? 'border-purple-500' :
+              'border-green-500'
+            }`}>
+              <p className="font-medium text-sm mb-1">{s.phaseLabel}</p>
+              <div className="grid grid-cols-4 gap-2 text-sm">
+                <div><span className="font-medium">Solução:</span> {s.solution}</div>
+                <div><span className="font-medium">Volume:</span> {s.volume} mL</div>
+                <div><span className="font-medium">Velocidade:</span> {s.rate} mL/h</div>
+                <div><span className="font-medium">Duração:</span> {s.duration}h</div>
+              </div>
+              {s.additives && s.additives.length > 0 && (
+                <p className="text-xs mt-1"><span className="font-medium">Aditivos:</span> {s.additives.join(', ')}</p>
+              )}
+              {s.notes && s.notes.length > 0 && (
+                <p className="text-xs mt-1 text-gray-600"><span className="font-medium">Notas:</span> {s.notes.join('; ')}</p>
+              )}
+            </div>
+          ))}
+          {hydration.monitoring.length > 0 && (
+            <div className="mt-2">
+              <p className="text-sm font-medium">Monitorização:</p>
+              <ul className="list-disc list-inside text-xs space-y-0.5 ml-2">
+                {hydration.monitoring.map((m, i) => <li key={i}>{m}</li>)}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Eletrólitos */}
+      {electrolytes && electrolytes.filter(e => e.status !== 'normal').length > 0 && (
+        <div className="mb-6">
+          <h2 className="text-lg font-semibold mb-3 text-gray-900">⚡ Reposição de Eletrólitos</h2>
+          {electrolytes.filter(e => e.status !== 'normal').map((e, idx) => (
+            <div key={idx} className="mb-3 p-3 border rounded bg-gray-50">
+              <div className="flex justify-between items-center mb-2">
+                <span className="font-semibold">{e.electrolyte}</span>
+                <span className={`text-xs px-2 py-0.5 rounded font-medium ${
+                  e.status === 'critical' ? 'bg-red-100 text-red-800' :
+                  e.status === 'low' ? 'bg-yellow-100 text-yellow-800' :
+                  e.status === 'high' ? 'bg-orange-100 text-orange-800' :
+                  'bg-red-100 text-red-800'
+                }`}>{e.statusLabel}</span>
+              </div>
+              <div className="grid grid-cols-2 gap-2 text-sm mb-2">
+                <div><span className="font-medium">Valor Atual:</span> {e.currentValue} {e.unit}</div>
+                <div><span className="font-medium">Faixa Normal:</span> {e.normalRange}</div>
+              </div>
+              {e.alerts.length > 0 && e.alerts.map((a, ai) => (
+                <div key={ai} className="text-xs p-1.5 mb-1 bg-red-50 border-l-2 border-red-400 text-red-700">{a}</div>
+              ))}
+              {e.replacements.length > 0 && (
+                <table className="w-full text-xs border-collapse border border-gray-200 mt-2">
+                  <thead className="bg-gray-100">
+                    <tr>
+                      <th className="border border-gray-200 p-1 text-left">Solução</th>
+                      <th className="border border-gray-200 p-1 text-left">Dose</th>
+                      <th className="border border-gray-200 p-1 text-left">Via</th>
+                      <th className="border border-gray-200 p-1 text-left">Velocidade</th>
+                      <th className="border border-gray-200 p-1 text-left">Duração</th>
+                      <th className="border border-gray-200 p-1 text-left">Frequência</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {e.replacements.map((r, ri) => (
+                      <tr key={ri}>
+                        <td className="border border-gray-200 p-1">{r.solution}</td>
+                        <td className="border border-gray-200 p-1 font-medium">{r.dose}</td>
+                        <td className="border border-gray-200 p-1">{r.route}</td>
+                        <td className="border border-gray-200 p-1">{r.rate}</td>
+                        <td className="border border-gray-200 p-1">{r.duration}</td>
+                        <td className="border border-gray-200 p-1">{r.frequency}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+              {e.monitoring.length > 0 && (
+                <div className="mt-1">
+                  <p className="text-xs font-medium">Monitorização:</p>
+                  <ul className="list-disc list-inside text-xs space-y-0.5 ml-2">
+                    {e.monitoring.map((m, mi) => <li key={mi}>{m}</li>)}
+                  </ul>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Transfusão */}
+      {transfusion && transfusion.filter(t => t.indicated).length > 0 && (
+        <div className="mb-6">
+          <h2 className="text-lg font-semibold mb-3 text-gray-900">🩸 Suporte Transfusional</h2>
+          {transfusion.filter(t => t.indicated).map((t, idx) => (
+            <div key={idx} className={`mb-3 p-3 rounded border-l-4 bg-gray-50 ${
+              t.urgency === 'immediate' ? 'border-red-500' : 'border-yellow-500'
+            }`}>
+              <div className="flex justify-between items-center mb-2">
+                <span className="font-semibold">{t.productLabel}</span>
+                <span className={`text-xs px-2 py-0.5 rounded font-medium ${
+                  t.urgency === 'immediate' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'
+                }`}>{t.urgencyLabel}</span>
+              </div>
+              <div className="grid grid-cols-2 gap-2 text-sm mb-2">
+                <div><span className="font-medium">Valor Atual:</span> {t.currentValue} {t.unit}</div>
+                <div><span className="font-medium">Threshold:</span> {t.threshold} {t.unit}</div>
+                <div><span className="font-medium">Volume:</span> {t.volume}</div>
+                <div><span className="font-medium">Incremento Esperado:</span> {t.expectedIncrement}</div>
+              </div>
+              {t.specialRequirements.length > 0 && (
+                <div className="mb-1">
+                  <p className="text-xs font-medium">Requisitos Especiais:</p>
+                  <ul className="list-disc list-inside text-xs ml-2">
+                    {t.specialRequirements.map((r, ri) => <li key={ri}>{r}</li>)}
+                  </ul>
+                </div>
+              )}
+              {t.premedication.length > 0 && (
+                <div className="mb-1">
+                  <p className="text-xs font-medium">Pré-Medicação:</p>
+                  <ul className="list-disc list-inside text-xs ml-2">
+                    {t.premedication.map((p, pi) => <li key={pi}>{p}</li>)}
+                  </ul>
+                </div>
+              )}
+              {t.alerts.length > 0 && t.alerts.map((a, ai) => (
+                <div key={ai} className="text-xs p-1.5 mb-1 bg-red-50 border-l-2 border-red-400 text-red-700">{a}</div>
+              ))}
+              {t.monitoring.length > 0 && (
+                <div className="mt-1">
+                  <p className="text-xs font-medium">Monitorização:</p>
+                  <ul className="list-disc list-inside text-xs space-y-0.5 ml-2">
+                    {t.monitoring.map((m, mi) => <li key={mi}>{m}</li>)}
+                  </ul>
+                </div>
+              )}
+            </div>
+          ))}
         </div>
       )}
 

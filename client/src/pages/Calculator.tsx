@@ -12,7 +12,7 @@ import ToxicityAssessment from '@/components/ToxicityAssessment';
 import { ToxicityPredictionWithMetrics } from '@/components/ToxicityPrediction';
 import PatientHistoryDB from '@/components/PatientHistoryDB';
 import EmergencyModal, { type EmergencyPatientData } from '@/components/EmergencyModal';
-import HydrationCalculator from '@/components/HydrationCalculator';
+import HydrationCalculator, { type HydrationSupportData } from '@/components/HydrationCalculator';
 
 // Lazy load PrintablePrescription para evitar travamento ao selecionar protocolo
 const PrintablePrescription = lazy(() => import('@/components/PrintablePrescription'));
@@ -75,6 +75,12 @@ export default function Calculator() {
   const [toxicities, setToxicities] = useState<Record<string, ToxicityGrade>>({});
   const [showEmergency, setShowEmergency] = useState(false);
 
+  // ── Dados de Hidratação/Eletrólitos/Transfusão (para PDF) ────────────────
+  const [hydrationSupportData, setHydrationSupportData] = useState<HydrationSupportData | null>(null);
+  const handleHydrationDataChange = useCallback((data: HydrationSupportData) => {
+    setHydrationSupportData(data);
+  }, []);
+
   // ── Cálculo de Doses ────────────────────────────────────────────────────
   const {
     calculatedDrugs,
@@ -117,6 +123,7 @@ export default function Calculator() {
     antiemetics,
     toxicities,
     institutionSettings,
+    hydrationSupportData,
   });
 
   // ── Dados do Paciente para Emergência ───────────────────────────────────
@@ -236,6 +243,7 @@ export default function Calculator() {
               patientData={patientData}
               calculatedValues={calculatedValues}
               selectedProtocol={selectedProtocol}
+              onDataChange={handleHydrationDataChange}
             />
 
             <ToxicityAssessment
@@ -270,6 +278,9 @@ export default function Calculator() {
             institutionLogo={institutionSettings?.institutionLogo ?? undefined}
             prescriberName={institutionSettings?.prescriberName ?? undefined}
             prescriberCRM={institutionSettings?.prescriberCRM ?? undefined}
+            hydration={hydrationSupportData?.hydration}
+            electrolytes={hydrationSupportData?.electrolytes}
+            transfusion={hydrationSupportData?.transfusion}
           />
         </Suspense>
       )}

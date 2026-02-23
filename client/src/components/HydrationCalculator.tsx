@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -53,10 +53,17 @@ import {
   type TransfusionRecommendation,
 } from "@/lib/hydrationSupport";
 
+export interface HydrationSupportData {
+  hydration: HydrationResult | null;
+  electrolytes: ElectrolyteReplacement[];
+  transfusion: TransfusionRecommendation[];
+}
+
 interface HydrationCalculatorProps {
   patientData: PatientData;
   calculatedValues: CalculatedValues | null;
   selectedProtocol: Protocol | null;
+  onDataChange?: (data: HydrationSupportData) => void;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -67,6 +74,7 @@ export default function HydrationCalculator({
   patientData,
   calculatedValues,
   selectedProtocol,
+  onDataChange,
 }: HydrationCalculatorProps) {
   const [activeTab, setActiveTab] = useState("hydration");
 
@@ -94,6 +102,55 @@ export default function HydrationCalculator({
   }, []);
 
   const hasPatientData = calculatedValues && patientData.weight > 0;
+
+  // Calcular dados de hidratação, eletrólitos e transfusão para expor ao pai (PDF)
+  const hydrationData = useMemo(() => {
+    if (!hasPatientData || !calculatedValues) return null;
+
+    const hydration = selectedProtocol ? calculateHydration({
+      weight: patientData.weight,
+      bsa: calculatedValues.bsa,
+      egfr: calculatedValues.egfr,
+      protocolName: selectedProtocol.name,
+      hasCardiacDisease,
+      hasRenalImpairment: calculatedValues.egfr < 60,
+    }) : null;
+
+    const electrolytes = calculateElectrolyteReplacements({
+      weight: patientData.weight,
+      egfr: calculatedValues.egfr,
+      hasCardiacDisease,
+      sodium: labValues.sodium ? parseFloat(labValues.sodium) : undefined,
+      potassium: labValues.potassium ? parseFloat(labValues.potassium) : undefined,
+      magnesium: labValues.magnesium ? parseFloat(labValues.magnesium) : undefined,
+      calciumIonized: labValues.calciumIonized ? parseFloat(labValues.calciumIonized) : undefined,
+      phosphorus: labValues.phosphorus ? parseFloat(labValues.phosphorus) : undefined,
+    });
+
+    const transfusion = calculateTransfusionSupport({
+      weight: patientData.weight,
+      hemoglobin: labValues.hemoglobin ? parseFloat(labValues.hemoglobin) : undefined,
+      platelets: labValues.platelets ? parseFloat(labValues.platelets) : undefined,
+      isBleeding,
+      isPreProcedure,
+      isBMT,
+      isImmunosuppressed,
+      hasFever,
+    });
+
+    return { hydration, electrolytes, transfusion };
+  }, [
+    hasPatientData, calculatedValues, selectedProtocol, patientData.weight,
+    hasCardiacDisease, labValues, isBleeding, isPreProcedure, isBMT,
+    isImmunosuppressed, hasFever,
+  ]);
+
+  // Notificar o pai quando os dados mudam
+  useEffect(() => {
+    if (onDataChange && hydrationData) {
+      onDataChange(hydrationData);
+    }
+  }, [hydrationData, onDataChange]);
 
   return (
     <Card className="border-blue-200 bg-blue-50/30">
