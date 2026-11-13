@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Teste isolado da interface — sem gravação</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+</head>
+<body>
+  <div id="root"></div>
+  <script>
+    // Apenas no harness: substituir a camada externa de autenticação/banco.
+    // Os formulários, cálculos, eventos, componentes e estilos são os reais.
+    const nativeFetch = window.fetch.bind(window);
+    window.fetch = async (input, init) => {
+      const url = new URL(typeof input === 'string' ? input : input.url, location.origin);
+      if (!url.pathname.startsWith('/api/trpc/')) return nativeFetch(input, init);
+      if (init?.method && init.method !== 'GET') throw new Error('Gravações bloqueadas no teste de interface');
+      const procedures = decodeURIComponent(url.pathname.split('/api/trpc/')[1]).split(',');
+      const fixture = {
+        'auth.me': { id: -1, name: 'Usuário fictício', openId: 'interface-test-only', role: 'user' },
+        'settings.get': { institutionName: 'Instituição fictícia — TESTE', prescriberName: 'Prescritor fictício', prescriberCRM: 'CRM TESTE' },
+        'customProtocols.listActive': [],
+        'patients.list': []
+      };
+      const result = procedures.map(name => {
+        if (!(name in fixture)) throw new Error('Procedimento sem fixture: ' + name);
+        return { result: { data: { json: fixture[name] } } };
+      });
+      return new Response(JSON.stringify(url.searchParams.has('batch') ? result : result[0]), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    };
+    const route = new URL(location.href).searchParams.get('path') || '/';
+    history.replaceState(null, '', route);
+  </script>
+  <script type="module" src="/src/main.tsx"></script>
+</body>
+</html>

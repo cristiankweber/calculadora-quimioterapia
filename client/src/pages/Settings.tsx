@@ -79,12 +79,12 @@ export default function Settings() {
       {/* Header */}
       <header className="bg-white border-b border-gray-200 shadow-sm">
         <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div>
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0">
               <h1 className="text-2xl font-bold text-gray-900">Configurações Institucionais</h1>
               <p className="text-sm text-gray-600">Personalize os dados da instituição e prescritor</p>
             </div>
-            <Button variant="outline" onClick={() => setLocation('/')}>
+            <Button variant="outline" className="self-start sm:self-auto" onClick={() => setLocation('/')}>
               <ArrowLeft className="w-4 h-4 mr-2" />
               Voltar
             </Button>
@@ -116,8 +116,8 @@ export default function Settings() {
 
               <div>
                 <Label htmlFor="logo">Logo da Instituição</Label>
-                <div className="flex items-start gap-4">
-                  <div className="flex-1">
+                <div className="flex flex-col items-start gap-4 sm:flex-row">
+                  <div className="w-full min-w-0 sm:flex-1">
                     <Input
                       id="logo"
                       type="file"
@@ -130,11 +130,11 @@ export default function Settings() {
                     </p>
                   </div>
                   {logoPreview && (
-                    <div className="border rounded-lg p-2 bg-white">
+                    <div className="max-w-full shrink-0 border rounded-lg p-2 bg-white">
                       <img
                         src={logoPreview}
-                        alt="Preview do logo"
-                        className="h-16 object-contain"
+                        alt="Prévia do logo da instituição"
+                        className="h-16 max-w-full object-contain"
                       />
                     </div>
                   )}
@@ -162,7 +162,7 @@ export default function Settings() {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="prescriberCRM">CRM</Label>
                   <Input

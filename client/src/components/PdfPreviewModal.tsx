@@ -10,15 +10,12 @@ import { useState, useCallback, useRef } from 'react';
 import {
   Dialog,
   DialogContent,
-  DialogHeader,
   DialogTitle,
   DialogDescription,
-  DialogFooter,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -26,8 +23,6 @@ import {
   Printer,
   Eye,
   Settings2,
-  ChevronLeft,
-  ChevronRight,
   User,
   Calculator,
   Pill,
@@ -195,19 +190,19 @@ export default function PdfPreviewModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[95vw] md:max-w-[90vw] lg:max-w-[1200px] h-[90vh] flex flex-col p-0 gap-0">
+      <DialogContent className="max-w-[calc(100%-1rem)] sm:max-w-[95vw] md:max-w-[90vw] lg:max-w-[1200px] h-[90dvh] flex flex-col overflow-hidden p-0 gap-0">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b">
-          <div>
-            <DialogTitle className="text-xl flex items-center gap-2">
-              <Eye className="h-5 w-5 text-primary" />
-              Preview da Prescrição
+        <div className="flex shrink-0 flex-col gap-3 px-4 pr-12 py-4 border-b sm:flex-row sm:items-center sm:justify-between sm:px-6 sm:pr-14">
+          <div className="min-w-0">
+            <DialogTitle className="text-lg sm:text-xl flex items-center gap-2">
+              <Eye className="h-5 w-5 shrink-0 text-primary" />
+              Prévia da Prescrição
             </DialogTitle>
             <DialogDescription className="mt-1">
-              Revise o documento antes de gerar o PDF. Personalize as seções no painel lateral.
+              Revise o documento antes de gerar o PDF. Use Seções para personalizar o conteúdo.
             </DialogDescription>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex shrink-0 items-center gap-2">
             <Badge variant="secondary" className="text-xs">
               {enabledCount}/{totalCount} seções
             </Badge>
@@ -215,6 +210,8 @@ export default function PdfPreviewModal({
               variant="outline"
               size="sm"
               onClick={() => setShowSettings(!showSettings)}
+              aria-expanded={showSettings}
+              aria-controls="pdf-section-settings"
               className="gap-1"
             >
               <Settings2 className="h-4 w-4" />
@@ -224,10 +221,10 @@ export default function PdfPreviewModal({
         </div>
 
         {/* Content */}
-        <div className="flex flex-1 overflow-hidden">
+        <div className="flex flex-1 min-h-0 min-w-0 flex-col overflow-hidden md:flex-row">
           {/* Settings Panel */}
           {showSettings && (
-            <div className="w-72 border-r bg-muted/30 flex flex-col">
+            <div id="pdf-section-settings" className="w-full max-h-[32dvh] shrink-0 border-b bg-muted/30 flex flex-col md:w-72 md:max-h-none md:border-b-0 md:border-r">
               <div className="p-4 border-b">
                 <h3 className="font-semibold text-sm mb-2">Seções do Documento</h3>
                 <div className="flex gap-2">
@@ -239,25 +236,27 @@ export default function PdfPreviewModal({
                   </Button>
                 </div>
               </div>
-              <ScrollArea className="flex-1">
+              <ScrollArea className="flex-1 min-h-0">
                 <div className="p-3 space-y-1">
                   {sectionConfigs.map((config) => (
                     <div
                       key={config.key}
-                      className={`flex items-center gap-3 p-2 rounded-md transition-colors ${
+                      className={`flex min-h-11 items-center gap-3 p-2 rounded-md transition-colors ${
                         !config.hasData ? 'opacity-40' : sections[config.key] ? 'bg-primary/5' : 'hover:bg-muted/50'
                       }`}
                     >
                       <Switch
+                        id={`pdf-section-${config.key}`}
+                        aria-label={config.label}
                         checked={sections[config.key]}
                         onCheckedChange={() => toggleSection(config.key)}
                         disabled={config.required || !config.hasData}
-                        className="scale-75"
+                        className="shrink-0"
                       />
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-1.5">
+                      <Label htmlFor={`pdf-section-${config.key}`} className="flex-1 min-w-0 cursor-pointer py-1">
+                        <div className="flex flex-wrap items-center gap-1.5">
                           <span className="text-muted-foreground">{config.icon}</span>
-                          <span className="text-xs font-medium truncate">{config.label}</span>
+                          <span className="text-sm font-medium">{config.label}</span>
                           {config.required && (
                             <Badge variant="secondary" className="text-[10px] px-1 py-0">Obrigatório</Badge>
                           )}
@@ -265,7 +264,7 @@ export default function PdfPreviewModal({
                             <Badge variant="outline" className="text-[10px] px-1 py-0">Sem dados</Badge>
                           )}
                         </div>
-                      </div>
+                      </Label>
                     </div>
                   ))}
                 </div>
@@ -274,12 +273,13 @@ export default function PdfPreviewModal({
           )}
 
           {/* Preview Area */}
-          <ScrollArea className="flex-1">
-            <div className="p-6">
+          <div data-testid="pdf-preview-scroll" role="region" aria-label="Documento da prescrição; role para explorar a página A4" tabIndex={0} className="flex-1 min-h-0 min-w-0 overflow-auto overscroll-contain focus-visible:outline-2 focus-visible:outline-ring">
+            <div className="w-max min-w-full p-4 sm:p-6">
               <div
                 ref={previewRef}
+                data-testid="pdf-preview-document"
                 className="bg-white text-black mx-auto shadow-lg border rounded-sm"
-                style={{ maxWidth: '210mm', minHeight: '297mm', padding: '20mm', fontSize: '11pt', lineHeight: '1.4' }}
+                style={{ width: '210mm', minHeight: '297mm', padding: '20mm', fontSize: '11pt', lineHeight: '1.4' }}
               >
                 {/* Cabeçalho */}
                 <div className="border-b-[3px] border-blue-600 pb-4 mb-5 flex items-start justify-between">
@@ -642,22 +642,22 @@ export default function PdfPreviewModal({
                 </div>
               </div>
             </div>
-          </ScrollArea>
+          </div>
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between px-6 py-3 border-t bg-muted/20">
-          <p className="text-xs text-muted-foreground">
-            Revise o documento antes de gerar. Seções desabilitadas não serão incluídas.
+        <div className="flex shrink-0 flex-col gap-3 px-4 py-3 border-t bg-muted/20 lg:flex-row lg:items-center lg:justify-between lg:px-6">
+          <p className="text-xs text-muted-foreground lg:max-w-md">
+            Prévia A4: deslize para explorar o documento. Revise o conteúdo antes de gerar.
           </p>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={() => onOpenChange(false)}>
+          <div className="grid w-full grid-cols-3 gap-2 sm:flex sm:w-auto">
+            <Button variant="outline" onClick={() => onOpenChange(false)} className="px-2 text-xs sm:text-sm">
               Cancelar
             </Button>
-            <Button variant="outline" onClick={() => onConfirmPrint(sections)} className="gap-1">
+            <Button variant="outline" onClick={() => onConfirmPrint(sections)} className="gap-1 px-2 has-[>svg]:px-2 text-xs sm:text-sm">
               <Printer className="h-4 w-4" /> Imprimir
             </Button>
-            <Button onClick={() => onConfirmPdf(sections)} className="gap-1">
+            <Button onClick={() => onConfirmPdf(sections)} className="gap-1 px-2 has-[>svg]:px-2 text-xs sm:text-sm">
               <FileDown className="h-4 w-4" /> Gerar PDF
             </Button>
           </div>

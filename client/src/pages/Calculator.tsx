@@ -172,14 +172,14 @@ export default function Calculator() {
       {/* HEADER */}
       <header className="border-b bg-card">
         <div className="container py-6">
-          <div className="flex justify-between items-center">
-            <div>
-              <h1 className="text-3xl font-bold">Calculadora de Prescrição Quimioterápica</h1>
+          <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
+            <div className="min-w-0 xl:max-w-md xl:shrink-0">
+              <h1 className="text-2xl sm:text-3xl font-bold leading-tight">Calculadora de Prescrição Quimioterápica</h1>
               <p className="text-muted-foreground">
                 Hematologia • Oncologia • Terapia Celular
               </p>
             </div>
-            <div className="flex gap-2 flex-wrap">
+            <div className="flex w-full gap-2 flex-wrap xl:flex-1 xl:justify-end" role="group" aria-label="Ações da calculadora">
               <Button
                 variant="destructive"
                 onClick={() => setShowEmergency(true)}
@@ -200,7 +200,7 @@ export default function Calculator() {
               <Button variant="outline" onClick={() => {
                 if (validateBeforeAction('visualizar preview')) setShowPdfPreview(true);
               }}>
-                <Eye className="h-4 w-4 mr-2" /> Preview / PDF
+                <Eye className="h-4 w-4 mr-2" /> Prévia / PDF
               </Button>
               <Button onClick={handleCopyPrescription}>
                 <Copy className="h-4 w-4 mr-2" /> Copiar

@@ -136,6 +136,20 @@
   }
 }
 
+/* Alvos de toque maiores sem alterar os cálculos ou a densidade do desktop. */
+@media (max-width: 767px) {
+  [data-slot="input"],
+  [data-slot="select-trigger"],
+  [data-slot="button"] {
+    min-height: 44px;
+  }
+
+  [data-slot="input"],
+  [data-slot="select-trigger"] {
+    font-size: 1rem;
+  }
+}
+
 @layer components {
   /**
    * Custom container utility that centers content and adds responsive padding.

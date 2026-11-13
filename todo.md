@@ -767,3 +767,22 @@
 - [x] Botão "Imprimir" direto do modal de preview
 - [x] Integrar modal ao botão PDF do Calculator.tsx
 - [x] Testar renderização do preview com dados completos
+
+---
+
+## Revisão de design — 13/11/2026
+
+Escopo: inspecionar a interface existente da calculadora e seus modais, preservando cálculos e conteúdo clínico. Priorizar problemas de responsividade, legibilidade e acessibilidade; alterações estruturais dependem de aprovação.
+
+- [x] Registrar capturas antes da revisão em 375, 768, 1280 e 1920 px.
+- [x] Inspecionar fluxo do paciente, seleção de protocolo, hidratação e prévia do PDF com dados fictícios.
+- [x] Identificar problemas comprovados e suas causas nos componentes.
+- [x] Corrigir cabeçalho responsivo, limites e rolagem da prévia A4, rótulos de 12 seções, cabeçalho da hidratação, upload móvel de logo, tamanhos de toque e texto, rótulos dos exames, idioma HTML e zoom. Sem alterações de regras clínicas.
+- [x] Revalidar 20 estados em quatro larguras e configurações móveis: 96 verificações sem falhas; confirmar idioma/zoom e filtros visuais. Suíte de 377 testes, TypeScript e build aprovados.
+- [x] Preparar relatório com capturas e limites; salvar checkpoint de entrega.
+
+Pendências explicitamente fora desta revisão visual:
+- [ ] Revisar divergência clínica: R-DHAP cadastrado com Carboplatina, mas hidratação detectada como Cisplatina pelo nome do protocolo.
+- [ ] Fazer a impressão direta respeitar PdfSections, atualmente ignoradas por handlePrint/PrintablePrescription.
+- [ ] Revisar estratégia de cache/Service Worker para não manter interfaces antigas em desenvolvimento e após atualizações.
+- [ ] Investigar gráficos vazios e classificação no Dashboard; exibir rastreabilidade da versão e validação das métricas de IA.

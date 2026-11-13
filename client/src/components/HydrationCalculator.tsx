@@ -298,22 +298,22 @@ function HydrationTab({
       ) : hydrationResult ? (
         <>
           {/* Tipo de protocolo */}
-          <div className="flex items-center justify-between">
-            <div>
+          <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex min-w-0 flex-wrap items-center gap-2">
               <Badge
                 variant={hydrationResult.protocolType === "none" ? "secondary" : "default"}
-                className={
+                className={`max-w-full whitespace-normal text-left ${
                   hydrationResult.protocolType.startsWith("cisplatin") || hydrationResult.protocolType === "methotrexate_hd"
                     ? "bg-red-100 text-red-800 border-red-200"
                     : hydrationResult.protocolType === "ifosfamide" || hydrationResult.protocolType === "cyclophosphamide_hd"
                     ? "bg-orange-100 text-orange-800 border-orange-200"
                     : ""
-                }
+                }`}
               >
                 {hydrationResult.protocolLabel}
               </Badge>
               {hydrationResult.totalVolume > 0 && (
-                <span className="ml-3 text-sm text-muted-foreground">
+                <span className="text-sm text-muted-foreground">
                   Volume total: <strong>{hydrationResult.totalVolume.toLocaleString()} mL</strong>
                 </span>
               )}
@@ -430,8 +430,9 @@ function ElectrolytesTab({
         <CardContent className="pt-0 pb-3">
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
             <div>
-              <Label className="text-xs">Na⁺ (mEq/L)</Label>
+              <Label htmlFor="support-sodium" className="text-xs">Na⁺ (mEq/L)</Label>
               <Input
+                id="support-sodium"
                 type="number"
                 step="0.1"
                 placeholder="135-145"
@@ -441,8 +442,9 @@ function ElectrolytesTab({
               />
             </div>
             <div>
-              <Label className="text-xs">K⁺ (mEq/L)</Label>
+              <Label htmlFor="support-potassium" className="text-xs">K⁺ (mEq/L)</Label>
               <Input
+                id="support-potassium"
                 type="number"
                 step="0.1"
                 placeholder="3.5-5.5"
@@ -452,8 +454,9 @@ function ElectrolytesTab({
               />
             </div>
             <div>
-              <Label className="text-xs">Mg²⁺ (mg/dL)</Label>
+              <Label htmlFor="support-magnesium" className="text-xs">Mg²⁺ (mg/dL)</Label>
               <Input
+                id="support-magnesium"
                 type="number"
                 step="0.1"
                 placeholder="1.8-2.4"
@@ -463,8 +466,9 @@ function ElectrolytesTab({
               />
             </div>
             <div>
-              <Label className="text-xs">Ca²⁺ (mmol/L)</Label>
+              <Label htmlFor="support-calcium" className="text-xs">Ca²⁺ (mmol/L)</Label>
               <Input
+                id="support-calcium"
                 type="number"
                 step="0.01"
                 placeholder="1.15-1.35"
@@ -474,8 +478,9 @@ function ElectrolytesTab({
               />
             </div>
             <div>
-              <Label className="text-xs">PO₄ (mg/dL)</Label>
+              <Label htmlFor="support-phosphorus" className="text-xs">PO₄ (mg/dL)</Label>
               <Input
+                id="support-phosphorus"
                 type="number"
                 step="0.1"
                 placeholder="2.5-4.5"
@@ -608,8 +613,9 @@ function TransfusionTab({
         <CardContent className="pt-0 pb-3">
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <Label className="text-xs">Hemoglobina (g/dL)</Label>
+              <Label htmlFor="support-hemoglobin" className="text-xs">Hemoglobina (g/dL)</Label>
               <Input
+                id="support-hemoglobin"
                 type="number"
                 step="0.1"
                 placeholder="Ex: 7.5"
@@ -619,8 +625,9 @@ function TransfusionTab({
               />
             </div>
             <div>
-              <Label className="text-xs">Plaquetas (/mm³)</Label>
+              <Label htmlFor="support-platelets" className="text-xs">Plaquetas (/mm³)</Label>
               <Input
+                id="support-platelets"
                 type="number"
                 step="1000"
                 placeholder="Ex: 15000"
