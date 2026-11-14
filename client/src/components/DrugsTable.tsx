@@ -1,24 +1,38 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
-import type { Drug } from '@/types/calculator';
-import { useState, memo, useCallback, useMemo } from 'react';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import type { Drug } from "@/types/calculator";
+import { useState, memo, useCallback, useMemo } from "react";
+import { getDoseResultUnit } from "@shared/clinicalDoseEngine";
 
 // ── Constantes estáticas (fora do componente para evitar recriação) ──────
 
 const EMETOGENIC_COLORS: Record<string, string> = {
-  high: 'bg-red-100 text-red-800 border-red-300',
-  moderate: 'bg-yellow-100 text-yellow-800 border-yellow-300',
-  low: 'bg-blue-100 text-blue-800 border-blue-300',
-  minimal: 'bg-green-100 text-green-800 border-green-300',
+  high: "bg-red-100 text-red-800 border-red-300",
+  moderate: "bg-yellow-100 text-yellow-800 border-yellow-300",
+  low: "bg-blue-100 text-blue-800 border-blue-300",
+  minimal: "bg-green-100 text-green-800 border-green-300",
 };
 
 const EMETOGENIC_LABELS: Record<string, string> = {
-  high: 'Alto',
-  moderate: 'Moderado',
-  low: 'Baixo',
-  minimal: 'Mínimo',
+  high: "Alto",
+  moderate: "Moderado",
+  low: "Baixo",
+  minimal: "Mínimo",
 };
 
 // ── Componente de Linha Memoizado ────────────────────────────────────────
@@ -49,13 +63,19 @@ const DrugRow = memo(function DrugRow({
       <TableCell className="font-semibold">{drug.name}</TableCell>
       <TableCell>
         {drug.dose} {drug.doseUnit}
-        {drug.doseUnit === 'AUC' && (
-          <Badge variant="outline" className="ml-2 text-xs bg-blue-50 text-blue-700 border-blue-300">
+        {drug.doseUnit === "AUC" && (
+          <Badge
+            variant="outline"
+            className="ml-2 text-xs bg-blue-50 text-blue-700 border-blue-300"
+          >
             Calvert
           </Badge>
         )}
-        {drug.doseUnit === 'cGy' && (
-          <Badge variant="outline" className="ml-2 text-xs bg-purple-50 text-purple-700 border-purple-300">
+        {drug.doseUnit === "cGy" && (
+          <Badge
+            variant="outline"
+            className="ml-2 text-xs bg-purple-50 text-purple-700 border-purple-300"
+          >
             Procedimento
           </Badge>
         )}
@@ -66,9 +86,9 @@ const DrugRow = memo(function DrugRow({
             type="number"
             step="0.1"
             value={editValue}
-            onChange={(e) => onEditChange(e.target.value)}
+            onChange={e => onEditChange(e.target.value)}
             onBlur={() => onEditBlur(index)}
-            onKeyDown={(e) => onKeyDown(e, index)}
+            onKeyDown={e => onKeyDown(e, index)}
             className="w-24 h-8"
             autoFocus
           />
@@ -79,13 +99,19 @@ const DrugRow = memo(function DrugRow({
               className="hover:bg-muted px-2 py-1 rounded transition-colors cursor-pointer"
               title="Clique para ajustar manualmente"
             >
-              {(drug.calculatedDose || 0).toFixed(1)} {drug.doseUnit === 'mcg/kg' ? 'mcg' : drug.doseUnit === 'cGy' ? 'cGy' : 'mg'}
+              {(drug.calculatedDose || 0).toFixed(1)}{" "}
+              {drug.resultUnit ?? getDoseResultUnit(drug.doseUnit)}
             </button>
-            {drug.maxDose && drug.calculatedDose && drug.calculatedDose >= drug.maxDose && (
-              <Badge variant="outline" className="text-xs bg-yellow-50 text-yellow-700 border-yellow-300">
-                Máx
-              </Badge>
-            )}
+            {drug.maxDose &&
+              drug.calculatedDose &&
+              drug.calculatedDose >= drug.maxDose && (
+                <Badge
+                  variant="outline"
+                  className="text-xs bg-yellow-50 text-yellow-700 border-yellow-300"
+                >
+                  Máx
+                </Badge>
+              )}
           </div>
         )}
       </TableCell>
@@ -93,13 +119,16 @@ const DrugRow = memo(function DrugRow({
       <TableCell>{drug.days}</TableCell>
       <TableCell>
         {drug.emetogenicRisk && (
-          <Badge variant="outline" className={EMETOGENIC_COLORS[drug.emetogenicRisk]}>
+          <Badge
+            variant="outline"
+            className={EMETOGENIC_COLORS[drug.emetogenicRisk]}
+          >
             {EMETOGENIC_LABELS[drug.emetogenicRisk]}
           </Badge>
         )}
       </TableCell>
       <TableCell className="text-sm text-muted-foreground max-w-xs">
-        {drug.observations || '-'}
+        {drug.observations || "-"}
       </TableCell>
     </TableRow>
   );
@@ -114,28 +143,34 @@ interface DrugsTableProps {
 
 function DrugsTable({ drugs, onDoseChange }: DrugsTableProps) {
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
-  const [editValue, setEditValue] = useState<string>('');
+  const [editValue, setEditValue] = useState<string>("");
 
   const handleDoseClick = useCallback((index: number, currentDose: number) => {
     setEditingIndex(index);
     setEditValue(currentDose.toFixed(1));
   }, []);
 
-  const handleDoseBlur = useCallback((index: number) => {
-    const newDose = parseFloat(editValue);
-    if (!isNaN(newDose) && newDose > 0 && onDoseChange) {
-      onDoseChange(index, newDose);
-    }
-    setEditingIndex(null);
-  }, [editValue, onDoseChange]);
-
-  const handleKeyDown = useCallback((e: React.KeyboardEvent, index: number) => {
-    if (e.key === 'Enter') {
-      handleDoseBlur(index);
-    } else if (e.key === 'Escape') {
+  const handleDoseBlur = useCallback(
+    (index: number) => {
+      const newDose = parseFloat(editValue);
+      if (!isNaN(newDose) && newDose > 0 && onDoseChange) {
+        onDoseChange(index, newDose);
+      }
       setEditingIndex(null);
-    }
-  }, [handleDoseBlur]);
+    },
+    [editValue, onDoseChange]
+  );
+
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent, index: number) => {
+      if (e.key === "Enter") {
+        handleDoseBlur(index);
+      } else if (e.key === "Escape") {
+        setEditingIndex(null);
+      }
+    },
+    [handleDoseBlur]
+  );
 
   const handleEditChange = useCallback((value: string) => {
     setEditValue(value);
@@ -146,7 +181,8 @@ function DrugsTable({ drugs, onDoseChange }: DrugsTableProps) {
       <CardHeader>
         <CardTitle>Doses Calculadas</CardTitle>
         <CardDescription>
-          Doses ajustadas por superfície corporal e fatores de correção (clique na dose para ajustar manualmente)
+          Doses ajustadas por superfície corporal e fatores de correção (clique
+          na dose para ajustar manualmente)
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -166,7 +202,10 @@ function DrugsTable({ drugs, onDoseChange }: DrugsTableProps) {
             <TableBody>
               {drugs.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                  <TableCell
+                    colSpan={7}
+                    className="text-center text-muted-foreground py-8"
+                  >
                     Selecione um protocolo para visualizar as drogas
                   </TableCell>
                 </TableRow>

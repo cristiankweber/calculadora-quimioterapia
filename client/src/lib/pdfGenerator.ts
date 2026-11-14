@@ -12,6 +12,7 @@ import type {
 } from "@/lib/hydrationSupport";
 import type { PdfSections } from "@/components/PdfPreviewModal";
 import { isActiveTemplateDocument } from "@shared/clinicalProtocols/templates";
+import { getDoseResultUnit } from "@shared/clinicalDoseEngine";
 
 interface PrescriptionData {
   patient: PatientData;
@@ -104,13 +105,7 @@ export function drugPrescriptionOutput(
   // Unit conversion belongs to the resolver. This fallback supports legacy records only.
   const unit =
     drug.resultUnit ||
-    (structured
-      ? "unidade não informada"
-      : drug.doseUnit === "mcg/kg"
-        ? "mcg"
-        : drug.doseUnit === "cGy"
-          ? "cGy"
-          : "mg");
+    (structured ? "unidade não informada" : getDoseResultUnit(drug.doseUnit));
   const calculated =
     typeof drug.calculatedDose === "number" &&
     Number.isFinite(drug.calculatedDose)

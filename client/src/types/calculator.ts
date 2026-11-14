@@ -34,7 +34,7 @@ export interface Drug {
     | "mcg/m²"
     | "mcg"
     | "UI/m²";
-  maxDose?: number; // Dose máxima absoluta em mg
+  maxDose?: number; // Limite absoluto na unidade do resultado: mg, mcg, UI ou cGy.
   calculatedDose?: number;
   resultUnit?: string;
   frequency?: number | null;

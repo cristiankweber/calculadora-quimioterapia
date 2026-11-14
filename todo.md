@@ -817,3 +817,14 @@ Desenho aprovado: `/home/ubuntu/protocolos-integracao/desenho-templates-utilizav
 - [x] Preparar entrega com arquivo compatível, comprovante de importação e limites remanescentes. Checkpoint restaurável será salvo na entrega; publicação deve ser acionada no painel do Manus para atualizar o domínio existente.
 
 Limites: decisões de idade/nível/alternativas ainda não interpretadas exigem revisão do JSON completo; não existe editor gráfico avançado novo. Fase e GFR absoluto possuem controles explícitos. Antiemese e resgates não são preenchidos por esquema genérico. A biblioteca antiga permanece bloqueada e separada dos templates ativos.
+
+---
+
+## Correção pontual — opção UI/m² — 14/11/2026
+
+Escopo: restaurar a unidade já suportada pelo motor no cadastro/edição, sem alterar protocolos armazenados ou liberar rascunhos.
+
+- [x] Reproduzir a ausência no formulário e a rejeição dos endpoints com testes de comportamento (RED observado); erros de unidade mg nas saídas reproduzidos.
+- [x] Incluir UI/m² no seletor e contratos CRUD; preservar UI no resultado do hook, tabela, fallback PDF/impressão e toast de ajuste manual; máximo rotulado na unidade física correta. Fórmula numérica do motor e protocolos armazenados intactos.
+- [x] Verificar import/export JSON, cálculo por SC e teto absoluto em UI: 739 testes/42 arquivos, TypeScript e build aprovados. Navegador selecionou UI/m² e confirmou Dose Máxima (UI), com zero gravações externas.
+- [x] Preparar correção verificada para checkpoint e entrega; atualização do domínio depende da publicação no painel do Manus.

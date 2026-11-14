@@ -8,13 +8,16 @@
  * - Recalcular apenas quando inputs relevantes mudam
  */
 
-import { useState, useMemo, useCallback } from 'react';
-import { toast } from 'sonner';
-import type { Protocol, Drug, CalculatedValues } from '@/types/calculator';
-import type { ToxicityGrade } from '@/data/ctcae';
-import { getDoseAdjustmentFactor } from '@/data/ctcae';
-import { calculateDrugDoseLegacy } from '@shared/clinicalDoseEngine';
-import { applyFluCyTBIRules, FLUCYTBI_PROTOCOL_ID } from '@/lib/flucytbiRules';
+import { useState, useMemo, useCallback } from "react";
+import { toast } from "sonner";
+import type { Protocol, Drug, CalculatedValues } from "@/types/calculator";
+import type { ToxicityGrade } from "@/data/ctcae";
+import { getDoseAdjustmentFactor } from "@/data/ctcae";
+import {
+  calculateDrugDoseLegacy,
+  getDoseResultUnit,
+} from "@shared/clinicalDoseEngine";
+import { applyFluCyTBIRules, FLUCYTBI_PROTOCOL_ID } from "@/lib/flucytbiRules";
 
 interface UseProtocolDoseCalculationInput {
   selectedProtocol: Protocol | null;
@@ -22,7 +25,7 @@ interface UseProtocolDoseCalculationInput {
   weight: number;
   toxicities: Record<string, ToxicityGrade>;
   patientAge?: number;
-  patientSex?: 'M' | 'F';
+  patientSex?: "M" | "F";
   patientCreatinine?: number;
 }
 
@@ -42,7 +45,9 @@ export function useProtocolDoseCalculation({
   patientSex,
   patientCreatinine,
 }: UseProtocolDoseCalculationInput): UseProtocolDoseCalculationReturn {
-  const [manualOverrides, setManualOverrides] = useState<Map<number, number>>(new Map());
+  const [manualOverrides, setManualOverrides] = useState<Map<number, number>>(
+    new Map()
+  );
 
   const toxicityFactor = useMemo(
     () => getDoseAdjustmentFactor(toxicities),
@@ -56,7 +61,11 @@ export function useProtocolDoseCalculation({
       // Verificar se há override manual
       const manualDose = manualOverrides.get(index);
       if (manualDose !== undefined) {
-        return { ...drug, calculatedDose: manualDose };
+        return {
+          ...drug,
+          calculatedDose: manualDose,
+          resultUnit: getDoseResultUnit(drug.doseUnit),
+        };
       }
 
       const baseDose = calculateDrugDoseLegacy(
@@ -72,6 +81,7 @@ export function useProtocolDoseCalculation({
       return {
         ...drug,
         calculatedDose: Math.round(baseDose * toxicityFactor * 10) / 10,
+        resultUnit: getDoseResultUnit(drug.doseUnit),
       };
     });
 
@@ -83,7 +93,7 @@ export function useProtocolDoseCalculation({
         weight,
         patientAge,
         patientSex,
-        patientCreatinine,
+        patientCreatinine
       );
     }
 
@@ -101,14 +111,20 @@ export function useProtocolDoseCalculation({
     patientCreatinine,
   ]);
 
-  const handleDoseChange = useCallback((index: number, newDose: number) => {
-    setManualOverrides(prev => {
-      const next = new Map(prev);
-      next.set(index, newDose);
-      return next;
-    });
-    toast.success(`Dose ajustada manualmente: ${newDose.toFixed(1)} mg`);
-  }, []);
+  const handleDoseChange = useCallback(
+    (index: number, newDose: number) => {
+      setManualOverrides(prev => {
+        const next = new Map(prev);
+        next.set(index, newDose);
+        return next;
+      });
+      const unit = selectedProtocol?.drugs[index]?.doseUnit;
+      toast.success(
+        `Dose ajustada manualmente: ${newDose.toFixed(1)} ${unit ? getDoseResultUnit(unit) : "mg"}`
+      );
+    },
+    [selectedProtocol]
+  );
 
   // Limpar overrides quando protocolo muda
   useMemo(() => {
@@ -116,10 +132,13 @@ export function useProtocolDoseCalculation({
   }, [selectedProtocol?.id]);
 
   // setCalculatedDrugs para compatibilidade com PatientHistoryDB
-  const setCalculatedDrugs = useCallback((action: React.SetStateAction<Drug[]>) => {
-    // Quando carregando do histórico, limpar overrides e deixar o useMemo recalcular
-    setManualOverrides(new Map());
-  }, []);
+  const setCalculatedDrugs = useCallback(
+    (action: React.SetStateAction<Drug[]>) => {
+      // Quando carregando do histórico, limpar overrides e deixar o useMemo recalcular
+      setManualOverrides(new Map());
+    },
+    []
+  );
 
   return {
     calculatedDrugs,

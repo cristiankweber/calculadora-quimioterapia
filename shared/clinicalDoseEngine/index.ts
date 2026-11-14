@@ -217,6 +217,16 @@ export function calculateDerivedValues(
 
 // ─── Cálculo de Dose de Droga ───────────────────────────────────────────────
 
+/** Unidade absoluta do resultado; não converte o valor numérico da dose. */
+export function getDoseResultUnit(
+  doseUnit: DoseUnit
+): "mg" | "mcg" | "UI" | "cGy" {
+  if (doseUnit === "UI/m²") return "UI";
+  if (doseUnit === "cGy") return "cGy";
+  if (doseUnit.startsWith("mcg")) return "mcg";
+  return "mg";
+}
+
 /**
  * Calcula dose ajustada de uma droga.
  * Retorna 0 se os dados forem insuficientes para o tipo de dose.

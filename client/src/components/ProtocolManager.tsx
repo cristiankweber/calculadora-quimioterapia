@@ -3,6 +3,7 @@ import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { isEnrichedClinicalDocument } from "@shared/clinicalProtocols/library";
 import { isActiveTemplateDocument } from "@shared/clinicalProtocols/templates";
+import { getDoseResultUnit } from "@shared/clinicalDoseEngine";
 import {
   Card,
   CardContent,
@@ -76,7 +77,7 @@ import {
 
 // ─── Tipos ─────────────────────────────────────────────────────────────────
 
-type DoseUnit = "mg/m²" | "mg/kg" | "mg" | "AUC" | "mcg/kg" | "cGy";
+type DoseUnit = "mg/m²" | "mg/kg" | "mg" | "AUC" | "mcg/kg" | "cGy" | "UI/m²";
 type EmetogenicRisk = "high" | "moderate" | "low" | "minimal";
 
 interface DrugForm {
@@ -159,6 +160,7 @@ const emetogenicLabels: Record<EmetogenicRisk, string> = {
 
 const doseUnitOptions: DoseUnit[] = [
   "mg/m²",
+  "UI/m²",
   "mg/kg",
   "mg",
   "AUC",
@@ -1154,7 +1156,10 @@ export default function ProtocolManager() {
                               updateDrug(index, "doseUnit", v)
                             }
                           >
-                            <SelectTrigger className="h-8 text-sm">
+                            <SelectTrigger
+                              className="h-8 text-sm"
+                              aria-label={`Unidade da droga ${index + 1}`}
+                            >
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -1167,7 +1172,9 @@ export default function ProtocolManager() {
                           </Select>
                         </div>
                         <div className="space-y-1">
-                          <Label className="text-xs">Dose Máxima (mg)</Label>
+                          <Label className="text-xs">
+                            Dose Máxima ({getDoseResultUnit(drug.doseUnit)})
+                          </Label>
                           <Input
                             type="number"
                             min={0}

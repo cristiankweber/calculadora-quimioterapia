@@ -494,6 +494,7 @@ export const appRouter = router({
                     dose: z.number().min(0),
                     doseUnit: z.enum([
                       "mg/m²",
+                      "UI/m²",
                       "mg/kg",
                       "mg",
                       "AUC",
@@ -586,6 +587,7 @@ export const appRouter = router({
                     dose: z.number().min(0),
                     doseUnit: z.enum([
                       "mg/m²",
+                      "UI/m²",
                       "mg/kg",
                       "mg",
                       "AUC",
