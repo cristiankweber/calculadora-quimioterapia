@@ -9,15 +9,22 @@
  * - Validação antes de cada ação
  */
 
-import { useState, useCallback } from 'react';
-import { toast } from 'sonner';
-import type { PatientData, Protocol, Drug, CalculatedValues, AntiemeticProphylaxis } from '@/types/calculator';
-import type { ToxicityGrade } from '@/data/ctcae';
-import { getDoseAdjustmentFactor } from '@/data/ctcae';
-import { generatePrescriptionPDF } from '@/lib/pdfGenerator';
-import { trpc } from '@/lib/trpc';
-import type { HydrationSupportData } from '@/components/HydrationCalculator';
-import type { PdfSections } from '@/components/PdfPreviewModal';
+import { useState, useCallback } from "react";
+import { toast } from "sonner";
+import type {
+  PatientData,
+  Protocol,
+  Drug,
+  CalculatedValues,
+  AntiemeticProphylaxis,
+} from "@/types/calculator";
+import type { ToxicityGrade } from "@/data/ctcae";
+import { getDoseAdjustmentFactor } from "@/data/ctcae";
+import { generatePrescriptionPDF } from "@/lib/pdfGenerator";
+import { trpc } from "@/lib/trpc";
+import type { HydrationSupportData } from "@/components/HydrationCalculator";
+import type { PdfSections } from "@/components/PdfPreviewModal";
+import { getPrescriptionBlockReason } from "@shared/clinicalProtocols/library";
 
 interface PrescriptionContext {
   patientData: PatientData;
@@ -58,8 +65,13 @@ function buildPrescriptionDataV2(ctx: PrescriptionContext) {
 
   // Identificar doses manuais
   const manualDoseOverrides = ctx.calculatedDrugs
-    .filter((d) => d.calculatedDose !== undefined && d.dose !== undefined && d.calculatedDose !== d.dose)
-    .map((d) => ({
+    .filter(
+      d =>
+        d.calculatedDose !== undefined &&
+        d.dose !== undefined &&
+        d.calculatedDose !== d.dose
+    )
+    .map(d => ({
       drugName: d.name,
       originalDose: d.dose,
       manualDose: d.calculatedDose ?? d.dose,
@@ -104,7 +116,7 @@ function buildPrescriptionDataV2(ctx: PrescriptionContext) {
       ecogAdjustmentFactor: calculatedValues.ecogAdjustmentFactor,
       globalAdjustmentFactor: calculatedValues.globalAdjustmentFactor,
     },
-    drugs: ctx.calculatedDrugs.map((d) => ({
+    drugs: ctx.calculatedDrugs.map(d => ({
       name: d.name,
       baseDose: d.dose,
       doseUnit: d.doseUnit,
@@ -118,11 +130,14 @@ function buildPrescriptionDataV2(ctx: PrescriptionContext) {
     })),
     preMedications: ctx.antiemetics
       ? [
-          ...ctx.antiemetics.day1.map((med) => ({ name: med, schedule: "D1" })),
-          ...ctx.antiemetics.days2to4.map((med) => ({ name: med, schedule: "D2-D4" })),
+          ...ctx.antiemetics.day1.map(med => ({ name: med, schedule: "D1" })),
+          ...ctx.antiemetics.days2to4.map(med => ({
+            name: med,
+            schedule: "D2-D4",
+          })),
         ]
       : undefined,
-    alerts: protocol.specialAlerts?.map((msg) => ({
+    alerts: protocol.specialAlerts?.map(msg => ({
       type: "protocol",
       message: msg,
     })),
@@ -135,8 +150,10 @@ function buildPrescriptionDataV2(ctx: PrescriptionContext) {
       },
       generatedAt: Date.now(),
       globalAdjustmentFactor: adjustmentFactor,
-      toxicityAdjustments: toxicityAdjustments.length > 0 ? toxicityAdjustments : undefined,
-      manualDoseOverrides: manualDoseOverrides.length > 0 ? manualDoseOverrides : undefined,
+      toxicityAdjustments:
+        toxicityAdjustments.length > 0 ? toxicityAdjustments : undefined,
+      manualDoseOverrides:
+        manualDoseOverrides.length > 0 ? manualDoseOverrides : undefined,
       clinicalInputs: {
         weight: ctx.patientData.weight,
         height: ctx.patientData.height,
@@ -150,31 +167,49 @@ function buildPrescriptionDataV2(ctx: PrescriptionContext) {
   };
 }
 
-export function usePrescriptionActions(ctx: PrescriptionContext): UsePrescriptionActionsReturn {
-  const [prescriptionId, setPrescriptionId] = useState('');
+export function usePrescriptionActions(
+  ctx: PrescriptionContext
+): UsePrescriptionActionsReturn {
+  const [prescriptionId, setPrescriptionId] = useState("");
   const [showPrint, setShowPrint] = useState(false);
 
   const createPatientMutation = trpc.patients.create.useMutation();
   const savePrescriptionMutation = trpc.prescriptions.create.useMutation();
 
-  const validateBeforeAction = useCallback((actionName: string): boolean => {
-    if (!ctx.selectedProtocol || !ctx.calculatedValues) {
-      toast.error(`Preencha todos os dados antes de ${actionName}`);
-      return false;
-    }
-    return true;
-  }, [ctx.selectedProtocol, ctx.calculatedValues]);
+  const validateBeforeAction = useCallback(
+    (actionName: string): boolean => {
+      const blockReason = getPrescriptionBlockReason(ctx.selectedProtocol);
+      if (blockReason) {
+        toast.error(blockReason);
+        return false;
+      }
+      if (!ctx.selectedProtocol || !ctx.calculatedValues) {
+        toast.error(`Preencha todos os dados antes de ${actionName}`);
+        return false;
+      }
+      return true;
+    },
+    [ctx.selectedProtocol, ctx.calculatedValues]
+  );
 
   const warnIfNoInstitution = useCallback(() => {
-    if (!ctx.institutionSettings?.institutionName || !ctx.institutionSettings?.prescriberName) {
-      toast.warning('Configure os dados institucionais em Configurações para personalizar a impressão');
+    if (
+      !ctx.institutionSettings?.institutionName ||
+      !ctx.institutionSettings?.prescriberName
+    ) {
+      toast.warning(
+        "Configure os dados institucionais em Configurações para personalizar a impressão"
+      );
     }
-  }, [ctx.institutionSettings?.institutionName, ctx.institutionSettings?.prescriberName]);
+  }, [
+    ctx.institutionSettings?.institutionName,
+    ctx.institutionSettings?.prescriberName,
+  ]);
 
   const handleSaveToHistory = useCallback(async () => {
-    if (!validateBeforeAction('salvar')) return;
+    if (!validateBeforeAction("salvar")) return;
     if (!ctx.patientData.name) {
-      toast.error('Preencha o nome do paciente antes de salvar');
+      toast.error("Preencha o nome do paciente antes de salvar");
       return;
     }
 
@@ -210,8 +245,12 @@ export function usePrescriptionActions(ctx: PrescriptionContext): UsePrescriptio
     } catch (err: unknown) {
       console.error(err);
       // Exibir mensagem de erro do backend se disponível
-      const message = err instanceof Error ? err.message : 'Erro ao salvar.';
-      toast.error(message.includes('Doses inválidas') ? message : 'Erro ao salvar prescrição.');
+      const message = err instanceof Error ? err.message : "Erro ao salvar.";
+      toast.error(
+        message.includes("Doses inválidas")
+          ? message
+          : "Erro ao salvar prescrição."
+      );
     }
   }, [
     ctx.patientData,
@@ -227,9 +266,15 @@ export function usePrescriptionActions(ctx: PrescriptionContext): UsePrescriptio
   ]);
 
   const handleCopyPrescription = useCallback(() => {
-    if (!validateBeforeAction('copiar')) return;
+    if (!validateBeforeAction("copiar")) return;
 
-    const { patientData, calculatedValues, selectedProtocol, selectedCycle, calculatedDrugs } = ctx;
+    const {
+      patientData,
+      calculatedValues,
+      selectedProtocol,
+      selectedCycle,
+      calculatedDrugs,
+    } = ctx;
 
     let text = `PRESCRIÇÃO DE QUIMIOTERAPIA\n\n`;
     text += `Paciente: ${patientData.name}\n`;
@@ -246,39 +291,45 @@ export function usePrescriptionActions(ctx: PrescriptionContext): UsePrescriptio
     });
 
     navigator.clipboard.writeText(text);
-    toast.success('Prescrição copiada!');
+    toast.success("Prescrição copiada!");
   }, [ctx, validateBeforeAction]);
 
-  const handleExportPDF = useCallback(async (sections?: PdfSections) => {
-    if (!validateBeforeAction('exportar o PDF')) return;
-    warnIfNoInstitution();
+  const handleExportPDF = useCallback(
+    async (sections?: PdfSections) => {
+      if (!validateBeforeAction("exportar o PDF")) return;
+      warnIfNoInstitution();
 
-    try {
-      await generatePrescriptionPDF({
-        patient: ctx.patientData,
-        calculatedValues: ctx.calculatedValues!,
-        protocol: ctx.selectedProtocol!,
-        cycle: ctx.selectedCycle,
-        drugs: ctx.calculatedDrugs,
-        antiemetics: ctx.antiemetics!,
-        hydration: ctx.hydrationSupportData?.hydration ?? null,
-        electrolytes: ctx.hydrationSupportData?.electrolytes ?? [],
-        transfusion: ctx.hydrationSupportData?.transfusion ?? [],
-        sections,
-      });
-      toast.success('PDF gerado com sucesso!');
-    } catch (error) {
-      console.error(error);
-      toast.error('Erro ao gerar PDF.');
-    }
-  }, [ctx, validateBeforeAction, warnIfNoInstitution]);
+      try {
+        await generatePrescriptionPDF({
+          patient: ctx.patientData,
+          calculatedValues: ctx.calculatedValues!,
+          protocol: ctx.selectedProtocol!,
+          cycle: ctx.selectedCycle,
+          drugs: ctx.calculatedDrugs,
+          antiemetics: ctx.antiemetics!,
+          hydration: ctx.hydrationSupportData?.hydration ?? null,
+          electrolytes: ctx.hydrationSupportData?.electrolytes ?? [],
+          transfusion: ctx.hydrationSupportData?.transfusion ?? [],
+          sections,
+        });
+        toast.success("PDF gerado com sucesso!");
+      } catch (error) {
+        console.error(error);
+        toast.error("Erro ao gerar PDF.");
+      }
+    },
+    [ctx, validateBeforeAction, warnIfNoInstitution]
+  );
 
-  const handlePrint = useCallback((sections?: PdfSections) => {
-    if (!validateBeforeAction('imprimir')) return;
-    warnIfNoInstitution();
-    setShowPrint(true);
-    setTimeout(() => window.print(), 80);
-  }, [validateBeforeAction, warnIfNoInstitution]);
+  const handlePrint = useCallback(
+    (sections?: PdfSections) => {
+      if (!validateBeforeAction("imprimir")) return;
+      warnIfNoInstitution();
+      setShowPrint(true);
+      setTimeout(() => window.print(), 80);
+    },
+    [validateBeforeAction, warnIfNoInstitution]
+  );
 
   return {
     prescriptionId,

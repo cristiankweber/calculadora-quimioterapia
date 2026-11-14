@@ -49,6 +49,10 @@ export interface Protocol {
   nursingCare: string[];
   specialAlerts: string[];
   emetogenicRisk: 'high' | 'moderate' | 'low' | 'minimal';
+  /** Documento fonte preservado: não é uma prescrição automaticamente liberada. */
+  clinicalDocument?: Record<string, unknown>;
+  clinicalPackage?: Record<string, unknown>;
+  libraryKind?: 'reviewed' | 'custom' | 'legacy';
 }
 
 export interface CumulativeDose {

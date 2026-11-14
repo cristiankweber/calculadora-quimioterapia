@@ -2,6 +2,12 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 import { appRouter } from "./routers";
 import type { TrpcContext } from "./_core/context";
 
+// Contratos do router: doubles de persistência, nunca o banco da aplicação.
+vi.mock('./db', () => ({
+  createCustomProtocol: vi.fn(async (input: Record<string,unknown>) => ({...input,id:500})),
+  getCustomProtocolById: vi.fn(async () => undefined),
+}));
+
 type AuthenticatedUser = NonNullable<TrpcContext["user"]>;
 
 /**

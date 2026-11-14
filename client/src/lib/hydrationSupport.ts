@@ -19,6 +19,14 @@ export interface HydrationInput {
   hasCardiacDisease: boolean;
   hasRenalImpairment: boolean; // eGFR < 60
   cisplatinDose?: number; // mg/m² (se aplicável)
+  /** Quando presente, a seleção de drogas é autoritativa, inclusive array vazio. */
+  drugs?: Array<{
+    name: string;
+    dose: number;
+    doseUnit: string;
+    administrationsPerDay?: number;
+  }>;
+  selectionResolved?: boolean;
 }
 
 export interface HydrationScheme {
@@ -33,7 +41,14 @@ export interface HydrationScheme {
 }
 
 export interface HydrationResult {
-  protocolType: "cisplatin_high" | "cisplatin_low" | "methotrexate_hd" | "ifosfamide" | "cyclophosphamide_hd" | "standard" | "none";
+  protocolType:
+    | "cisplatin_high"
+    | "cisplatin_low"
+    | "methotrexate_hd"
+    | "ifosfamide"
+    | "cyclophosphamide_hd"
+    | "standard"
+    | "none";
   protocolLabel: string;
   totalVolume: number; // mL total
   schemes: HydrationScheme[];
@@ -116,32 +131,39 @@ export interface TransfusionRecommendation {
 /** Protocolos que requerem hidratação especial */
 const NEPHROTOXIC_PROTOCOLS: Record<string, string> = {
   // Cisplatina
-  "cisplatin": "cisplatin_high",
-  "dhap": "cisplatin_high",
+  cisplatin: "cisplatin_high",
+  dhap: "cisplatin_high",
   "r-dhap": "cisplatin_high",
-  "eshap": "cisplatin_high",
-  "ice": "cisplatin_high",
+  eshap: "cisplatin_high",
+  ice: "cisplatin_high",
   "r-ice": "cisplatin_high",
-  "bep": "cisplatin_high",
-  "ep": "cisplatin_high",
+  bep: "cisplatin_high",
+  ep: "cisplatin_high",
   // Metotrexato alta dose
   "hd-mtx": "methotrexate_hd",
   "hyper-cvad parte b": "methotrexate_hd",
   "hyper-cvad b": "methotrexate_hd",
   // Ifosfamida
-  "ifosfamide": "ifosfamide",
+  ifosfamide: "ifosfamide",
   "flag-ida": "ifosfamide",
   // Ciclofosfamida alta dose
-  "cyclophosphamide_hd": "cyclophosphamide_hd",
+  cyclophosphamide_hd: "cyclophosphamide_hd",
   "hyper-cvad parte a": "cyclophosphamide_hd",
   "hyper-cvad a": "cyclophosphamide_hd",
 };
 
-function detectProtocolType(protocolName: string): HydrationResult["protocolType"] {
+function detectProtocolType(
+  protocolName: string
+): HydrationResult["protocolType"] {
   const lower = protocolName.toLowerCase().trim();
 
   // Cisplatina
-  if (lower.includes("cisplatin") || lower.includes("dhap") || lower.includes("eshap") || lower.includes("bep")) {
+  if (
+    lower.includes("cisplatin") ||
+    lower.includes("dhap") ||
+    lower.includes("eshap") ||
+    lower.includes("bep")
+  ) {
     return "cisplatin_high";
   }
   if (lower.includes("r-dhap") || lower.includes("r-ice")) {
@@ -149,8 +171,11 @@ function detectProtocolType(protocolName: string): HydrationResult["protocolType
   }
 
   // Metotrexato alta dose
-  if (lower.includes("hd-mtx") || lower.includes("metotrexato alta dose") ||
-      (lower.includes("hyper-cvad") && lower.includes("b"))) {
+  if (
+    lower.includes("hd-mtx") ||
+    lower.includes("metotrexato alta dose") ||
+    (lower.includes("hyper-cvad") && lower.includes("b"))
+  ) {
     return "methotrexate_hd";
   }
 
@@ -160,19 +185,59 @@ function detectProtocolType(protocolName: string): HydrationResult["protocolType
   }
 
   // Ciclofosfamida alta dose (>1g/m²)
-  if ((lower.includes("hyper-cvad") && lower.includes("a")) ||
-      lower.includes("ciclofosfamida alta dose")) {
+  if (
+    (lower.includes("hyper-cvad") && lower.includes("a")) ||
+    lower.includes("ciclofosfamida alta dose")
+  ) {
     return "cyclophosphamide_hd";
   }
 
   // Protocolos com risco moderado
-  if (lower.includes("carboplatina") || lower.includes("carboplatin") ||
-      lower.includes("r-chop") || lower.includes("abvd") ||
-      lower.includes("da-r-epoch")) {
+  if (
+    lower.includes("carboplatina") ||
+    lower.includes("carboplatin") ||
+    lower.includes("r-chop") ||
+    lower.includes("abvd") ||
+    lower.includes("da-r-epoch")
+  ) {
     return "standard";
   }
 
   return "none";
+}
+
+function detectDrugRequirements(
+  drugs: NonNullable<HydrationInput["drugs"]>
+): HydrationResult["protocolType"][] {
+  const requirements = new Set<HydrationResult["protocolType"]>();
+  let hasCarboplatin = false;
+  for (const drug of drugs) {
+    const name = drug.name
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase();
+    // Carboplatina não é equivalente a cisplatina. Agentes IT não disparam HD-MTX.
+    if (name.includes("cisplatin") && !name.includes("carboplatin"))
+      requirements.add("cisplatin_high");
+    if (name.includes("carboplatin")) hasCarboplatin = true;
+    if (name.includes("ifosfamid")) requirements.add("ifosfamide");
+    if (
+      (name.includes("metotrexat") || name.includes("methotrexat")) &&
+      drug.doseUnit === "mg/m²" &&
+      drug.dose >= 500
+    )
+      requirements.add("methotrexate_hd");
+    if (name.includes("ciclofosfamid") || name.includes("cyclophosphamid")) {
+      const daily = drug.dose * (drug.administrationsPerDay ?? 1);
+      if (
+        (drug.doseUnit === "mg/m²" && daily >= 1000) ||
+        (drug.doseUnit === "mg/kg" && daily >= 50)
+      )
+        requirements.add("cyclophosphamide_hd");
+    }
+  }
+  if (!requirements.size && hasCarboplatin) requirements.add("standard");
+  return Array.from(requirements);
 }
 
 const PROTOCOL_LABELS: Record<string, string> = {
@@ -186,7 +251,45 @@ const PROTOCOL_LABELS: Record<string, string> = {
 };
 
 export function calculateHydration(input: HydrationInput): HydrationResult {
-  const type = detectProtocolType(input.protocolName);
+  if (input.selectionResolved === false) {
+    return {
+      protocolType: "none",
+      protocolLabel: "Seleção clínica não resolvida — suporte pendente",
+      totalVolume: 0,
+      schemes: [],
+      alerts: [
+        {
+          type: "warning",
+          message:
+            "Resolver fase, calendário e doses antes de definir hidratação. Nenhum esquema foi escolhido automaticamente.",
+        },
+      ],
+      monitoring: [
+        "Conferir suporte e resgates no documento da fase selecionada.",
+      ],
+    };
+  }
+  const requirements =
+    input.drugs === undefined ? null : detectDrugRequirements(input.drugs);
+  if (requirements && requirements.length > 1) {
+    return {
+      protocolType: "none",
+      protocolLabel: "Requisitos múltiplos — seleção clínica necessária",
+      totalVolume: 0,
+      schemes: [],
+      alerts: [
+        {
+          type: "warning",
+          message:
+            "Mais de um agente exige suporte específico. Não somar esquemas ou escolher um por prioridade; definir hidratação, resgate e mesna pela fase/dia e condição clínica.",
+        },
+      ],
+      monitoring: requirements.map(type => PROTOCOL_LABELS[type]),
+    };
+  }
+  const type = requirements
+    ? (requirements[0] ?? "none")
+    : detectProtocolType(input.protocolName);
   const alerts: HydrationAlert[] = [];
   const monitoring: string[] = [];
   let schemes: HydrationScheme[] = [];
@@ -195,7 +298,8 @@ export function calculateHydration(input: HydrationInput): HydrationResult {
   if (input.hasCardiacDisease) {
     alerts.push({
       type: "danger",
-      message: "Paciente cardiopata: reduzir volume total em 30-50%. Monitorar balanço hídrico rigorosamente. Considerar furosemida profilática.",
+      message:
+        "Paciente cardiopata: reduzir volume total em 30-50%. Monitorar balanço hídrico rigorosamente. Considerar furosemida profilática.",
     });
   }
   if (input.hasRenalImpairment) {
@@ -213,11 +317,12 @@ export function calculateHydration(input: HydrationInput): HydrationResult {
         "Peso diário (alvo: variação <2 kg)",
         "Eletrólitos (Na, K, Mg, Ca) antes e 24h após",
         "Creatinina sérica antes de cada ciclo",
-        "Balanço hídrico a cada 4h",
+        "Balanço hídrico a cada 4h"
       );
       alerts.push({
         type: "info",
-        message: "Manter débito urinário ≥100 mL/h. Se <100 mL/h, administrar Furosemida 20-40mg IV.",
+        message:
+          "Manter débito urinário ≥100 mL/h. Se <100 mL/h, administrar Furosemida 20-40mg IV.",
       });
       break;
 
@@ -229,11 +334,12 @@ export function calculateHydration(input: HydrationInput): HydrationResult {
         "Creatinina sérica diária",
         "Débito urinário ≥200 mL/h",
         "Balanço hídrico a cada 4h",
-        "Leucovorin conforme nível sérico de MTX",
+        "Leucovorin conforme nível sérico de MTX"
       );
       alerts.push({
         type: "danger",
-        message: "OBRIGATÓRIO: pH urinário ≥7.0 antes de iniciar MTX. Se pH <7.0, aumentar NaHCO3.",
+        message:
+          "OBRIGATÓRIO: pH urinário ≥7.0 antes de iniciar MTX. Se pH <7.0, aumentar NaHCO3.",
       });
       break;
 
@@ -243,11 +349,12 @@ export function calculateHydration(input: HydrationInput): HydrationResult {
         "Hematúria (fita reagente a cada 6h)",
         "Débito urinário ≥100 mL/h",
         "Balanço hídrico a cada 8h",
-        "Eletrólitos diários",
+        "Eletrólitos diários"
       );
       alerts.push({
         type: "info",
-        message: "MESNA obrigatório: dose = 60-100% da dose de Ifosfamida, fracionada em 3 doses (0h, 4h, 8h).",
+        message:
+          "MESNA obrigatório: dose = 60-100% da dose de Ifosfamida, fracionada em 3 doses (0h, 4h, 8h).",
       });
       break;
 
@@ -257,11 +364,12 @@ export function calculateHydration(input: HydrationInput): HydrationResult {
         "Hematúria (fita reagente a cada 6h)",
         "Débito urinário ≥100 mL/h",
         "Balanço hídrico a cada 8h",
-        "Peso diário",
+        "Peso diário"
       );
       alerts.push({
         type: "info",
-        message: "MESNA obrigatório para doses >1g/m². Dose = 60-100% da Ciclofosfamida.",
+        message:
+          "MESNA obrigatório para doses >1g/m². Dose = 60-100% da Ciclofosfamida.",
       });
       break;
 
@@ -270,18 +378,21 @@ export function calculateHydration(input: HydrationInput): HydrationResult {
       monitoring.push(
         "Balanço hídrico diário",
         "Eletrólitos conforme protocolo",
-        "Sinais de sobrecarga hídrica",
+        "Sinais de sobrecarga hídrica"
       );
       break;
 
     case "none":
-      monitoring.push("Hidratação oral conforme tolerância", "Monitorar sinais de desidratação");
+      monitoring.push(
+        "Hidratação oral conforme tolerância",
+        "Monitorar sinais de desidratação"
+      );
       break;
   }
 
   // Reduzir volumes para cardiopatas
   if (input.hasCardiacDisease && schemes.length > 0) {
-    schemes = schemes.map((s) => ({
+    schemes = schemes.map(s => ({
       ...s,
       volume: Math.round(s.volume * 0.7),
       rate: Math.round(s.rate * 0.7),
@@ -447,7 +558,9 @@ function getIfosfamideHydration(input: HydrationInput): HydrationScheme[] {
   ];
 }
 
-function getCyclophosphamideHydration(input: HydrationInput): HydrationScheme[] {
+function getCyclophosphamideHydration(
+  input: HydrationInput
+): HydrationScheme[] {
   const bsa = input.bsa;
   const volume = Math.round(Math.max(1000, bsa * 1500));
 
@@ -522,20 +635,39 @@ function getStandardHydration(input: HydrationInput): HydrationScheme[] {
 // REPOSIÇÃO DE ELETRÓLITOS
 // ═══════════════════════════════════════════════════════════════════════════════
 
-export function calculateElectrolyteReplacements(input: ElectrolyteInput): ElectrolyteReplacement[] {
+export function calculateElectrolyteReplacements(
+  input: ElectrolyteInput
+): ElectrolyteReplacement[] {
   const results: ElectrolyteReplacement[] = [];
 
   if (input.potassium !== undefined) {
-    results.push(calculatePotassiumReplacement(input.potassium, input.weight, input.egfr, input.hasCardiacDisease));
+    results.push(
+      calculatePotassiumReplacement(
+        input.potassium,
+        input.weight,
+        input.egfr,
+        input.hasCardiacDisease
+      )
+    );
   }
   if (input.magnesium !== undefined) {
-    results.push(calculateMagnesiumReplacement(input.magnesium, input.weight, input.egfr));
+    results.push(
+      calculateMagnesiumReplacement(input.magnesium, input.weight, input.egfr)
+    );
   }
   if (input.calciumIonized !== undefined) {
-    results.push(calculateCalciumReplacement(input.calciumIonized, input.weight, input.hasCardiacDisease));
+    results.push(
+      calculateCalciumReplacement(
+        input.calciumIonized,
+        input.weight,
+        input.hasCardiacDisease
+      )
+    );
   }
   if (input.phosphorus !== undefined) {
-    results.push(calculatePhosphorusReplacement(input.phosphorus, input.weight));
+    results.push(
+      calculatePhosphorusReplacement(input.phosphorus, input.weight)
+    );
   }
   if (input.sodium !== undefined) {
     results.push(calculateSodiumAssessment(input.sodium, input.weight));
@@ -551,9 +683,11 @@ function getElectrolyteStatus(
   high: number,
   criticalHigh: number
 ): { status: ElectrolyteReplacement["status"]; label: string } {
-  if (value < criticalLow) return { status: "critical", label: "Criticamente Baixo" };
+  if (value < criticalLow)
+    return { status: "critical", label: "Criticamente Baixo" };
   if (value < low) return { status: "low", label: "Baixo" };
-  if (value > criticalHigh) return { status: "critical_high", label: "Criticamente Alto" };
+  if (value > criticalHigh)
+    return { status: "critical_high", label: "Criticamente Alto" };
   if (value > high) return { status: "high", label: "Alto" };
   return { status: "normal", label: "Normal" };
 }
@@ -579,12 +713,19 @@ function calculatePotassiumReplacement(
       rate: "20 mEq/h (máx. 40 mEq/h em UTI com monitorização)",
       duration: "2-4 horas",
       frequency: "Repetir conforme nível sérico",
-      notes: "Velocidade máxima por veia periférica: 10 mEq/h. Acesso central: até 40 mEq/h.",
+      notes:
+        "Velocidade máxima por veia periférica: 10 mEq/h. Acesso central: até 40 mEq/h.",
     });
-    alerts.push("HIPOCALEMIA GRAVE: risco de arritmia. Monitorização cardíaca contínua obrigatória.");
-    alerts.push("Repor Magnésio simultaneamente (hipocalemia refratária se Mg baixo).");
+    alerts.push(
+      "HIPOCALEMIA GRAVE: risco de arritmia. Monitorização cardíaca contínua obrigatória."
+    );
+    alerts.push(
+      "Repor Magnésio simultaneamente (hipocalemia refratária se Mg baixo)."
+    );
     if (hasCardiac) {
-      alerts.push("CARDIOPATA: velocidade máxima 10 mEq/h. ECG antes e após reposição.");
+      alerts.push(
+        "CARDIOPATA: velocidade máxima 10 mEq/h. ECG antes e após reposição."
+      );
     }
   } else if (k < 3.5) {
     // Hipocalemia leve-moderada
@@ -610,20 +751,26 @@ function calculatePotassiumReplacement(
   }
 
   if (k > 5.5) {
-    alerts.push("HIPERCALEMIA: ECG imediato. Verificar se amostra não é hemolisada.");
+    alerts.push(
+      "HIPERCALEMIA: ECG imediato. Verificar se amostra não é hemolisada."
+    );
     if (k > 6.5) {
-      alerts.push("HIPERCALEMIA GRAVE: Gluconato de Cálcio 10% 10mL IV em 2-3 min (cardioproteção). Insulina 10UI + Glicose 50% 50mL IV. Nebulização com Salbutamol 10-20mg.");
+      alerts.push(
+        "HIPERCALEMIA GRAVE: Gluconato de Cálcio 10% 10mL IV em 2-3 min (cardioproteção). Insulina 10UI + Glicose 50% 50mL IV. Nebulização com Salbutamol 10-20mg."
+      );
     }
   }
 
   if (egfr < 30) {
-    alerts.push("Insuficiência renal: reduzir dose de reposição e monitorar mais frequentemente.");
+    alerts.push(
+      "Insuficiência renal: reduzir dose de reposição e monitorar mais frequentemente."
+    );
   }
 
   monitoring.push(
     "K sérico: controle 2-4h após reposição IV",
     "ECG se K <3.0 ou >5.5",
-    "Monitorar Mg simultaneamente",
+    "Monitorar Mg simultaneamente"
   );
 
   return {
@@ -661,7 +808,9 @@ function calculateMagnesiumReplacement(
       frequency: "Repetir conforme nível sérico",
       notes: "Monitorar reflexos patelares. Suspender se reflexos abolidos.",
     });
-    alerts.push("HIPOMAGNESEMIA GRAVE: risco de arritmia e convulsão. Monitorização cardíaca.");
+    alerts.push(
+      "HIPOMAGNESEMIA GRAVE: risco de arritmia e convulsão. Monitorização cardíaca."
+    );
     alerts.push("Hipocalemia pode ser refratária até corrigir Mg.");
   } else if (mg < 1.8) {
     // Hipomagnesemia leve-moderada
@@ -687,13 +836,15 @@ function calculateMagnesiumReplacement(
   }
 
   if (egfr < 30) {
-    alerts.push("Insuficiência renal: risco de hipermagnesemia. Reduzir dose em 50%.");
+    alerts.push(
+      "Insuficiência renal: risco de hipermagnesemia. Reduzir dose em 50%."
+    );
   }
 
   monitoring.push(
     "Mg sérico: controle 6-8h após reposição",
     "Reflexos patelares durante infusão IV",
-    "K sérico (corrigir simultaneamente)",
+    "K sérico (corrigir simultaneamente)"
   );
 
   return {
@@ -729,11 +880,16 @@ function calculateCalciumReplacement(
       rate: "Infundir em 10-20 min",
       duration: "20 minutos",
       frequency: "Repetir conforme CaI",
-      notes: "NUNCA infundir em bolus rápido (risco de arritmia). Não misturar com bicarbonato.",
+      notes:
+        "NUNCA infundir em bolus rápido (risco de arritmia). Não misturar com bicarbonato.",
     });
-    alerts.push("HIPOCALCEMIA GRAVE: risco de tetania, convulsão e arritmia. ECG obrigatório.");
+    alerts.push(
+      "HIPOCALCEMIA GRAVE: risco de tetania, convulsão e arritmia. ECG obrigatório."
+    );
     if (hasCardiac) {
-      alerts.push("CARDIOPATA: infundir mais lentamente (30 min). Monitorização contínua.");
+      alerts.push(
+        "CARDIOPATA: infundir mais lentamente (30 min). Monitorização contínua."
+      );
     }
   } else if (caI < 1.15) {
     // Hipocalcemia leve-moderada
@@ -759,9 +915,13 @@ function calculateCalciumReplacement(
   }
 
   if (caI > 1.35) {
-    alerts.push("HIPERCALCEMIA: investigar causa (tumor, PTH, vitamina D). Hidratação vigorosa com SF 0,9%.");
+    alerts.push(
+      "HIPERCALCEMIA: investigar causa (tumor, PTH, vitamina D). Hidratação vigorosa com SF 0,9%."
+    );
     if (caI > 1.6) {
-      alerts.push("HIPERCALCEMIA GRAVE: SF 0,9% 200-300 mL/h + Furosemida 20-40mg IV + Ácido Zoledrônico 4mg IV em 15 min.");
+      alerts.push(
+        "HIPERCALCEMIA GRAVE: SF 0,9% 200-300 mL/h + Furosemida 20-40mg IV + Ácido Zoledrônico 4mg IV em 15 min."
+      );
     }
   }
 
@@ -769,7 +929,7 @@ function calculateCalciumReplacement(
     "CaI: controle 4-6h após reposição",
     "ECG se CaI <0.9 ou >1.5",
     "Mg e K séricos (corrigir simultaneamente)",
-    "Albumina sérica (para interpretar Ca total)",
+    "Albumina sérica (para interpretar Ca total)"
   );
 
   return {
@@ -806,8 +966,12 @@ function calculatePhosphorusReplacement(
       frequency: "Repetir conforme nível sérico",
       notes: "Monitorar K durante infusão (contém potássio). Máx. 80 mmol/dia.",
     });
-    alerts.push("HIPOFOSFATEMIA GRAVE: risco de fraqueza muscular, insuficiência respiratória e rabdomiólise.");
-    alerts.push("Comum na Síndrome de Lise Tumoral (fase de reposição) e realimentação.");
+    alerts.push(
+      "HIPOFOSFATEMIA GRAVE: risco de fraqueza muscular, insuficiência respiratória e rabdomiólise."
+    );
+    alerts.push(
+      "Comum na Síndrome de Lise Tumoral (fase de reposição) e realimentação."
+    );
   } else if (p < 2.5) {
     // Hipofosfatemia leve-moderada
     replacements.push({
@@ -832,16 +996,20 @@ function calculatePhosphorusReplacement(
   }
 
   if (p > 4.5) {
-    alerts.push("HIPERFOSFATEMIA: investigar insuficiência renal ou lise tumoral.");
+    alerts.push(
+      "HIPERFOSFATEMIA: investigar insuficiência renal ou lise tumoral."
+    );
     if (p > 7.0) {
-      alerts.push("HIPERFOSFATEMIA GRAVE (Lise Tumoral?): Hidratação vigorosa + Sevelamer 800mg 3x/dia + considerar diálise.");
+      alerts.push(
+        "HIPERFOSFATEMIA GRAVE (Lise Tumoral?): Hidratação vigorosa + Sevelamer 800mg 3x/dia + considerar diálise."
+      );
     }
   }
 
   monitoring.push(
     "P sérico: controle 6-12h após reposição",
     "K sérico (se usando fosfato de potássio)",
-    "Ca sérico (relação inversa com fósforo)",
+    "Ca sérico (relação inversa com fósforo)"
   );
 
   return {
@@ -879,8 +1047,12 @@ function calculateSodiumAssessment(
       frequency: "Repetir bolus se sintomático após 20 min (máx. 3 bolus)",
       notes: `Déficit estimado: ${deficit} mEq. CORREÇÃO MÁXIMA: 8-10 mEq/L em 24h (risco de mielinólise pontina).`,
     });
-    alerts.push("HIPONATREMIA GRAVE: risco de convulsão e edema cerebral. Correção LENTA obrigatória.");
-    alerts.push("Correção máxima: 8-10 mEq/L nas primeiras 24h. Se ultrapassar, considerar desmopressina.");
+    alerts.push(
+      "HIPONATREMIA GRAVE: risco de convulsão e edema cerebral. Correção LENTA obrigatória."
+    );
+    alerts.push(
+      "Correção máxima: 8-10 mEq/L nas primeiras 24h. Se ultrapassar, considerar desmopressina."
+    );
   } else if (na < 130) {
     // Hiponatremia moderada
     replacements.push({
@@ -917,9 +1089,13 @@ function calculateSodiumAssessment(
   }
 
   if (na > 145) {
-    alerts.push("HIPERNATREMIA: geralmente por desidratação. Repor água livre.");
+    alerts.push(
+      "HIPERNATREMIA: geralmente por desidratação. Repor água livre."
+    );
     if (na > 155) {
-      alerts.push("HIPERNATREMIA GRAVE: SG 5% IV. Correção máxima: 10-12 mEq/L em 24h.");
+      alerts.push(
+        "HIPERNATREMIA GRAVE: SG 5% IV. Correção máxima: 10-12 mEq/L em 24h."
+      );
     }
   }
 
@@ -927,7 +1103,7 @@ function calculateSodiumAssessment(
     "Na sérico: controle a cada 4-6h durante correção",
     "Osmolaridade sérica e urinária",
     "Balanço hídrico rigoroso",
-    "Avaliação neurológica seriada",
+    "Avaliação neurológica seriada"
   );
 
   return {
@@ -947,7 +1123,9 @@ function calculateSodiumAssessment(
 // SUPORTE TRANSFUSIONAL
 // ═══════════════════════════════════════════════════════════════════════════════
 
-export function calculateTransfusionSupport(input: TransfusionInput): TransfusionRecommendation[] {
+export function calculateTransfusionSupport(
+  input: TransfusionInput
+): TransfusionRecommendation[] {
   const results: TransfusionRecommendation[] = [];
 
   if (input.hemoglobin !== undefined) {
@@ -960,7 +1138,9 @@ export function calculateTransfusionSupport(input: TransfusionInput): Transfusio
   return results;
 }
 
-function calculateRBCTransfusion(input: TransfusionInput): TransfusionRecommendation {
+function calculateRBCTransfusion(
+  input: TransfusionInput
+): TransfusionRecommendation {
   const hb = input.hemoglobin!;
   let threshold = 7.0; // AABB 2023: threshold restritivo
   let indicated = false;
@@ -992,7 +1172,9 @@ function calculateRBCTransfusion(input: TransfusionInput): TransfusionRecommenda
 
   // Sintomático com Hb 7-8
   if (!indicated && hb >= 7.0 && hb < 8.0) {
-    alerts.push("Hb entre 7-8 g/dL: transfundir se sintomático (taquicardia, dispneia, hipotensão ortostática).");
+    alerts.push(
+      "Hb entre 7-8 g/dL: transfundir se sintomático (taquicardia, dispneia, hipotensão ortostática)."
+    );
   }
 
   // Cálculo de volume
@@ -1002,16 +1184,22 @@ function calculateRBCTransfusion(input: TransfusionInput): TransfusionRecommenda
 
   // Requisitos especiais
   if (input.isBMT || input.isImmunosuppressed) {
-    specialRequirements.push("Hemácias IRRADIADAS (prevenção de GVHD transfusional)");
+    specialRequirements.push(
+      "Hemácias IRRADIADAS (prevenção de GVHD transfusional)"
+    );
     specialRequirements.push("Hemácias FILTRADAS (leucodepletadas)");
   }
   if (input.hasFever) {
-    specialRequirements.push("Hemácias FILTRADAS (reduzir reação febril não-hemolítica)");
+    specialRequirements.push(
+      "Hemácias FILTRADAS (reduzir reação febril não-hemolítica)"
+    );
     premedication.push("Dipirona 1g IV ou Paracetamol 750mg VO (30 min antes)");
   }
 
   // Pré-medicação padrão para pacientes oncológicos
-  premedication.push("Furosemida 20mg IV (se risco de sobrecarga, ICC, ou ≥2 concentrados)");
+  premedication.push(
+    "Furosemida 20mg IV (se risco de sobrecarga, ICC, ou ≥2 concentrados)"
+  );
 
   const monitoring = [
     "Sinais vitais: antes, 15 min, 30 min, 1h e ao término",
@@ -1021,7 +1209,9 @@ function calculateRBCTransfusion(input: TransfusionInput): TransfusionRecommenda
   ];
 
   if (hb < 5.0) {
-    alerts.push("ANEMIA GRAVE: considerar transfusão de emergência. Tipagem sanguínea + prova cruzada URGENTE.");
+    alerts.push(
+      "ANEMIA GRAVE: considerar transfusão de emergência. Tipagem sanguínea + prova cruzada URGENTE."
+    );
   }
 
   return {
@@ -1029,7 +1219,12 @@ function calculateRBCTransfusion(input: TransfusionInput): TransfusionRecommenda
     productLabel: "Concentrado de Hemácias",
     indicated,
     urgency,
-    urgencyLabel: urgency === "immediate" ? "Imediata" : urgency === "routine" ? "Rotina" : "Não Indicada",
+    urgencyLabel:
+      urgency === "immediate"
+        ? "Imediata"
+        : urgency === "routine"
+          ? "Rotina"
+          : "Não Indicada",
     currentValue: hb,
     threshold,
     unit: "g/dL",
@@ -1042,7 +1237,9 @@ function calculateRBCTransfusion(input: TransfusionInput): TransfusionRecommenda
   };
 }
 
-function calculatePlateletTransfusion(input: TransfusionInput): TransfusionRecommendation {
+function calculatePlateletTransfusion(
+  input: TransfusionInput
+): TransfusionRecommendation {
   const plt = input.platelets!;
   // Normalizar: se valor >1000, assumir que está em /mm³; senão, x10³/µL
   const pltNormalized = plt > 1000 ? plt : plt * 1000;
@@ -1083,13 +1280,19 @@ function calculatePlateletTransfusion(input: TransfusionInput): TransfusionRecom
 
   // Alertas intermediários
   if (!indicated && pltNormalized >= 10000 && pltNormalized < 20000) {
-    alerts.push("Plaquetas 10-20.000: transfundir se febre, infecção, sangramento mucoso ou pré-procedimento.");
+    alerts.push(
+      "Plaquetas 10-20.000: transfundir se febre, infecção, sangramento mucoso ou pré-procedimento."
+    );
   }
 
   // Tipo de produto
   const isAferesis = true; // Preferir aférese em oncologia
-  const volume = isAferesis ? "1 unidade de aférese (~200-300 mL)" : "1 pool de plaquetas randômicas (5-6 unidades, ~300 mL)";
-  const expectedIncrease = isAferesis ? "30.000-50.000/mm³" : "20.000-40.000/mm³";
+  const volume = isAferesis
+    ? "1 unidade de aférese (~200-300 mL)"
+    : "1 pool de plaquetas randômicas (5-6 unidades, ~300 mL)";
+  const expectedIncrease = isAferesis
+    ? "30.000-50.000/mm³"
+    : "20.000-40.000/mm³";
 
   // Requisitos especiais
   if (input.isBMT || input.isImmunosuppressed) {
@@ -1110,7 +1313,9 @@ function calculatePlateletTransfusion(input: TransfusionInput): TransfusionRecom
   ];
 
   if (pltNormalized < 5000) {
-    alerts.push("PLAQUETOPENIA GRAVE: risco de sangramento espontâneo (SNC). Transfusão IMEDIATA.");
+    alerts.push(
+      "PLAQUETOPENIA GRAVE: risco de sangramento espontâneo (SNC). Transfusão IMEDIATA."
+    );
   }
 
   return {
@@ -1118,7 +1323,12 @@ function calculatePlateletTransfusion(input: TransfusionInput): TransfusionRecom
     productLabel: "Concentrado de Plaquetas",
     indicated,
     urgency,
-    urgencyLabel: urgency === "immediate" ? "Imediata" : urgency === "routine" ? "Rotina" : "Não Indicada",
+    urgencyLabel:
+      urgency === "immediate"
+        ? "Imediata"
+        : urgency === "routine"
+          ? "Rotina"
+          : "Não Indicada",
     currentValue: pltNormalized,
     threshold,
     unit: "/mm³",

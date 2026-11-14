@@ -435,7 +435,9 @@ describe("convertAllProtocols", () => {
     const records = convertAllProtocols(sourceProtocols as any, 10);
     expect(records).toHaveLength(1);
     expect(records[0].userId).toBe(10);
-    expect(records[0].protocolId).toBe("system-r-chop");
+    expect(records[0].protocolId).toMatch(/^imported-r-chop-[a-f0-9]{64}$/);
+    expect(convertAllProtocols(sourceProtocols as any, 10)[0].protocolId).toBe(records[0].protocolId);
+    expect(convertAllProtocols(sourceProtocols as any, 11)[0].protocolId).not.toBe(records[0].protocolId);
     expect(records[0].name).toBe("R-CHOP");
     expect(records[0].isSystem).toBe(1);
     expect(records[0].isActive).toBe(1);
@@ -444,7 +446,7 @@ describe("convertAllProtocols", () => {
     expect(records[0].renalAdjustments).toEqual(["Ajuste renal"]);
   });
 
-  it("limpa calculatedDose das drogas ao converter", () => {
+  it("preserva campos brutos arquivados sem interpretá-los como dose resolvida", () => {
     const sourceProtocols = [
       {
         id: "test",
@@ -457,7 +459,7 @@ describe("convertAllProtocols", () => {
             name: "Droga",
             dose: 100,
             doseUnit: "mg/m²",
-            calculatedDose: 185, // Should be removed
+            calculatedDose: 185, // Apenas arquivo fonte; o cálculo usa o motor próprio.
             route: "IV",
             days: "1",
           },
@@ -474,7 +476,8 @@ describe("convertAllProtocols", () => {
 
     const records = convertAllProtocols(sourceProtocols as any, 1);
     const drugs = records[0].drugs as any[];
-    expect(drugs[0]).not.toHaveProperty("calculatedDose");
+    expect(drugs[0].calculatedDose).toBe(185);
+    expect(records[0].clinicalDocument).toEqual(sourceProtocols[0]);
   });
 });
 

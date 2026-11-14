@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useMemo, useRef } from "react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
+import { isEnrichedClinicalDocument } from "@shared/clinicalProtocols/library";
 import {
   Card,
   CardContent,
@@ -213,9 +214,9 @@ function StringListEditor({
       <div className="flex gap-2">
         <Input
           value={newItem}
-          onChange={(e) => setNewItem(e.target.value)}
+          onChange={e => setNewItem(e.target.value)}
           placeholder={placeholder}
-          onKeyDown={(e) => {
+          onKeyDown={e => {
             if (e.key === "Enter") {
               e.preventDefault();
               addItem();
@@ -274,7 +275,7 @@ export default function ProtocolManager() {
       setDialogOpen(false);
       resetForm();
     },
-    onError: (err) => {
+    onError: err => {
       toast.error(`Erro ao criar protocolo: ${err.message}`);
     },
   });
@@ -287,7 +288,7 @@ export default function ProtocolManager() {
       setDialogOpen(false);
       resetForm();
     },
-    onError: (err) => {
+    onError: err => {
       toast.error(`Erro ao atualizar protocolo: ${err.message}`);
     },
   });
@@ -298,7 +299,7 @@ export default function ProtocolManager() {
       utils.customProtocols.listActive.invalidate();
       toast.success("Protocolo excluído com sucesso!");
     },
-    onError: (err) => {
+    onError: err => {
       toast.error(`Erro ao excluir protocolo: ${err.message}`);
     },
   });
@@ -309,13 +310,13 @@ export default function ProtocolManager() {
       utils.customProtocols.listActive.invalidate();
       toast.success("Protocolo restaurado com sucesso!");
     },
-    onError: (err) => {
+    onError: err => {
       toast.error(`Erro ao restaurar protocolo: ${err.message}`);
     },
   });
 
   const exportMutation = trpc.customProtocols.export.useMutation({
-    onSuccess: (data) => {
+    onSuccess: data => {
       const blob = new Blob([JSON.stringify(data, null, 2)], {
         type: "application/json",
       });
@@ -325,16 +326,18 @@ export default function ProtocolManager() {
       a.download = `protocolos-export-${new Date().toISOString().slice(0, 10)}.json`;
       a.click();
       URL.revokeObjectURL(url);
-      toast.success(`${data.protocols.length} protocolo(s) exportado(s)!`);
+      toast.success(
+        "JSON exportado com documentos, calendários e fontes preservados."
+      );
       setSelectedIds(new Set());
     },
-    onError: (err) => {
+    onError: err => {
       toast.error(`Erro ao exportar: ${err.message}`);
     },
   });
 
   const exportAllMutation = trpc.customProtocols.exportAll.useMutation({
-    onSuccess: (data) => {
+    onSuccess: data => {
       const blob = new Blob([JSON.stringify(data, null, 2)], {
         type: "application/json",
       });
@@ -344,33 +347,35 @@ export default function ProtocolManager() {
       a.download = `protocolos-todos-${new Date().toISOString().slice(0, 10)}.json`;
       a.click();
       URL.revokeObjectURL(url);
-      toast.success(`${data.protocols.length} protocolo(s) exportado(s)!`);
+      toast.success(
+        "JSON exportado com documentos, calendários e fontes preservados."
+      );
     },
-    onError: (err) => {
+    onError: err => {
       toast.error(`Erro ao exportar: ${err.message}`);
     },
   });
 
   const importMutation = trpc.customProtocols.import.useMutation({
-    onSuccess: (data) => {
+    onSuccess: data => {
       utils.customProtocols.list.invalidate();
       utils.customProtocols.listActive.invalidate();
       toast.success(`${data.imported} protocolo(s) importado(s) com sucesso!`);
       setImportDialogOpen(false);
     },
-    onError: (err) => {
+    onError: err => {
       toast.error(`Erro na importação: ${err.message}`);
     },
   });
 
   const seedMutation = trpc.customProtocols.seedSystem.useMutation({
-    onSuccess: (data) => {
+    onSuccess: data => {
       utils.customProtocols.list.invalidate();
       utils.customProtocols.listActive.invalidate();
       toast.success(data.message);
       setSeedDialogOpen(false);
     },
-    onError: (err) => {
+    onError: err => {
       toast.error(`Erro ao importar protocolos do sistema: ${err.message}`);
     },
   });
@@ -401,7 +406,7 @@ export default function ProtocolManager() {
   }, []);
 
   const toggleSection = useCallback((section: string) => {
-    setExpandedSections((prev) => {
+    setExpandedSections(prev => {
       const next = new Set(prev);
       if (next.has(section)) next.delete(section);
       else next.add(section);
@@ -414,7 +419,7 @@ export default function ProtocolManager() {
     if (!searchTerm.trim()) return customProtocols;
     const term = searchTerm.toLowerCase();
     return customProtocols.filter(
-      (p) =>
+      p =>
         p.name.toLowerCase().includes(term) ||
         p.indication.toLowerCase().includes(term)
     );
@@ -423,14 +428,14 @@ export default function ProtocolManager() {
   // ── Drug Management ────────────────────────────────────────────────────
 
   const addDrug = useCallback(() => {
-    setFormData((prev) => ({
+    setFormData(prev => ({
       ...prev,
       drugs: [...prev.drugs, { ...emptyDrug }],
     }));
   }, []);
 
   const removeDrug = useCallback((index: number) => {
-    setFormData((prev) => ({
+    setFormData(prev => ({
       ...prev,
       drugs: prev.drugs.filter((_, i) => i !== index),
     }));
@@ -438,7 +443,7 @@ export default function ProtocolManager() {
 
   const updateDrug = useCallback(
     (index: number, field: keyof DrugForm, value: any) => {
-      setFormData((prev) => ({
+      setFormData(prev => ({
         ...prev,
         drugs: prev.drugs.map((d, i) =>
           i === index ? { ...d, [field]: value } : d
@@ -451,14 +456,14 @@ export default function ProtocolManager() {
   // ── Dilution Management ────────────────────────────────────────────────
 
   const addDilution = useCallback(() => {
-    setFormData((prev) => ({
+    setFormData(prev => ({
       ...prev,
       dilutionInfo: [...prev.dilutionInfo, { ...emptyDilution }],
     }));
   }, []);
 
   const removeDilution = useCallback((index: number) => {
-    setFormData((prev) => ({
+    setFormData(prev => ({
       ...prev,
       dilutionInfo: prev.dilutionInfo.filter((_, i) => i !== index),
     }));
@@ -466,7 +471,7 @@ export default function ProtocolManager() {
 
   const updateDilution = useCallback(
     (index: number, field: keyof DilutionInfoForm, value: string) => {
-      setFormData((prev) => ({
+      setFormData(prev => ({
         ...prev,
         dilutionInfo: prev.dilutionInfo.map((d, i) =>
           i === index ? { ...d, [field]: value } : d
@@ -484,54 +489,51 @@ export default function ProtocolManager() {
     setDialogOpen(true);
   }, [resetForm]);
 
-  const openEditDialog = useCallback(
-    (protocol: any) => {
-      const drugs: DrugForm[] = (protocol.drugs as any[]).map((d: any) => ({
-        name: d.name || "",
-        dose: d.dose || 0,
-        doseUnit: d.doseUnit || "mg/m²",
-        maxDose: d.maxDose,
-        route: d.route || "IV",
-        days: d.days || "1",
-        observations: d.observations,
-        emetogenicRisk: d.emetogenicRisk,
-        renalAdjustment: d.renalAdjustment,
-        hepaticAdjustment: d.hepaticAdjustment,
-      }));
+  const openEditDialog = useCallback((protocol: any) => {
+    const drugs: DrugForm[] = (protocol.drugs as any[]).map((d: any) => ({
+      name: d.name || "",
+      dose: d.dose || 0,
+      doseUnit: d.doseUnit || "mg/m²",
+      maxDose: d.maxDose,
+      route: d.route || "IV",
+      days: d.days || "1",
+      observations: d.observations,
+      emetogenicRisk: d.emetogenicRisk,
+      renalAdjustment: d.renalAdjustment,
+      hepaticAdjustment: d.hepaticAdjustment,
+    }));
 
-      const dilutionInfo: DilutionInfoForm[] = (
-        (protocol.dilutionInfo as any[]) || []
-      ).map((d: any) => ({
-        drugName: d.drugName || "",
-        diluent: d.diluent || "",
-        volume: d.volume || "",
-        infusionTime: d.infusionTime || "",
-        stability: d.stability || "",
-        specialInstructions: d.specialInstructions || "",
-      }));
+    const dilutionInfo: DilutionInfoForm[] = (
+      (protocol.dilutionInfo as any[]) || []
+    ).map((d: any) => ({
+      drugName: d.drugName || "",
+      diluent: d.diluent || "",
+      volume: d.volume || "",
+      infusionTime: d.infusionTime || "",
+      stability: d.stability || "",
+      specialInstructions: d.specialInstructions || "",
+    }));
 
-      setFormData({
-        name: protocol.name,
-        indication: protocol.indication,
-        cycles: protocol.cycles,
-        cycleLength: protocol.cycleLength,
-        emetogenicRisk: protocol.emetogenicRisk,
-        drugs,
-        specialAlerts: (protocol.specialAlerts as string[]) || [],
-        prophylaxis: (protocol.prophylaxis as string[]) || [],
-        nursingCare: (protocol.nursingCare as string[]) || [],
-        renalAdjustments: (protocol.renalAdjustments as string[]) || [],
-        hepaticAdjustments: (protocol.hepaticAdjustments as string[]) || [],
-        hematologicAdjustments:
-          (protocol.hematologicAdjustments as string[]) || [],
-        dilutionInfo,
-      });
-      setEditingId(protocol.id);
-      setExpandedSections(new Set(["drugs"]));
-      setDialogOpen(true);
-    },
-    []
-  );
+    setFormData({
+      name: protocol.name,
+      indication: protocol.indication,
+      cycles: protocol.cycles,
+      cycleLength: protocol.cycleLength,
+      emetogenicRisk: protocol.emetogenicRisk,
+      drugs,
+      specialAlerts: (protocol.specialAlerts as string[]) || [],
+      prophylaxis: (protocol.prophylaxis as string[]) || [],
+      nursingCare: (protocol.nursingCare as string[]) || [],
+      renalAdjustments: (protocol.renalAdjustments as string[]) || [],
+      hepaticAdjustments: (protocol.hepaticAdjustments as string[]) || [],
+      hematologicAdjustments:
+        (protocol.hematologicAdjustments as string[]) || [],
+      dilutionInfo,
+    });
+    setEditingId(protocol.id);
+    setExpandedSections(new Set(["drugs"]));
+    setDialogOpen(true);
+  }, []);
 
   const handleSubmit = useCallback(() => {
     // Validação básica
@@ -560,7 +562,7 @@ export default function ProtocolManager() {
 
     const payload = {
       ...formData,
-      drugs: formData.drugs.map((d) => ({
+      drugs: formData.drugs.map(d => ({
         ...d,
         observations: d.observations || undefined,
         emetogenicRisk: d.emetogenicRisk || undefined,
@@ -569,9 +571,7 @@ export default function ProtocolManager() {
         maxDose: d.maxDose || undefined,
       })),
       specialAlerts:
-        formData.specialAlerts.length > 0
-          ? formData.specialAlerts
-          : undefined,
+        formData.specialAlerts.length > 0 ? formData.specialAlerts : undefined,
       prophylaxis:
         formData.prophylaxis.length > 0 ? formData.prophylaxis : undefined,
       nursingCare:
@@ -612,7 +612,7 @@ export default function ProtocolManager() {
   // ── Selection & Import/Export ──────────────────────────────────────────
 
   const toggleSelect = useCallback((id: number) => {
-    setSelectedIds((prev) => {
+    setSelectedIds(prev => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
@@ -623,9 +623,9 @@ export default function ProtocolManager() {
   const toggleSelectAll = useCallback(() => {
     if (!customProtocols) return;
     const activeIds = customProtocols
-      .filter((p) => p.isActive === 1)
-      .map((p) => p.id);
-    setSelectedIds((prev) => {
+      .filter(p => p.isActive === 1)
+      .map(p => p.id);
+    setSelectedIds(prev => {
       if (prev.size === activeIds.length) return new Set();
       return new Set(activeIds);
     });
@@ -636,7 +636,7 @@ export default function ProtocolManager() {
       const file = e.target.files?.[0];
       if (!file) return;
       const reader = new FileReader();
-      reader.onload = (ev) => {
+      reader.onload = ev => {
         const text = ev.target?.result as string;
         setImportJsonText(text);
         setImportDialogOpen(true);
@@ -703,7 +703,7 @@ export default function ProtocolManager() {
             className="gap-2"
           >
             <Database className="h-4 w-4" />
-            Importar Protocolos do Sistema
+            Sincronizar 52 revisados
           </Button>
           <Button
             variant="outline"
@@ -754,7 +754,7 @@ export default function ProtocolManager() {
         <Input
           placeholder="Buscar protocolos por nome ou indicação..."
           value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
+          onChange={e => setSearchTerm(e.target.value)}
           className="pl-9"
         />
       </div>
@@ -779,7 +779,11 @@ export default function ProtocolManager() {
                 : "Crie seu primeiro protocolo personalizado para começar."}
             </p>
             {!searchTerm && (
-              <Button onClick={openCreateDialog} variant="outline" className="gap-2">
+              <Button
+                onClick={openCreateDialog}
+                variant="outline"
+                className="gap-2"
+              >
                 <Plus className="h-4 w-4" />
                 Criar Protocolo
               </Button>
@@ -789,7 +793,7 @@ export default function ProtocolManager() {
       ) : (
         <div className="grid gap-4">
           {/* Select All toggle */}
-          {filteredProtocols.filter((p) => p.isActive === 1).length > 0 && (
+          {filteredProtocols.filter(p => p.isActive === 1).length > 0 && (
             <div className="flex items-center gap-2 px-1">
               <button
                 type="button"
@@ -797,7 +801,7 @@ export default function ProtocolManager() {
                 className="flex items-center gap-2 text-sm text-slate-600 hover:text-slate-900 transition-colors"
               >
                 {selectedIds.size ===
-                filteredProtocols.filter((p) => p.isActive === 1).length ? (
+                filteredProtocols.filter(p => p.isActive === 1).length ? (
                   <CheckSquare className="h-4 w-4 text-primary" />
                 ) : (
                   <Square className="h-4 w-4" />
@@ -806,12 +810,13 @@ export default function ProtocolManager() {
               </button>
               {selectedIds.size > 0 && (
                 <span className="text-xs text-slate-500">
-                  ({selectedIds.size} selecionado{selectedIds.size > 1 ? "s" : ""})
+                  ({selectedIds.size} selecionado
+                  {selectedIds.size > 1 ? "s" : ""})
                 </span>
               )}
             </div>
           )}
-          {filteredProtocols.map((protocol) => (
+          {filteredProtocols.map(protocol => (
             <Card
               key={protocol.id}
               className={`transition-all ${protocol.isActive === 0 ? "opacity-60 border-dashed" : ""} ${selectedIds.has(protocol.id) ? "ring-2 ring-primary/50" : ""}`}
@@ -833,12 +838,25 @@ export default function ProtocolManager() {
                     </button>
                   )}
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
+                    <div className="flex flex-wrap items-center gap-2 mb-1">
                       <h3 className="font-semibold text-slate-900 truncate">
                         {protocol.name}
                       </h3>
+                      {isEnrichedClinicalDocument(
+                        protocol.clinicalDocument
+                      ) && (
+                        <Badge
+                          variant="outline"
+                          className="text-xs border-amber-300 text-amber-900"
+                        >
+                          Rascunho · somente consulta
+                        </Badge>
+                      )}
                       {(protocol as any).isSystem === 1 && (
-                        <Badge variant="outline" className="text-xs shrink-0 border-blue-300 text-blue-700">
+                        <Badge
+                          variant="outline"
+                          className="text-xs shrink-0 border-blue-300 text-blue-700"
+                        >
                           Sistema
                         </Badge>
                       )}
@@ -853,7 +871,9 @@ export default function ProtocolManager() {
                         className="text-xs shrink-0"
                       >
                         Risco{" "}
-                        {emetogenicLabels[protocol.emetogenicRisk as EmetogenicRisk] || protocol.emetogenicRisk}
+                        {emetogenicLabels[
+                          protocol.emetogenicRisk as EmetogenicRisk
+                        ] || protocol.emetogenicRisk}
                       </Badge>
                       {protocol.isActive === 0 && (
                         <Badge variant="outline" className="text-xs shrink-0">
@@ -869,8 +889,9 @@ export default function ProtocolManager() {
                         {(protocol.drugs as any[])?.length || 0} droga(s)
                       </span>
                       <span>
-                        {protocol.cycles} ciclo(s) de {protocol.cycleLength}{" "}
-                        dias
+                        {isEnrichedClinicalDocument(protocol.clinicalDocument)
+                          ? "Calendário e fases no documento clínico"
+                          : `${protocol.cycles} ciclo(s) de ${protocol.cycleLength} dias`}
                       </span>
                       <span>
                         Criado em{" "}
@@ -879,6 +900,25 @@ export default function ProtocolManager() {
                         )}
                       </span>
                     </div>
+                    {isEnrichedClinicalDocument(protocol.clinicalDocument) && (
+                      <details className="mt-3 text-sm">
+                        <summary className="cursor-pointer text-primary">
+                          Documento integral · versão{" "}
+                          {String(
+                            protocol.clinicalPackage?.version ?? "não informada"
+                          )}
+                        </summary>
+                        <p className="my-2 text-muted-foreground">
+                          Para simular calendário e doses, selecione este
+                          protocolo na calculadora. Revisões devem ser
+                          importadas em JSON completo, sem remover políticas de
+                          segurança.
+                        </p>
+                        <pre className="max-h-80 overflow-auto rounded-md bg-muted p-3 text-xs">
+                          {JSON.stringify(protocol.clinicalDocument, null, 2)}
+                        </pre>
+                      </details>
+                    )}
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
                     {protocol.isActive === 0 ? (
@@ -899,6 +939,16 @@ export default function ProtocolManager() {
                           variant="ghost"
                           size="sm"
                           onClick={() => openEditDialog(protocol)}
+                          disabled={isEnrichedClinicalDocument(
+                            protocol.clinicalDocument
+                          )}
+                          title={
+                            isEnrichedClinicalDocument(
+                              protocol.clinicalDocument
+                            )
+                              ? "Revisar por JSON completo; o editor legado não preserva fases."
+                              : "Editar protocolo"
+                          }
                         >
                           <Pencil className="h-4 w-4" />
                         </Button>
@@ -947,8 +997,8 @@ export default function ProtocolManager() {
                 <Input
                   id="protocol-name"
                   value={formData.name}
-                  onChange={(e) =>
-                    setFormData((prev) => ({ ...prev, name: e.target.value }))
+                  onChange={e =>
+                    setFormData(prev => ({ ...prev, name: e.target.value }))
                   }
                   placeholder="Ex: R-CHOP, FLAG-Ida, VRd..."
                 />
@@ -960,8 +1010,8 @@ export default function ProtocolManager() {
                 <Textarea
                   id="protocol-indication"
                   value={formData.indication}
-                  onChange={(e) =>
-                    setFormData((prev) => ({
+                  onChange={e =>
+                    setFormData(prev => ({
                       ...prev,
                       indication: e.target.value,
                     }))
@@ -977,8 +1027,8 @@ export default function ProtocolManager() {
                   type="number"
                   min={1}
                   value={formData.cycles}
-                  onChange={(e) =>
-                    setFormData((prev) => ({
+                  onChange={e =>
+                    setFormData(prev => ({
                       ...prev,
                       cycles: parseInt(e.target.value) || 1,
                     }))
@@ -994,8 +1044,8 @@ export default function ProtocolManager() {
                   type="number"
                   min={1}
                   value={formData.cycleLength}
-                  onChange={(e) =>
-                    setFormData((prev) => ({
+                  onChange={e =>
+                    setFormData(prev => ({
                       ...prev,
                       cycleLength: parseInt(e.target.value) || 21,
                     }))
@@ -1006,8 +1056,8 @@ export default function ProtocolManager() {
                 <Label>Risco Emetogênico</Label>
                 <Select
                   value={formData.emetogenicRisk}
-                  onValueChange={(v) =>
-                    setFormData((prev) => ({
+                  onValueChange={v =>
+                    setFormData(prev => ({
                       ...prev,
                       emetogenicRisk: v as EmetogenicRisk,
                     }))
@@ -1063,7 +1113,7 @@ export default function ProtocolManager() {
                           </Label>
                           <Input
                             value={drug.name}
-                            onChange={(e) =>
+                            onChange={e =>
                               updateDrug(index, "name", e.target.value)
                             }
                             placeholder="Ex: Rituximabe"
@@ -1079,7 +1129,7 @@ export default function ProtocolManager() {
                             min={0}
                             step="any"
                             value={drug.dose || ""}
-                            onChange={(e) =>
+                            onChange={e =>
                               updateDrug(
                                 index,
                                 "dose",
@@ -1094,7 +1144,7 @@ export default function ProtocolManager() {
                           <Label className="text-xs">Unidade</Label>
                           <Select
                             value={drug.doseUnit}
-                            onValueChange={(v) =>
+                            onValueChange={v =>
                               updateDrug(index, "doseUnit", v)
                             }
                           >
@@ -1102,7 +1152,7 @@ export default function ProtocolManager() {
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                              {doseUnitOptions.map((unit) => (
+                              {doseUnitOptions.map(unit => (
                                 <SelectItem key={unit} value={unit}>
                                   {unit}
                                 </SelectItem>
@@ -1117,7 +1167,7 @@ export default function ProtocolManager() {
                             min={0}
                             step="any"
                             value={drug.maxDose || ""}
-                            onChange={(e) =>
+                            onChange={e =>
                               updateDrug(
                                 index,
                                 "maxDose",
@@ -1134,15 +1184,13 @@ export default function ProtocolManager() {
                           </Label>
                           <Select
                             value={drug.route}
-                            onValueChange={(v) =>
-                              updateDrug(index, "route", v)
-                            }
+                            onValueChange={v => updateDrug(index, "route", v)}
                           >
                             <SelectTrigger className="h-8 text-sm">
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                              {routeOptions.map((route) => (
+                              {routeOptions.map(route => (
                                 <SelectItem key={route} value={route}>
                                   {route}
                                 </SelectItem>
@@ -1156,7 +1204,7 @@ export default function ProtocolManager() {
                           </Label>
                           <Input
                             value={drug.days}
-                            onChange={(e) =>
+                            onChange={e =>
                               updateDrug(index, "days", e.target.value)
                             }
                             placeholder="1-3, 8, 15"
@@ -1169,7 +1217,7 @@ export default function ProtocolManager() {
                           <Label className="text-xs">Observações</Label>
                           <Input
                             value={drug.observations || ""}
-                            onChange={(e) =>
+                            onChange={e =>
                               updateDrug(index, "observations", e.target.value)
                             }
                             placeholder="Observações opcionais"
@@ -1182,7 +1230,7 @@ export default function ProtocolManager() {
                           </Label>
                           <Select
                             value={drug.emetogenicRisk || "none"}
-                            onValueChange={(v) =>
+                            onValueChange={v =>
                               updateDrug(
                                 index,
                                 "emetogenicRisk",
@@ -1232,8 +1280,8 @@ export default function ProtocolManager() {
                 label="Alertas Clínicos"
                 icon={AlertTriangle}
                 items={formData.specialAlerts}
-                onChange={(items) =>
-                  setFormData((prev) => ({ ...prev, specialAlerts: items }))
+                onChange={items =>
+                  setFormData(prev => ({ ...prev, specialAlerts: items }))
                 }
                 placeholder="Ex: Risco de síndrome de lise tumoral"
               />
@@ -1251,8 +1299,8 @@ export default function ProtocolManager() {
                 label="Profilaxias Recomendadas"
                 icon={Shield}
                 items={formData.prophylaxis}
-                onChange={(items) =>
-                  setFormData((prev) => ({ ...prev, prophylaxis: items }))
+                onChange={items =>
+                  setFormData(prev => ({ ...prev, prophylaxis: items }))
                 }
                 placeholder="Ex: Aciclovir 400mg 12/12h"
               />
@@ -1270,8 +1318,8 @@ export default function ProtocolManager() {
                 label="Informações para Enfermagem"
                 icon={Stethoscope}
                 items={formData.nursingCare}
-                onChange={(items) =>
-                  setFormData((prev) => ({ ...prev, nursingCare: items }))
+                onChange={items =>
+                  setFormData(prev => ({ ...prev, nursingCare: items }))
                 }
                 placeholder="Ex: Monitorar sinais vitais a cada 15 min durante infusão"
               />
@@ -1294,8 +1342,8 @@ export default function ProtocolManager() {
                   label="Ajustes Renais"
                   icon={AlertTriangle}
                   items={formData.renalAdjustments}
-                  onChange={(items) =>
-                    setFormData((prev) => ({
+                  onChange={items =>
+                    setFormData(prev => ({
                       ...prev,
                       renalAdjustments: items,
                     }))
@@ -1306,8 +1354,8 @@ export default function ProtocolManager() {
                   label="Ajustes Hepáticos"
                   icon={AlertTriangle}
                   items={formData.hepaticAdjustments}
-                  onChange={(items) =>
-                    setFormData((prev) => ({
+                  onChange={items =>
+                    setFormData(prev => ({
                       ...prev,
                       hepaticAdjustments: items,
                     }))
@@ -1318,8 +1366,8 @@ export default function ProtocolManager() {
                   label="Ajustes Hematológicos"
                   icon={AlertTriangle}
                   items={formData.hematologicAdjustments}
-                  onChange={(items) =>
-                    setFormData((prev) => ({
+                  onChange={items =>
+                    setFormData(prev => ({
                       ...prev,
                       hematologicAdjustments: items,
                     }))
@@ -1359,12 +1407,8 @@ export default function ProtocolManager() {
                           <Label className="text-xs">Droga</Label>
                           <Input
                             value={dilution.drugName}
-                            onChange={(e) =>
-                              updateDilution(
-                                index,
-                                "drugName",
-                                e.target.value
-                              )
+                            onChange={e =>
+                              updateDilution(index, "drugName", e.target.value)
                             }
                             placeholder="Nome da droga"
                             className="h-8 text-sm"
@@ -1374,7 +1418,7 @@ export default function ProtocolManager() {
                           <Label className="text-xs">Diluente</Label>
                           <Input
                             value={dilution.diluent}
-                            onChange={(e) =>
+                            onChange={e =>
                               updateDilution(index, "diluent", e.target.value)
                             }
                             placeholder="Ex: SF 0,9%"
@@ -1385,7 +1429,7 @@ export default function ProtocolManager() {
                           <Label className="text-xs">Volume</Label>
                           <Input
                             value={dilution.volume}
-                            onChange={(e) =>
+                            onChange={e =>
                               updateDilution(index, "volume", e.target.value)
                             }
                             placeholder="Ex: 250 mL"
@@ -1396,7 +1440,7 @@ export default function ProtocolManager() {
                           <Label className="text-xs">Tempo de Infusão</Label>
                           <Input
                             value={dilution.infusionTime}
-                            onChange={(e) =>
+                            onChange={e =>
                               updateDilution(
                                 index,
                                 "infusionTime",
@@ -1411,12 +1455,8 @@ export default function ProtocolManager() {
                           <Label className="text-xs">Estabilidade</Label>
                           <Input
                             value={dilution.stability}
-                            onChange={(e) =>
-                              updateDilution(
-                                index,
-                                "stability",
-                                e.target.value
-                              )
+                            onChange={e =>
+                              updateDilution(index, "stability", e.target.value)
                             }
                             placeholder="Ex: 24h em temperatura ambiente"
                             className="h-8 text-sm"
@@ -1428,7 +1468,7 @@ export default function ProtocolManager() {
                           </Label>
                           <Input
                             value={dilution.specialInstructions}
-                            onChange={(e) =>
+                            onChange={e =>
                               updateDilution(
                                 index,
                                 "specialInstructions",
@@ -1464,7 +1504,11 @@ export default function ProtocolManager() {
             >
               Cancelar
             </Button>
-            <Button onClick={handleSubmit} disabled={isSaving} className="gap-2">
+            <Button
+              onClick={handleSubmit}
+              disabled={isSaving}
+              className="gap-2"
+            >
               {isSaving ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
@@ -1485,8 +1529,8 @@ export default function ProtocolManager() {
               Importar Protocolos de JSON
             </DialogTitle>
             <DialogDescription>
-              Cole o conteúdo JSON ou selecione um arquivo exportado anteriormente.
-              Os protocolos serão adicionados à sua lista.
+              Cole o conteúdo JSON ou selecione um arquivo exportado
+              anteriormente. Os protocolos serão adicionados à sua lista.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
@@ -1494,30 +1538,31 @@ export default function ProtocolManager() {
               <Label>Conteúdo JSON</Label>
               <Textarea
                 value={importJsonText}
-                onChange={(e) => setImportJsonText(e.target.value)}
+                onChange={e => setImportJsonText(e.target.value)}
                 placeholder='{\n  "version": "1.0",\n  "protocols": [...]\n}'
                 className="font-mono text-xs min-h-[200px]"
               />
             </div>
-            {importJsonText && (() => {
-              try {
-                const parsed = JSON.parse(importJsonText);
-                const count = parsed?.protocols?.length || 0;
-                return (
-                  <div className="flex items-center gap-2 text-sm text-green-700 bg-green-50 px-3 py-2 rounded-md">
-                    <CheckSquare className="h-4 w-4" />
-                    JSON válido — {count} protocolo(s) encontrado(s)
-                  </div>
-                );
-              } catch {
-                return (
-                  <div className="flex items-center gap-2 text-sm text-red-700 bg-red-50 px-3 py-2 rounded-md">
-                    <AlertTriangle className="h-4 w-4" />
-                    JSON inválido — verifique o formato
-                  </div>
-                );
-              }
-            })()}
+            {importJsonText &&
+              (() => {
+                try {
+                  const parsed = JSON.parse(importJsonText);
+                  const count = parsed?.protocols?.length || 0;
+                  return (
+                    <div className="flex items-center gap-2 text-sm text-green-700 bg-green-50 px-3 py-2 rounded-md">
+                      <CheckSquare className="h-4 w-4" />
+                      JSON válido — {count} protocolo(s) encontrado(s)
+                    </div>
+                  );
+                } catch {
+                  return (
+                    <div className="flex items-center gap-2 text-sm text-red-700 bg-red-50 px-3 py-2 rounded-md">
+                      <AlertTriangle className="h-4 w-4" />
+                      JSON inválido — verifique o formato
+                    </div>
+                  );
+                }
+              })()}
           </div>
           <DialogFooter>
             <Button
@@ -1551,13 +1596,14 @@ export default function ProtocolManager() {
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
               <Database className="h-5 w-5" />
-              Importar Protocolos do Sistema
+              Sincronizar 52 documentos revisados
             </AlertDialogTitle>
             <AlertDialogDescription>
-              Esta ação importará os 51 protocolos pré-cadastrados (R-CHOP, ABVD,
-              HiDAC, etc.) para sua lista de protocolos personalizados. Protocolos
-              já importados anteriormente não serão duplicados. Você poderá
-              editá-los livremente após a importação.
+              Adiciona os 52 rascunhos clínicos à sua conta com calendários,
+              fases, políticas e fontes preservados. Documentos já presentes não
+              serão duplicados; personalizados e legados não serão substituídos.
+              Esta operação não homologa nem libera prescrições. As revisões
+              devem usar importação/exportação do JSON completo.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -1572,7 +1618,7 @@ export default function ProtocolManager() {
               ) : (
                 <Database className="h-4 w-4" />
               )}
-              Importar Protocolos
+              Sincronizar documentos
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

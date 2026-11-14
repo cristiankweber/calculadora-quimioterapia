@@ -147,6 +147,10 @@ export const customProtocols = mysqlTable("custom_protocols", {
   emetogenicRisk: mysqlEnum("emetogenicRisk", ["high", "moderate", "low", "minimal"]).default("moderate").notNull(),
   /** Drogas do protocolo (JSON array de DrugDefinition) */
   drugs: json("drugs").notNull(),
+  /** Documento importado integral; campos legados são apenas resumos para listagem. */
+  clinicalDocument: json("clinicalDocument").$type<Record<string, unknown>>(),
+  /** Envelope integral do pacote, incluindo versão/fontes/extras, sem o array protocols. */
+  clinicalPackage: json("clinicalPackage").$type<Record<string, unknown>>(),
   /** Alertas especiais (JSON array de strings) */
   specialAlerts: json("specialAlerts").$type<string[]>(),
   /** Profilaxias recomendadas (JSON array de strings) */

@@ -7,11 +7,15 @@ import { TRPCError } from "@trpc/server";
 import * as db from "./db";
 import { predictToxicity, getModelMetrics } from "./toxicityModel";
 import {
-  convertAllProtocols,
-  validateImportFormat,
-  convertImportToDbRecords,
-  type ProtocolExportFormat,
-} from "./seedSystemProtocols";
+  getPrescriptionBlockReason,
+  isEnrichedClinicalDocument,
+} from "../shared/clinicalProtocols/library";
+import {
+  exportClinicalProtocols,
+  importClinicalProtocols,
+  syncClinicalLibrary,
+} from "./clinicalProtocolStorage";
+import { clinicalProtocolsRouter } from "./routers/clinicalProtocols";
 import {
   createPrescriptionInputSchema,
   validateDoseSafety,
@@ -72,7 +76,7 @@ function logBlockedPersistence(
       prescriptionId,
       errorCount: errors.length,
       // Não logar erros completos para evitar expor dados clínicos
-      errorSummary: errors.map((e) => e.substring(0, 80)),
+      errorSummary: errors.map(e => e.substring(0, 80)),
       timestamp: new Date().toISOString(),
     })
   );
@@ -120,8 +124,9 @@ function enrichAuditMetadata(
 
 export const appRouter = router({
   system: systemRouter,
+  clinicalProtocols: clinicalProtocolsRouter,
   auth: router({
-    me: publicProcedure.query((opts) => opts.ctx.user),
+    me: publicProcedure.query(opts => opts.ctx.user),
     logout: publicProcedure.mutation(({ ctx }) => {
       const cookieOptions = getSessionCookieOptions(ctx.req);
       ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
@@ -232,9 +237,7 @@ export const appRouter = router({
     getByPrescriptionId: protectedProcedure
       .input(z.object({ prescriptionId: z.string() }))
       .query(async ({ input }) => {
-        return await db.getPrescriptionByPrescriptionId(
-          input.prescriptionId
-        );
+        return await db.getPrescriptionByPrescriptionId(input.prescriptionId);
       }),
 
     /**
@@ -251,16 +254,34 @@ export const appRouter = router({
     create: protectedProcedure
       .input(createPrescriptionInputSchema)
       .mutation(async ({ ctx, input }) => {
+        const sourceId = input.prescriptionData.protocol.id;
+        const storedProtocol = sourceId
+          ? await db.getCustomProtocolByProtocolId(sourceId)
+          : undefined;
+        if (storedProtocol && storedProtocol.userId !== ctx.user.id) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Protocolo não encontrado para este usuário.",
+          });
+        }
+        const clinicalBlock =
+          getPrescriptionBlockReason(input.prescriptionData.protocol) ??
+          getPrescriptionBlockReason(input.protocolName) ??
+          (storedProtocol
+            ? getPrescriptionBlockReason({
+                id: storedProtocol.protocolId,
+                name: storedProtocol.name,
+                clinicalDocument: storedProtocol.clinicalDocument,
+              })
+            : null);
+        if (clinicalBlock)
+          throw new TRPCError({ code: "FORBIDDEN", message: clinicalBlock });
         const prescriptionId = `RX-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
         // ── 1. Validação de segurança de doses ──
         const doseErrors = validateDoseSafety(input.prescriptionData.drugs);
         if (doseErrors.length > 0) {
-          logBlockedPersistence(
-            "invalid_doses",
-            prescriptionId,
-            doseErrors
-          );
+          logBlockedPersistence("invalid_doses", prescriptionId, doseErrors);
           throw new TRPCError({
             code: "BAD_REQUEST",
             message: `Doses inválidas detectadas: ${doseErrors.length} erro(s). Verifique os valores e tente novamente.`,
@@ -278,8 +299,7 @@ export const appRouter = router({
 
         // Verificar divergência BSA
         if (serverBSA > 0 && input.bsa > 0) {
-          const bsaDiff =
-            (Math.abs(serverBSA - input.bsa) / serverBSA) * 100;
+          const bsaDiff = (Math.abs(serverBSA - input.bsa) / serverBSA) * 100;
           if (bsaDiff > CLINICAL_DIVERGENCE_THRESHOLD) {
             logClinicalDivergence(
               prescriptionId,
@@ -435,43 +455,62 @@ export const appRouter = router({
 
     create: protectedProcedure
       .input(
-        z.object({
-          name: z.string().min(1, "Nome é obrigatório").max(255),
-          indication: z.string().min(1, "Indicação é obrigatória").max(512),
-          cycles: z.number().int().min(1).default(1),
-          cycleLength: z.number().int().min(1).default(21),
-          emetogenicRisk: z.enum(["high", "moderate", "low", "minimal"]).default("moderate"),
-          drugs: z.array(
-            z.object({
-              name: z.string().min(1),
-              dose: z.number().min(0),
-              doseUnit: z.enum(["mg/m²", "mg/kg", "mg", "AUC", "mcg/kg", "cGy"]),
-              maxDose: z.number().optional(),
-              route: z.string().min(1),
-              days: z.string().min(1),
-              observations: z.string().optional(),
-              emetogenicRisk: z.enum(["high", "moderate", "low", "minimal"]).optional(),
-              renalAdjustment: z.string().optional(),
-              hepaticAdjustment: z.string().optional(),
-            })
-          ).min(1, "Pelo menos uma droga é obrigatória"),
-          specialAlerts: z.array(z.string()).optional(),
-          prophylaxis: z.array(z.string()).optional(),
-          nursingCare: z.array(z.string()).optional(),
-          renalAdjustments: z.array(z.string()).optional(),
-          hepaticAdjustments: z.array(z.string()).optional(),
-          hematologicAdjustments: z.array(z.string()).optional(),
-          dilutionInfo: z.array(
-            z.object({
-              drugName: z.string(),
-              diluent: z.string(),
-              volume: z.string(),
-              infusionTime: z.string(),
-              stability: z.string(),
-              specialInstructions: z.string(),
-            })
-          ).optional(),
-        })
+        z
+          .object({
+            name: z.string().min(1, "Nome é obrigatório").max(255),
+            indication: z.string().min(1, "Indicação é obrigatória").max(512),
+            cycles: z.number().int().min(1).default(1),
+            cycleLength: z.number().int().min(1).default(21),
+            emetogenicRisk: z
+              .enum(["high", "moderate", "low", "minimal"])
+              .default("moderate"),
+            drugs: z
+              .array(
+                z
+                  .object({
+                    name: z.string().min(1),
+                    dose: z.number().min(0),
+                    doseUnit: z.enum([
+                      "mg/m²",
+                      "mg/kg",
+                      "mg",
+                      "AUC",
+                      "mcg/kg",
+                      "cGy",
+                    ]),
+                    maxDose: z.number().optional(),
+                    route: z.string().min(1),
+                    days: z.string().min(1),
+                    observations: z.string().optional(),
+                    emetogenicRisk: z
+                      .enum(["high", "moderate", "low", "minimal"])
+                      .optional(),
+                    renalAdjustment: z.string().optional(),
+                    hepaticAdjustment: z.string().optional(),
+                  })
+                  .strict()
+              )
+              .min(1, "Pelo menos uma droga é obrigatória"),
+            specialAlerts: z.array(z.string()).optional(),
+            prophylaxis: z.array(z.string()).optional(),
+            nursingCare: z.array(z.string()).optional(),
+            renalAdjustments: z.array(z.string()).optional(),
+            hepaticAdjustments: z.array(z.string()).optional(),
+            hematologicAdjustments: z.array(z.string()).optional(),
+            dilutionInfo: z
+              .array(
+                z.object({
+                  drugName: z.string(),
+                  diluent: z.string(),
+                  volume: z.string(),
+                  infusionTime: z.string(),
+                  stability: z.string(),
+                  specialInstructions: z.string(),
+                })
+              )
+              .optional(),
+          })
+          .strict()
       )
       .mutation(async ({ ctx, input }) => {
         // Gerar protocolId único baseado no nome
@@ -507,44 +546,63 @@ export const appRouter = router({
 
     update: protectedProcedure
       .input(
-        z.object({
-          id: z.number(),
-          name: z.string().min(1).max(255).optional(),
-          indication: z.string().min(1).max(512).optional(),
-          cycles: z.number().int().min(1).optional(),
-          cycleLength: z.number().int().min(1).optional(),
-          emetogenicRisk: z.enum(["high", "moderate", "low", "minimal"]).optional(),
-          drugs: z.array(
-            z.object({
-              name: z.string().min(1),
-              dose: z.number().min(0),
-              doseUnit: z.enum(["mg/m²", "mg/kg", "mg", "AUC", "mcg/kg", "cGy"]),
-              maxDose: z.number().optional(),
-              route: z.string().min(1),
-              days: z.string().min(1),
-              observations: z.string().optional(),
-              emetogenicRisk: z.enum(["high", "moderate", "low", "minimal"]).optional(),
-              renalAdjustment: z.string().optional(),
-              hepaticAdjustment: z.string().optional(),
-            })
-          ).optional(),
-          specialAlerts: z.array(z.string()).optional(),
-          prophylaxis: z.array(z.string()).optional(),
-          nursingCare: z.array(z.string()).optional(),
-          renalAdjustments: z.array(z.string()).optional(),
-          hepaticAdjustments: z.array(z.string()).optional(),
-          hematologicAdjustments: z.array(z.string()).optional(),
-          dilutionInfo: z.array(
-            z.object({
-              drugName: z.string(),
-              diluent: z.string(),
-              volume: z.string(),
-              infusionTime: z.string(),
-              stability: z.string(),
-              specialInstructions: z.string(),
-            })
-          ).optional(),
-        })
+        z
+          .object({
+            id: z.number(),
+            name: z.string().min(1).max(255).optional(),
+            indication: z.string().min(1).max(512).optional(),
+            cycles: z.number().int().min(1).optional(),
+            cycleLength: z.number().int().min(1).optional(),
+            emetogenicRisk: z
+              .enum(["high", "moderate", "low", "minimal"])
+              .optional(),
+            drugs: z
+              .array(
+                z
+                  .object({
+                    name: z.string().min(1),
+                    dose: z.number().min(0),
+                    doseUnit: z.enum([
+                      "mg/m²",
+                      "mg/kg",
+                      "mg",
+                      "AUC",
+                      "mcg/kg",
+                      "cGy",
+                    ]),
+                    maxDose: z.number().optional(),
+                    route: z.string().min(1),
+                    days: z.string().min(1),
+                    observations: z.string().optional(),
+                    emetogenicRisk: z
+                      .enum(["high", "moderate", "low", "minimal"])
+                      .optional(),
+                    renalAdjustment: z.string().optional(),
+                    hepaticAdjustment: z.string().optional(),
+                  })
+                  .strict()
+              )
+              .optional(),
+            specialAlerts: z.array(z.string()).optional(),
+            prophylaxis: z.array(z.string()).optional(),
+            nursingCare: z.array(z.string()).optional(),
+            renalAdjustments: z.array(z.string()).optional(),
+            hepaticAdjustments: z.array(z.string()).optional(),
+            hematologicAdjustments: z.array(z.string()).optional(),
+            dilutionInfo: z
+              .array(
+                z.object({
+                  drugName: z.string(),
+                  diluent: z.string(),
+                  volume: z.string(),
+                  infusionTime: z.string(),
+                  stability: z.string(),
+                  specialInstructions: z.string(),
+                })
+              )
+              .optional(),
+          })
+          .strict()
       )
       .mutation(async ({ ctx, input }) => {
         // Verificar se o protocolo pertence ao usuário
@@ -556,8 +614,30 @@ export const appRouter = router({
           });
         }
 
+        if (isEnrichedClinicalDocument(existing.clinicalDocument)) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message:
+              "Documento clínico versionado: exporte e revise o JSON completo, depois importe uma nova versão. O formulário legado não preserva fases e calendários.",
+          });
+        }
         const { id, ...data } = input;
-        await db.updateCustomProtocol(id, data as any);
+        const updates =
+          existing.clinicalDocument &&
+          existing.clinicalPackage?.version === "1.0"
+            ? {
+                ...data,
+                clinicalDocument: {
+                  ...existing.clinicalDocument,
+                  ...Object.fromEntries(
+                    Object.entries(data).filter(
+                      ([, value]) => value !== undefined
+                    )
+                  ),
+                },
+              }
+            : data;
+        await db.updateCustomProtocol(id, updates as any);
         return { success: true };
       }),
 
@@ -589,145 +669,58 @@ export const appRouter = router({
         return { success: true };
       }),
 
-    // ── Exportar protocolos selecionados como JSON ─────────────────────
+    // Intercâmbio clínico sem perda; endpoints anteriores preservados para a UI.
     export: protectedProcedure
-      .input(z.object({ ids: z.array(z.number()).min(1) }))
+      .input(z.object({ ids: z.array(z.number().int().positive()).min(1) }))
       .mutation(async ({ ctx, input }) => {
-        const protocols = await db.getCustomProtocolsByIds(input.ids);
-        // Verificar que todos pertencem ao usuário
-        const owned = protocols.filter((p) => p.userId === ctx.user.id);
-        if (owned.length === 0) {
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message: "Nenhum protocolo encontrado.",
-          });
-        }
-
-        const exportData: ProtocolExportFormat = {
-          version: "1.0",
-          exportedAt: new Date().toISOString(),
-          protocols: owned.map((p) => ({
-            name: p.name,
-            indication: p.indication,
-            cycles: p.cycles,
-            cycleLength: p.cycleLength,
-            emetogenicRisk: p.emetogenicRisk,
-            drugs: (p.drugs as any[]).map((d: any) => ({
-              name: d.name,
-              dose: d.dose,
-              doseUnit: d.doseUnit,
-              ...(d.maxDose ? { maxDose: d.maxDose } : {}),
-              route: d.route,
-              days: d.days,
-              ...(d.observations ? { observations: d.observations } : {}),
-              ...(d.emetogenicRisk ? { emetogenicRisk: d.emetogenicRisk } : {}),
-              ...(d.renalAdjustment ? { renalAdjustment: d.renalAdjustment } : {}),
-              ...(d.hepaticAdjustment ? { hepaticAdjustment: d.hepaticAdjustment } : {}),
-            })),
-            specialAlerts: (p.specialAlerts as string[]) || [],
-            prophylaxis: (p.prophylaxis as string[]) || [],
-            nursingCare: (p.nursingCare as string[]) || [],
-            renalAdjustments: (p.renalAdjustments as string[]) || [],
-            hepaticAdjustments: (p.hepaticAdjustments as string[]) || [],
-            hematologicAdjustments: (p.hematologicAdjustments as string[]) || [],
-            dilutionInfo: (p.dilutionInfo as any[]) || [],
-          })),
-        };
-
-        return exportData;
-      }),
-
-    // ── Exportar todos os protocolos do usuário ───────────────────────
-    exportAll: protectedProcedure.mutation(async ({ ctx }) => {
-      const protocols = await db.getCustomProtocolsByUserId(ctx.user.id);
-      const active = protocols.filter((p) => p.isActive === 1);
-
-      const exportData: ProtocolExportFormat = {
-        version: "1.0",
-        exportedAt: new Date().toISOString(),
-        protocols: active.map((p) => ({
-          name: p.name,
-          indication: p.indication,
-          cycles: p.cycles,
-          cycleLength: p.cycleLength,
-          emetogenicRisk: p.emetogenicRisk,
-          drugs: (p.drugs as any[]).map((d: any) => ({
-            name: d.name,
-            dose: d.dose,
-            doseUnit: d.doseUnit,
-            ...(d.maxDose ? { maxDose: d.maxDose } : {}),
-            route: d.route,
-            days: d.days,
-            ...(d.observations ? { observations: d.observations } : {}),
-            ...(d.emetogenicRisk ? { emetogenicRisk: d.emetogenicRisk } : {}),
-            ...(d.renalAdjustment ? { renalAdjustment: d.renalAdjustment } : {}),
-            ...(d.hepaticAdjustment ? { hepaticAdjustment: d.hepaticAdjustment } : {}),
-          })),
-          specialAlerts: (p.specialAlerts as string[]) || [],
-          prophylaxis: (p.prophylaxis as string[]) || [],
-          nursingCare: (p.nursingCare as string[]) || [],
-          renalAdjustments: (p.renalAdjustments as string[]) || [],
-          hepaticAdjustments: (p.hepaticAdjustments as string[]) || [],
-          hematologicAdjustments: (p.hematologicAdjustments as string[]) || [],
-          dilutionInfo: (p.dilutionInfo as any[]) || [],
-        })),
-      };
-
-      return exportData;
-    }),
-
-    // ── Importar protocolos de JSON ───────────────────────────────────
-    import: protectedProcedure
-      .input(z.object({ jsonData: z.string() }))
-      .mutation(async ({ ctx, input }) => {
-        let parsed: unknown;
         try {
-          parsed = JSON.parse(input.jsonData);
-        } catch {
+          return await exportClinicalProtocols(ctx.user.id, input.ids);
+        } catch (error) {
           throw new TRPCError({
             code: "BAD_REQUEST",
-            message: "JSON inválido. Verifique o formato do arquivo.",
+            message:
+              error instanceof Error ? error.message : "Falha na exportação.",
           });
         }
-
-        const errors = validateImportFormat(parsed);
-        if (errors.length > 0) {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: `Erros de validação: ${errors.join("; ")}`,
-          });
-        }
-
-        const records = convertImportToDbRecords(
-          parsed as ProtocolExportFormat,
-          ctx.user.id
-        );
-        const count = await db.bulkCreateCustomProtocols(records);
-        return { imported: count };
       }),
-
-    // ── Popular banco com protocolos do sistema ──────────────────────
-    seedSystem: protectedProcedure.mutation(async ({ ctx }) => {
-      // Importar protocolos do arquivo estático
-      const { protocols } = await import("../client/src/data/protocols");
-
-      // Verificar se já existem protocolos do sistema para este usuário
-      const existing = await db.getAllSystemProtocols(ctx.user.id);
-      const existingIds = new Set(existing.map((p) => p.protocolId));
-
-      // Filtrar apenas os que ainda não existem
-      const records = convertAllProtocols(protocols, ctx.user.id);
-      const newRecords = records.filter((r) => !existingIds.has(r.protocolId));
-
-      if (newRecords.length === 0) {
-        return { imported: 0, message: "Todos os protocolos do sistema já estão cadastrados." };
+    exportAll: protectedProcedure.mutation(async ({ ctx }) => {
+      try {
+        return await exportClinicalProtocols(ctx.user.id);
+      } catch (error) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message:
+            error instanceof Error ? error.message : "Falha na exportação.",
+        });
       }
-
-      const count = await db.bulkCreateCustomProtocols(newRecords);
-      return {
-        imported: count,
-        message: `${count} protocolo(s) do sistema importado(s) com sucesso.`,
-      };
+    }),
+    import: protectedProcedure
+      .input(z.object({ jsonData: z.string().min(1).max(5_000_000) }))
+      .mutation(async ({ ctx, input }) => {
+        try {
+          return await importClinicalProtocols(ctx.user.id, input.jsonData);
+        } catch (error) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message:
+              error instanceof Error ? error.message : "Falha na importação.",
+          });
+        }
+      }),
+    seedSystem: protectedProcedure.mutation(async ({ ctx }) => {
+      try {
+        const result = await syncClinicalLibrary(ctx.user.id);
+        return {
+          ...result,
+          message: `${result.imported} documento(s) revisado(s) adicionado(s); ${result.skipped} já presentes. Nenhum personalizado foi substituído. Prescrição dos rascunhos continua bloqueada.`,
+        };
+      } catch (error) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message:
+            error instanceof Error ? error.message : "Falha na sincronização.",
+        });
+      }
     }),
   }),
 

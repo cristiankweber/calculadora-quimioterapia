@@ -11,26 +11,26 @@
  */
 
 import { z } from "zod";
+import { getPrescriptionBlockReason } from "../shared/clinicalProtocols/library";
 
 // ─── Refinamentos numéricos seguros ──────────────────────────────────────────
 
 /** Número finito (rejeita NaN e Infinity) */
-const safeNumber = z.number().refine(
-  (n) => Number.isFinite(n),
-  { message: "Valor numérico inválido (NaN ou Infinity)" }
-);
+const safeNumber = z
+  .number()
+  .refine(n => Number.isFinite(n), {
+    message: "Valor numérico inválido (NaN ou Infinity)",
+  });
 
 /** Número finito não-negativo (dose, peso, etc.) */
-const nonNegativeNumber = safeNumber.refine(
-  (n) => n >= 0,
-  { message: "Valor não pode ser negativo" }
-);
+const nonNegativeNumber = safeNumber.refine(n => n >= 0, {
+  message: "Valor não pode ser negativo",
+});
 
 /** Número finito positivo (dose base, BSA, etc.) */
-const positiveNumber = safeNumber.refine(
-  (n) => n > 0,
-  { message: "Valor deve ser positivo" }
-);
+const positiveNumber = safeNumber.refine(n => n > 0, {
+  message: "Valor deve ser positivo",
+});
 
 // ─── Sub-schemas ─────────────────────────────────────────────────────────────
 
@@ -101,31 +101,39 @@ const alertSchema = z.object({
 /** Metadados de auditoria (v2) */
 const auditMetadataSchema = z.object({
   version: z.literal(2).optional().default(2),
-  formulaVersions: z.object({
-    bsa: z.string().optional().default("DuBois"),
-    egfr: z.string().optional().default("CKD-EPI-2021"),
-    dose: z.string().optional().default("standard"),
-  }).optional(),
+  formulaVersions: z
+    .object({
+      bsa: z.string().optional().default("DuBois"),
+      egfr: z.string().optional().default("CKD-EPI-2021"),
+      dose: z.string().optional().default("standard"),
+    })
+    .optional(),
   generatedAt: z.number().optional(), // Unix timestamp ms
   userId: z.number().optional(),
   userName: z.string().optional(),
   globalAdjustmentFactor: nonNegativeNumber.optional(),
   toxicityAdjustments: z.array(toxicityAdjustmentSchema).optional(),
-  manualDoseOverrides: z.array(z.object({
-    drugName: z.string(),
-    originalDose: nonNegativeNumber,
-    manualDose: nonNegativeNumber,
-    reason: z.string().optional(),
-  })).optional(),
-  clinicalInputs: z.object({
-    weight: positiveNumber,
-    height: positiveNumber,
-    creatinine: positiveNumber,
-    age: z.number().int().min(0).max(150),
-    sex: z.enum(["M", "F"]),
-    ecog: z.number().int().min(0).max(4),
-    bilirubin: nonNegativeNumber.optional(),
-  }).optional(),
+  manualDoseOverrides: z
+    .array(
+      z.object({
+        drugName: z.string(),
+        originalDose: nonNegativeNumber,
+        manualDose: nonNegativeNumber,
+        reason: z.string().optional(),
+      })
+    )
+    .optional(),
+  clinicalInputs: z
+    .object({
+      weight: positiveNumber,
+      height: positiveNumber,
+      creatinine: positiveNumber,
+      age: z.number().int().min(0).max(150),
+      sex: z.enum(["M", "F"]),
+      ecog: z.number().int().min(0).max(4),
+      bilirubin: nonNegativeNumber.optional(),
+    })
+    .optional(),
 });
 
 // ─── Schema principal: prescriptionData v2 ──────────────────────────────────
@@ -143,21 +151,30 @@ export const prescriptionDataSchemaV2 = z.object({
     emetogenicRisk: z.string().optional(),
     cycle: z.number().int().min(1).optional(),
     totalCycles: z.number().int().min(1).optional(),
+    clinicalDocument: z.record(z.string(), z.unknown()).optional(),
+    calculationPolicy: z.record(z.string(), z.unknown()).optional(),
+    review: z.record(z.string(), z.unknown()).optional(),
   }),
 
   // Valores calculados
   calculatedValues: calculatedValuesSchema,
 
   // Drogas prescritas
-  drugs: z.array(drugSchema).min(1, "Prescrição deve conter ao menos uma droga"),
+  drugs: z
+    .array(drugSchema)
+    .min(1, "Prescrição deve conter ao menos uma droga"),
 
   // Pré-medicações
-  preMedications: z.array(z.object({
-    name: z.string(),
-    dose: z.string().optional(),
-    route: z.string().optional(),
-    schedule: z.string().optional(),
-  })).optional(),
+  preMedications: z
+    .array(
+      z.object({
+        name: z.string(),
+        dose: z.string().optional(),
+        route: z.string().optional(),
+        schedule: z.string().optional(),
+      })
+    )
+    .optional(),
 
   // Alertas clínicos
   alerts: z.array(alertSchema).optional(),
@@ -187,14 +204,20 @@ export const prescriptionDataSchemaV1 = z.record(z.string(), z.unknown());
  * Retorna o objeto normalizado ou null se não for possível.
  * Não lança exceções — falhas são registradas em log.
  */
-export function normalizeLegacyPayload(raw: unknown): PrescriptionDataV2 | null {
+export function normalizeLegacyPayload(
+  raw: unknown
+): PrescriptionDataV2 | null {
   if (!raw || typeof raw !== "object") return null;
 
   const data = raw as Record<string, unknown>;
 
   try {
     // Se já é v2, validar diretamente
-    if (data.audit && typeof data.audit === "object" && (data.audit as Record<string, unknown>).version === 2) {
+    if (
+      data.audit &&
+      typeof data.audit === "object" &&
+      (data.audit as Record<string, unknown>).version === 2
+    ) {
       const result = prescriptionDataSchemaV2.safeParse(data);
       if (result.success) return result.data;
     }
@@ -203,7 +226,9 @@ export function normalizeLegacyPayload(raw: unknown): PrescriptionDataV2 | null 
     const patient = data.patient as Record<string, unknown> | undefined;
     const protocol = data.protocol as Record<string, unknown> | undefined;
     const drugs = data.drugs as unknown[] | undefined;
-    const calculatedValues = data.calculatedValues as Record<string, unknown> | undefined;
+    const calculatedValues = data.calculatedValues as
+      | Record<string, unknown>
+      | undefined;
 
     if (!patient || !protocol || !drugs || !calculatedValues) {
       // Formato muito diferente — retornar null
@@ -215,7 +240,11 @@ export function normalizeLegacyPayload(raw: unknown): PrescriptionDataV2 | null 
       ...data,
       audit: {
         version: 2,
-        formulaVersions: { bsa: "DuBois", egfr: "CKD-EPI-2021", dose: "standard" },
+        formulaVersions: {
+          bsa: "DuBois",
+          egfr: "CKD-EPI-2021",
+          dose: "standard",
+        },
         generatedAt: Date.now(),
         // Marcar como migrado de v1
         migrationNote: "Normalizado automaticamente de formato legado v1",
@@ -235,7 +264,14 @@ export function normalizeLegacyPayload(raw: unknown): PrescriptionDataV2 | null 
  * Valida que todas as doses em um array de drogas são seguras.
  * Retorna array de erros encontrados (vazio = tudo OK).
  */
-export function validateDoseSafety(drugs: Array<{ name: string; finalDose?: number; calculatedDose?: number; baseDose?: number }>): string[] {
+export function validateDoseSafety(
+  drugs: Array<{
+    name: string;
+    finalDose?: number;
+    calculatedDose?: number;
+    baseDose?: number;
+  }>
+): string[] {
   const errors: string[] = [];
 
   for (const drug of drugs) {
@@ -243,7 +279,9 @@ export function validateDoseSafety(drugs: Array<{ name: string; finalDose?: numb
     if (dose === undefined || dose === null) continue;
 
     if (!Number.isFinite(dose)) {
-      errors.push(`Dose inválida para ${drug.name}: valor não-finito (${dose})`);
+      errors.push(
+        `Dose inválida para ${drug.name}: valor não-finito (${dose})`
+      );
     } else if (dose < 0) {
       errors.push(`Dose negativa para ${drug.name}: ${dose}`);
     }
@@ -258,15 +296,34 @@ export function validateDoseSafety(drugs: Array<{ name: string; finalDose?: numb
  * Schema completo para o endpoint prescriptions.create.
  * Substitui o z.any() anterior com validação explícita.
  */
-export const createPrescriptionInputSchema = z.object({
-  patientId: z.number().int().positive(),
-  patientName: z.string().min(1),
-  protocolName: z.string().min(1),
-  cycle: z.number().int().min(1),
-  bsa: positiveNumber,
-  egfr: nonNegativeNumber,
-  renalStatus: z.string().min(1),
-  prescriptionData: prescriptionDataSchemaV2,
-});
+export const createPrescriptionInputSchema = z
+  .object({
+    patientId: z.number().int().positive(),
+    patientName: z.string().min(1),
+    protocolName: z.string().min(1),
+    cycle: z.number().int().min(1),
+    bsa: positiveNumber,
+    egfr: nonNegativeNumber,
+    renalStatus: z.string().min(1),
+    prescriptionData: prescriptionDataSchemaV2,
+  })
+  .superRefine((input, ctx) => {
+    const protocol = input.prescriptionData.protocol;
+    const reason =
+      getPrescriptionBlockReason(protocol) ??
+      getPrescriptionBlockReason(input.protocolName);
+    const embeddedClinicalPolicy =
+      protocol.calculationPolicy !== undefined || protocol.review !== undefined;
+    if (reason || embeddedClinicalPolicy) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["prescriptionData", "protocol"],
+        message:
+          reason ?? "Documento clínico não homologado: prescrição bloqueada.",
+      });
+    }
+  });
 
-export type CreatePrescriptionInput = z.infer<typeof createPrescriptionInputSchema>;
+export type CreatePrescriptionInput = z.infer<
+  typeof createPrescriptionInputSchema
+>;

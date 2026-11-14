@@ -1,33 +1,56 @@
-import { useState, useCallback, useMemo, lazy, Suspense } from 'react';
-import { useLocation } from 'wouter';
-import { Button } from '@/components/ui/button';
-import { toast } from 'sonner';
-import PatientForm from '@/components/PatientForm';
-import CalculatedValuesDisplay from '@/components/CalculatedValues';
-import ProtocolSelector from '@/components/ProtocolSelector';
-import DrugsTable from '@/components/DrugsTable';
-import ProphylaxisAlerts from '@/components/ProphylaxisAlerts';
-import DilutionInfo from '@/components/DilutionInfo';
-import ToxicityAssessment from '@/components/ToxicityAssessment';
-import { ToxicityPredictionWithMetrics } from '@/components/ToxicityPrediction';
-import PatientHistoryDB from '@/components/PatientHistoryDB';
-import EmergencyModal, { type EmergencyPatientData } from '@/components/EmergencyModal';
-import HydrationCalculator, { type HydrationSupportData } from '@/components/HydrationCalculator';
-import PdfPreviewModal, { type PdfSections } from '@/components/PdfPreviewModal';
+import { useState, useCallback, useMemo, lazy, Suspense } from "react";
+import { useLocation } from "wouter";
+import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
+import PatientForm from "@/components/PatientForm";
+import CalculatedValuesDisplay from "@/components/CalculatedValues";
+import ProtocolSelector from "@/components/ProtocolSelector";
+import DrugsTable from "@/components/DrugsTable";
+import ProphylaxisAlerts from "@/components/ProphylaxisAlerts";
+import DilutionInfo from "@/components/DilutionInfo";
+import ToxicityAssessment from "@/components/ToxicityAssessment";
+import { ToxicityPredictionWithMetrics } from "@/components/ToxicityPrediction";
+import PatientHistoryDB from "@/components/PatientHistoryDB";
+import EmergencyModal, {
+  type EmergencyPatientData,
+} from "@/components/EmergencyModal";
+import HydrationCalculator, {
+  type HydrationSupportData,
+} from "@/components/HydrationCalculator";
+import PdfPreviewModal, {
+  type PdfSections,
+} from "@/components/PdfPreviewModal";
+import ClinicalProtocolPanel from "@/components/ClinicalProtocolPanel";
+import {
+  getKnownClinicalDocument,
+  getPrescriptionBlockReason,
+  clinicalPackage,
+} from "@shared/clinicalProtocols/library";
+import {
+  resolveClinicalProtocol,
+  getClinicalPrescriptionBlock,
+} from "@shared/clinicalProtocols/resolver";
+import type {
+  ClinicalProtocolDocument,
+  ClinicalContext,
+} from "@shared/clinicalProtocols/types";
+import { useAuth } from "@/_core/hooks/useAuth";
 
 // Lazy load PrintablePrescription para evitar travamento ao selecionar protocolo
-const PrintablePrescription = lazy(() => import('@/components/PrintablePrescription'));
+const PrintablePrescription = lazy(
+  () => import("@/components/PrintablePrescription")
+);
 
-import type { PatientData, Protocol, Drug } from '@/types/calculator';
-import type { ToxicityGrade } from '@/data/ctcae';
+import type { PatientData, Protocol, Drug } from "@/types/calculator";
+import type { ToxicityGrade } from "@/data/ctcae";
 
-import { generateAntiemeticProphylaxis } from '@/lib/antiemetics';
-import { trpc } from '@/lib/trpc';
+import { generateAntiemeticProphylaxis } from "@/lib/antiemetics";
+import { trpc } from "@/lib/trpc";
 
 // Hooks especializados extraídos
-import { usePatientCalculations } from '@/hooks/usePatientCalculations';
-import { useProtocolDoseCalculation } from '@/hooks/useProtocolDoseCalculation';
-import { usePrescriptionActions } from '@/hooks/usePrescriptionActions';
+import { usePatientCalculations } from "@/hooks/usePatientCalculations";
+import { useProtocolDoseCalculation } from "@/hooks/useProtocolDoseCalculation";
+import { usePrescriptionActions } from "@/hooks/usePrescriptionActions";
 
 import {
   FileDown,
@@ -39,28 +62,30 @@ import {
   AlertCircle,
   Droplets,
   Eye,
-} from 'lucide-react';
+} from "lucide-react";
 
 export default function Calculator() {
   const [, setLocation] = useLocation();
 
   // ── Estado do Paciente ──────────────────────────────────────────────────
   const [patientData, setPatientData] = useState<PatientData>({
-    name: '',
+    name: "",
     age: 0,
-    sex: 'M',
+    sex: "M",
     weight: 0,
     height: 0,
     creatinine: 0,
     bilirubin: 0,
     ecog: 0,
-    comorbidities: '',
+    comorbidities: "",
   });
 
   const handlePatientChange = useCallback((newData: PatientData) => {
     setPatientData(prev => {
       for (const key in newData) {
-        if (newData[key as keyof PatientData] !== prev[key as keyof PatientData]) {
+        if (
+          newData[key as keyof PatientData] !== prev[key as keyof PatientData]
+        ) {
           return newData;
         }
       }
@@ -69,44 +94,118 @@ export default function Calculator() {
   }, []);
 
   // ── Cálculos do Paciente (BSA, eGFR, etc.) ─────────────────────────────
-  const { calculatedValues, validationErrors } = usePatientCalculations(patientData);
+  const { calculatedValues, validationErrors } =
+    usePatientCalculations(patientData);
 
   // ── Estado do Protocolo ─────────────────────────────────────────────────
-  const [selectedProtocol, setSelectedProtocol] = useState<Protocol | null>(null);
+  const [selectedProtocol, setSelectedProtocol] = useState<Protocol | null>(
+    null
+  );
   const [selectedCycle, setSelectedCycle] = useState<number>(1);
-  const [toxicities, setToxicities] = useState<Record<string, ToxicityGrade>>({});
+  const [toxicities, setToxicities] = useState<Record<string, ToxicityGrade>>(
+    {}
+  );
+  const [clinicalSelection, setClinicalSelection] = useState<ClinicalContext>({
+    cycle: 1,
+  });
+  const clinicalDocument = getKnownClinicalDocument(selectedProtocol) as
+    | ClinicalProtocolDocument
+    | undefined;
+  const prescriptionBlock = getPrescriptionBlockReason(selectedProtocol);
+  const clinicalContext = useMemo<ClinicalContext>(
+    () => ({
+      ...clinicalSelection,
+      cycle: selectedCycle,
+      bsa: calculatedValues?.bsa,
+      weight: patientData.weight || undefined,
+      egfr: calculatedValues?.egfr,
+    }),
+    [
+      clinicalSelection,
+      selectedCycle,
+      calculatedValues?.bsa,
+      calculatedValues?.egfr,
+      patientData.weight,
+    ]
+  );
+  const clinicalResolution = useMemo(
+    () =>
+      clinicalDocument
+        ? resolveClinicalProtocol(clinicalDocument, clinicalContext)
+        : null,
+    [clinicalDocument, clinicalContext]
+  );
+  const handleProtocolChange = useCallback((protocol: Protocol | null) => {
+    setSelectedProtocol(protocol);
+    setSelectedCycle(1);
+    setClinicalSelection({ cycle: 1 });
+  }, []);
   const [showEmergency, setShowEmergency] = useState(false);
 
   // ── Dados de Hidratação/Eletrólitos/Transfusão (para PDF) ────────────────
-  const [hydrationSupportData, setHydrationSupportData] = useState<HydrationSupportData | null>(null);
+  const [hydrationSupportData, setHydrationSupportData] =
+    useState<HydrationSupportData | null>(null);
   const [showPdfPreview, setShowPdfPreview] = useState(false);
-  const handleHydrationDataChange = useCallback((data: HydrationSupportData) => {
-    setHydrationSupportData(data);
-  }, []);
+  const handleHydrationDataChange = useCallback(
+    (data: HydrationSupportData) => {
+      setHydrationSupportData(data);
+    },
+    []
+  );
 
   // ── Cálculo de Doses ────────────────────────────────────────────────────
-  const {
-    calculatedDrugs,
-    handleDoseChange,
-    setCalculatedDrugs,
-  } = useProtocolDoseCalculation({
-    selectedProtocol,
-    calculatedValues,
-    weight: patientData.weight,
-    toxicities,
-    patientAge: patientData.age,
-    patientSex: patientData.sex,
-    patientCreatinine: patientData.creatinine,
-  });
+  const { calculatedDrugs, handleDoseChange, setCalculatedDrugs } =
+    useProtocolDoseCalculation({
+      selectedProtocol: clinicalDocument ? null : selectedProtocol,
+      calculatedValues,
+      weight: patientData.weight,
+      toxicities,
+      patientAge: patientData.age,
+      patientSex: patientData.sex,
+      patientCreatinine: patientData.creatinine,
+    });
+  const effectiveSupportDrugs = useMemo(
+    () =>
+      clinicalResolution
+        ? clinicalResolution.rows
+            .filter(row => row.status === "ready")
+            .map(row => ({
+              name: row.source.name,
+              dose: row.dose ?? 0,
+              doseUnit: row.doseUnit ?? row.source.doseUnit,
+              administrationsPerDay:
+                row.doseRepresents === "per_24_hours"
+                  ? 1
+                  : (row.frequency ?? undefined),
+            }))
+        : calculatedDrugs.map(drug => ({
+            name: drug.name,
+            dose: drug.dose,
+            doseUnit: drug.doseUnit,
+          })),
+    [clinicalResolution, calculatedDrugs]
+  );
+  const supportSelectionResolved =
+    !clinicalResolution ||
+    (clinicalResolution.rows.length > 0 &&
+      !clinicalResolution.rows.some(row => row.status === "blocked") &&
+      clinicalResolution.issues.every(
+        issue =>
+          clinicalDocument &&
+          getClinicalPrescriptionBlock(clinicalDocument).includes(issue)
+      ));
 
   // ── Antieméticos ────────────────────────────────────────────────────────
   const antiemetics = useMemo(() => {
-    if (!selectedProtocol) return null;
+    if (!selectedProtocol || clinicalDocument) return null;
     return generateAntiemeticProphylaxis(selectedProtocol.emetogenicRisk);
-  }, [selectedProtocol?.emetogenicRisk]);
+  }, [selectedProtocol?.emetogenicRisk, clinicalDocument]);
 
   // ── Configurações Institucionais ────────────────────────────────────────
-  const { data: institutionSettings } = trpc.settings.get.useQuery();
+  const { isAuthenticated } = useAuth();
+  const { data: institutionSettings } = trpc.settings.get.useQuery(undefined, {
+    enabled: isAuthenticated,
+  });
 
   // ── Ações de Prescrição (salvar, copiar, PDF, imprimir) ─────────────────
   const {
@@ -154,32 +253,44 @@ export default function Calculator() {
   ]);
 
   // ── Carregar Histórico ──────────────────────────────────────────────────
-  const handleLoadPatient = useCallback((loadedPatient: PatientData, prescriptionData?: any) => {
-    setPatientData(loadedPatient);
+  const handleLoadPatient = useCallback(
+    (loadedPatient: PatientData, prescriptionData?: any) => {
+      setPatientData(loadedPatient);
 
-    if (prescriptionData) {
-      if (prescriptionData.protocol) setSelectedProtocol(prescriptionData.protocol);
-      if (prescriptionData.cycle) setSelectedCycle(prescriptionData.cycle);
-      if (prescriptionData.calculatedDrugs) setCalculatedDrugs(prescriptionData.calculatedDrugs);
-      if (prescriptionData.toxicities) setToxicities(prescriptionData.toxicities);
-    }
-  }, [setCalculatedDrugs]);
+      if (prescriptionData) {
+        if (prescriptionData.protocol)
+          setSelectedProtocol(prescriptionData.protocol);
+        if (prescriptionData.cycle) setSelectedCycle(prescriptionData.cycle);
+        setClinicalSelection({ cycle: prescriptionData.cycle || 1 });
+        if (prescriptionData.calculatedDrugs)
+          setCalculatedDrugs(prescriptionData.calculatedDrugs);
+        if (prescriptionData.toxicities)
+          setToxicities(prescriptionData.toxicities);
+      }
+    },
+    [setCalculatedDrugs]
+  );
 
   // ── Render ──────────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-background">
-
       {/* HEADER */}
       <header className="border-b bg-card">
         <div className="container py-6">
           <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
             <div className="min-w-0 xl:max-w-md xl:shrink-0">
-              <h1 className="text-2xl sm:text-3xl font-bold leading-tight">Calculadora de Prescrição Quimioterápica</h1>
+              <h1 className="text-2xl sm:text-3xl font-bold leading-tight">
+                Calculadora de Prescrição Quimioterápica
+              </h1>
               <p className="text-muted-foreground">
                 Hematologia • Oncologia • Terapia Celular
               </p>
             </div>
-            <div className="flex w-full gap-2 flex-wrap xl:flex-1 xl:justify-end" role="group" aria-label="Ações da calculadora">
+            <div
+              className="flex w-full gap-2 flex-wrap xl:flex-1 xl:justify-end"
+              role="group"
+              aria-label="Ações da calculadora"
+            >
               <Button
                 variant="destructive"
                 onClick={() => setShowEmergency(true)}
@@ -188,21 +299,42 @@ export default function Calculator() {
                 <AlertCircle className="h-4 w-4 mr-2" /> EMERGÊNCIA
               </Button>
               <PatientHistoryDB onLoadPatient={handleLoadPatient} />
-              <Button variant="outline" onClick={handleSaveToHistory}>
+              <Button
+                variant="outline"
+                onClick={handleSaveToHistory}
+                disabled={Boolean(prescriptionBlock)}
+                title={prescriptionBlock ?? undefined}
+              >
                 <Save className="h-4 w-4 mr-2" /> Salvar
               </Button>
-              <Button variant="outline" onClick={() => setLocation('/settings')}>
+              <Button
+                variant="outline"
+                onClick={() => setLocation("/settings")}
+              >
                 <SettingsIcon className="h-4 w-4 mr-2" /> Configurações
               </Button>
-              <Button variant="outline" onClick={() => setLocation('/dashboard')}>
+              <Button
+                variant="outline"
+                onClick={() => setLocation("/dashboard")}
+              >
                 <BarChart3 className="h-4 w-4 mr-2" /> Dashboard
               </Button>
-              <Button variant="outline" onClick={() => {
-                if (validateBeforeAction('visualizar preview')) setShowPdfPreview(true);
-              }}>
+              <Button
+                variant="outline"
+                disabled={Boolean(prescriptionBlock)}
+                title={prescriptionBlock ?? undefined}
+                onClick={() => {
+                  if (validateBeforeAction("visualizar preview"))
+                    setShowPdfPreview(true);
+                }}
+              >
                 <Eye className="h-4 w-4 mr-2" /> Prévia / PDF
               </Button>
-              <Button onClick={handleCopyPrescription}>
+              <Button
+                onClick={handleCopyPrescription}
+                disabled={Boolean(prescriptionBlock)}
+                title={prescriptionBlock ?? undefined}
+              >
                 <Copy className="h-4 w-4 mr-2" /> Copiar
               </Button>
             </div>
@@ -213,7 +345,6 @@ export default function Calculator() {
       {/* MAIN */}
       <main className="container py-8">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-
           {/* COLUNA 1 */}
           <div className="space-y-6 lg:col-span-1">
             <PatientForm
@@ -225,7 +356,7 @@ export default function Calculator() {
             <ProtocolSelector
               selectedProtocol={selectedProtocol}
               selectedCycle={selectedCycle}
-              onProtocolChange={setSelectedProtocol}
+              onProtocolChange={handleProtocolChange}
               onCycleChange={setSelectedCycle}
             />
           </div>
@@ -233,19 +364,57 @@ export default function Calculator() {
           {/* COLUNA 2 - RESULTADOS */}
           <div className="space-y-6 lg:col-span-2">
             {calculatedValues && (
-              <CalculatedValuesDisplay values={calculatedValues} />
+              <CalculatedValuesDisplay
+                referenceOnly={Boolean(clinicalDocument)}
+                values={
+                  clinicalDocument
+                    ? {
+                        ...calculatedValues,
+                        ecogAdjustmentFactor: 1,
+                        globalAdjustmentFactor: 1,
+                        renalStatusLabel:
+                          "Estimativa indexada de função renal; não determina ajuste automático ou elegibilidade.",
+                      }
+                    : calculatedValues
+                }
+              />
             )}
 
-            <DrugsTable drugs={calculatedDrugs} onDoseChange={handleDoseChange} />
-
-            <ProphylaxisAlerts protocol={selectedProtocol} antiemetics={antiemetics} />
-
-            <DilutionInfo drugs={calculatedDrugs} />
+            {clinicalDocument && clinicalResolution ? (
+              <ClinicalProtocolPanel
+                document={clinicalDocument}
+                resolution={clinicalResolution}
+                context={clinicalContext}
+                onContextChange={next => {
+                  setClinicalSelection(next);
+                  setSelectedCycle(next.cycle);
+                }}
+                packageData={
+                  selectedProtocol?.clinicalPackage ??
+                  (clinicalPackage as unknown as Record<string, unknown>)
+                }
+              />
+            ) : (
+              <>
+                <DrugsTable
+                  drugs={calculatedDrugs}
+                  onDoseChange={handleDoseChange}
+                />
+                <ProphylaxisAlerts
+                  protocol={selectedProtocol}
+                  antiemetics={antiemetics}
+                />
+                <DilutionInfo drugs={calculatedDrugs} />
+              </>
+            )}
 
             <HydrationCalculator
               patientData={patientData}
               calculatedValues={calculatedValues}
               selectedProtocol={selectedProtocol}
+              effectiveDrugs={effectiveSupportDrugs}
+              selectionResolved={supportSelectionResolved}
+              proposalOnly={Boolean(prescriptionBlock)}
               onDataChange={handleHydrationDataChange}
             />
 
@@ -257,19 +426,65 @@ export default function Calculator() {
             />
 
             {/* Predição de Toxicidade com IA */}
-            <ToxicityPredictionWithMetrics
-              patientData={patientData}
-              protocol={selectedProtocol}
-            />
+            {!clinicalDocument && (
+              <ToxicityPredictionWithMetrics
+                patientData={patientData}
+                protocol={selectedProtocol}
+              />
+            )}
           </div>
-
         </div>
       </main>
 
       {/* IMPRESSÃO — SOMENTE QUANDO NECESSÁRIO */}
-      {showPrint && selectedProtocol && calculatedValues && antiemetics && (
-        <Suspense fallback={<div className="print:hidden">Preparando impressão...</div>}>
-          <PrintablePrescription
+      {showPrint &&
+        !prescriptionBlock &&
+        selectedProtocol &&
+        calculatedValues &&
+        antiemetics && (
+          <Suspense
+            fallback={
+              <div className="print:hidden">Preparando impressão...</div>
+            }
+          >
+            <PrintablePrescription
+              patient={patientData}
+              calculatedValues={calculatedValues}
+              protocol={selectedProtocol}
+              cycle={selectedCycle}
+              drugs={calculatedDrugs}
+              antiemetics={antiemetics}
+              prescriptionId={prescriptionId}
+              institutionName={
+                institutionSettings?.institutionName ?? undefined
+              }
+              institutionLogo={
+                institutionSettings?.institutionLogo ?? undefined
+              }
+              prescriberName={institutionSettings?.prescriberName ?? undefined}
+              prescriberCRM={institutionSettings?.prescriberCRM ?? undefined}
+              hydration={hydrationSupportData?.hydration}
+              electrolytes={hydrationSupportData?.electrolytes}
+              transfusion={hydrationSupportData?.transfusion}
+            />
+          </Suspense>
+        )}
+
+      {/* MODAL DE EMERGÊNCIA */}
+      <EmergencyModal
+        open={showEmergency}
+        onOpenChange={setShowEmergency}
+        patientData={emergencyPatientData}
+      />
+
+      {/* MODAL DE PREVIEW DO PDF */}
+      {!prescriptionBlock &&
+        selectedProtocol &&
+        calculatedValues &&
+        antiemetics && (
+          <PdfPreviewModal
+            open={showPdfPreview}
+            onOpenChange={setShowPdfPreview}
             patient={patientData}
             calculatedValues={calculatedValues}
             protocol={selectedProtocol}
@@ -284,46 +499,16 @@ export default function Calculator() {
             hydration={hydrationSupportData?.hydration}
             electrolytes={hydrationSupportData?.electrolytes}
             transfusion={hydrationSupportData?.transfusion}
+            onConfirmPdf={async sections => {
+              setShowPdfPreview(false);
+              await handleExportPDF(sections);
+            }}
+            onConfirmPrint={sections => {
+              setShowPdfPreview(false);
+              handlePrint(sections);
+            }}
           />
-        </Suspense>
-      )}
-
-      {/* MODAL DE EMERGÊNCIA */}
-      <EmergencyModal
-        open={showEmergency}
-        onOpenChange={setShowEmergency}
-        patientData={emergencyPatientData}
-      />
-
-      {/* MODAL DE PREVIEW DO PDF */}
-      {selectedProtocol && calculatedValues && antiemetics && (
-        <PdfPreviewModal
-          open={showPdfPreview}
-          onOpenChange={setShowPdfPreview}
-          patient={patientData}
-          calculatedValues={calculatedValues}
-          protocol={selectedProtocol}
-          cycle={selectedCycle}
-          drugs={calculatedDrugs}
-          antiemetics={antiemetics}
-          prescriptionId={prescriptionId}
-          institutionName={institutionSettings?.institutionName ?? undefined}
-          institutionLogo={institutionSettings?.institutionLogo ?? undefined}
-          prescriberName={institutionSettings?.prescriberName ?? undefined}
-          prescriberCRM={institutionSettings?.prescriberCRM ?? undefined}
-          hydration={hydrationSupportData?.hydration}
-          electrolytes={hydrationSupportData?.electrolytes}
-          transfusion={hydrationSupportData?.transfusion}
-          onConfirmPdf={async (sections) => {
-            setShowPdfPreview(false);
-            await handleExportPDF(sections);
-          }}
-          onConfirmPrint={(sections) => {
-            setShowPdfPreview(false);
-            handlePrint(sections);
-          }}
-        />
-      )}
+        )}
     </div>
   );
 }

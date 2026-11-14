@@ -786,3 +786,18 @@ Pendências explicitamente fora desta revisão visual:
 - [ ] Fazer a impressão direta respeitar PdfSections, atualmente ignoradas por handlePrint/PrintablePrescription.
 - [ ] Revisar estratégia de cache/Service Worker para não manter interfaces antigas em desenvolvimento e após atualizações.
 - [ ] Investigar gráficos vazios e classificação no Dashboard; exibir rastreabilidade da versão e validação das métricas de IA.
+
+---
+
+## Integração segura dos 52 protocolos — 13/11/2026
+
+Desenho aprovado pelo usuário: `/home/ubuntu/protocolos-integracao/desenho-integracao-52-protocolos.md`. Biblioteca revisada para consulta/simulação; sem homologação ou liberação de prescrição dos rascunhos.
+
+- [x] Preservar o JSON original, hash, fontes e biblioteca legada; integrar 52 documentos sem alteração clínica inferida.
+- [x] Criar contratos e resolver de calendários/fases com testes RED/GREEN; frequência, unidades, doses diárias divididas e pendências fail-closed.
+- [x] Persistir documento clínico completo, importação/exportação sem perda e sincronização idempotente por usuário/versão; preservar personalizados. Migração 0009 nullable aplicada e registrada; sincronização disponível por ação explícita, não executada globalmente.
+- [x] Integrar seleção padrão, fase/ciclo/dia, simulação sem ajustes genéricos e painel de fontes/pendências/diluição do documento.
+- [x] Bloquear saídas de prescrição frontend/backend e impedir bypass por todos os 51 protocolos históricos/aliases correspondentes.
+- [x] Vincular hidratação às drogas efetivas; não inferir cisplatina em R-ICE ou ifosfamida em FLAG-Ida; exibir requisitos múltiplos sem somar esquemas.
+- [x] Auditar determinísticamente os 52 documentos, rodar suíte completa/TypeScript/build e validar navegador com dados fictícios. Dez verificações de interface passaram. Testes legados de CRUD isolados do banco; revertidos estritamente oito registros fictícios criados pela execução anterior, com backup; nenhum paciente ou prescrição alterado.
+- [x] Preparar entrega com documento exportável intacto, relatório de integração e auditoria de calendários; 648 testes/28 arquivos, TypeScript, build e round-trip aprovados. Checkpoint restaurável salva o estado de entrega.

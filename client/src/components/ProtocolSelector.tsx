@@ -1,20 +1,45 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { protocols } from '@/data/protocols';
-import type { Protocol } from '@/types/calculator';
-import { Search, ChevronDown } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Badge } from '@/components/ui/badge';
-import { trpc } from '@/lib/trpc';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import type { Protocol } from "@/types/calculator";
+import { Search } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { trpc } from "@/lib/trpc";
+import { useAuth } from "@/_core/hooks/useAuth";
+import {
+  getClinicalCatalogue,
+  type CatalogueKind,
+} from "@/lib/clinicalCatalogue";
 
 interface ProtocolSelectorProps {
   selectedProtocol: Protocol | null;
   selectedCycle: number;
-  onProtocolChange: (protocol: Protocol) => void;
+  onProtocolChange: (protocol: Protocol | null) => void;
   onCycleChange: (cycle: number) => void;
 }
 
@@ -24,226 +49,239 @@ export default function ProtocolSelector({
   onProtocolChange,
   onCycleChange,
 }: ProtocolSelectorProps) {
-  const [searchTerm, setSearchTerm] = useState('');
+  const [kind, setKind] = useState<CatalogueKind>("reviewed");
+  const [searchTerm, setSearchTerm] = useState("");
   const [showSuggestions, setShowSuggestions] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
-
-  // Atalho Ctrl+K (ou Cmd+K no Mac) para focar no campo de busca
+  const { isAuthenticated } = useAuth();
+  const { data: storedProtocols, isError } =
+    trpc.customProtocols.listActive.useQuery(undefined, {
+      staleTime: 30_000,
+      enabled: isAuthenticated,
+    });
+  const protocolList = useMemo(
+    () =>
+      getClinicalCatalogue(
+        kind,
+        (storedProtocols ?? []) as unknown as Record<string, unknown>[]
+      ),
+    [kind, storedProtocols]
+  );
+  const filteredProtocols = useMemo(
+    () =>
+      protocolList.filter(
+        p =>
+          !searchTerm.trim() ||
+          `${p.name} ${p.indication}`
+            .toLowerCase()
+            .includes(searchTerm.trim().toLowerCase())
+      ),
+    [protocolList, searchTerm]
+  );
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
-        e.preventDefault();
+    const handle = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key === "k") {
+        event.preventDefault();
         searchInputRef.current?.focus();
-        searchInputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
       }
     };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    window.addEventListener("keydown", handle);
+    return () => window.removeEventListener("keydown", handle);
   }, []);
-
-  // Buscar protocolos customizados do banco de dados
-  const { data: customProtocolsRaw } = trpc.customProtocols.listActive.useQuery(undefined, {
-    staleTime: 30_000, // Cache por 30s para evitar re-fetches
-  });
-
-  // Converter protocolos customizados para o formato Protocol
-  const customProtocolsMapped = useMemo<Protocol[]>(() => {
-    if (!customProtocolsRaw) return [];
-    return customProtocolsRaw.map((cp) => {
-      const drugs = (cp.drugs as any[]) || [];
-      return {
-        id: cp.protocolId,
-        name: `★ ${cp.name}`,
-        indication: cp.indication,
-        cycles: cp.cycles,
-        cycleLength: cp.cycleLength,
-        emetogenicRisk: cp.emetogenicRisk as Protocol['emetogenicRisk'],
-        drugs: drugs.map((d: any) => ({
-          name: d.name || '',
-          dose: d.dose || 0,
-          doseUnit: d.doseUnit || 'mg/m²',
-          maxDose: d.maxDose,
-          calculatedDose: 0,
-          route: d.route || 'IV',
-          days: d.days || '1',
-          observations: d.observations,
-          emetogenicRisk: d.emetogenicRisk,
-          renalAdjustment: d.renalAdjustment,
-          hepaticAdjustment: d.hepaticAdjustment,
-        })),
-        renalAdjustments: (cp.renalAdjustments as string[]) || [],
-        hepaticAdjustments: (cp.hepaticAdjustments as string[]) || [],
-        hematologicAdjustments: (cp.hematologicAdjustments as string[]) || [],
-        prophylaxis: (cp.prophylaxis as string[]) || [],
-        nursingCare: (cp.nursingCare as string[]) || [],
-        specialAlerts: (cp.specialAlerts as string[]) || [],
-      };
-    });
-  }, [customProtocolsRaw]);
-
-  // Memoizar lista combinada de protocolos (customizados primeiro, depois built-in)
-  const protocolList = useMemo(() => [
-    ...customProtocolsMapped,
-    ...protocols,
-  ], [customProtocolsMapped]);
-
-  // Filtrar protocolos baseado no termo de busca
-  const filteredProtocols = useMemo(() => {
-    if (!searchTerm.trim()) {
-      return protocolList;
-    }
-    
-    const term = searchTerm.toLowerCase();
-    return protocolList.filter((protocol) => 
-      protocol.name.toLowerCase().includes(term) ||
-      protocol.indication.toLowerCase().includes(term)
-    );
-  }, [searchTerm, protocolList]);
-
+  const choose = (protocol: Protocol) => {
+    onProtocolChange(protocol);
+    setSearchTerm("");
+    setShowSuggestions(false);
+  };
+  const highlight = (text: string) => {
+    const escaped = searchTerm.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    if (!escaped) return text;
+    return text
+      .split(new RegExp(`(${escaped})`, "gi"))
+      .map((part, i) =>
+        part.toLowerCase() === searchTerm.toLowerCase() ? (
+          <strong key={i}>{part}</strong>
+        ) : (
+          part
+        )
+      );
+  };
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Seleção de Protocolo</CardTitle>
+        <CardTitle>Seleção de protocolo</CardTitle>
         <CardDescription>
-          Escolha o protocolo quimioterápico e o ciclo atual
+          52 documentos revisados para consulta e simulação. Homologação clínica
+          não concedida.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* Campo de busca com autocomplete */}
         <div className="space-y-2">
-          <Label htmlFor="search">Buscar Protocolo</Label>
-          <Popover open={showSuggestions && searchTerm.length > 0 && filteredProtocols.length > 0} onOpenChange={setShowSuggestions}>
+          <Label htmlFor="protocol-library">Biblioteca</Label>
+          <Select
+            value={kind}
+            onValueChange={value => {
+              setKind(value as CatalogueKind);
+              setSearchTerm("");
+              onProtocolChange(null);
+            }}
+          >
+            <SelectTrigger id="protocol-library">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="reviewed">
+                Revisados — rascunhos clínicos
+              </SelectItem>
+              <SelectItem value="custom">Personalizados</SelectItem>
+              <SelectItem value="legacy">
+                Legados — consulta histórica
+              </SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        {kind === "legacy" && (
+          <p
+            role="status"
+            className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950"
+          >
+            Cadastros anteriores preservados. Protocolos correspondentes à
+            biblioteca revisada não podem gerar novas prescrições pela versão
+            antiga.
+          </p>
+        )}
+        {kind === "custom" && !isAuthenticated && (
+          <p className="text-sm text-muted-foreground">
+            Entre na sua conta pelo Dashboard para consultar seus
+            personalizados. A biblioteca revisada não exige login.
+          </p>
+        )}
+        {isError && (
+          <p role="alert" className="text-sm text-destructive">
+            Não foi possível carregar os protocolos da conta. A biblioteca
+            revisada continua disponível.
+          </p>
+        )}
+        <div className="space-y-2">
+          <Label htmlFor="search">Buscar protocolo</Label>
+          <Popover
+            open={
+              showSuggestions &&
+              searchTerm.length > 0 &&
+              filteredProtocols.length > 0
+            }
+            onOpenChange={setShowSuggestions}
+          >
             <PopoverTrigger asChild>
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   ref={searchInputRef}
                   id="search"
-                  type="text"
-                  placeholder="Digite o nome do protocolo (ex: R-CHOP, FLAG-Ida)..."
+                  placeholder="Nome ou indicação (ex.: R-DHAP, BuEM)"
+                  className="pl-9"
                   value={searchTerm}
-                  onChange={(e) => {
+                  onChange={e => {
                     setSearchTerm(e.target.value);
                     setShowSuggestions(true);
                   }}
                   onFocus={() => setShowSuggestions(true)}
-                  className="pl-9"
                 />
               </div>
             </PopoverTrigger>
-            <PopoverContent className="w-[400px] p-0" align="start">
-              <Command>
+            <PopoverContent
+              className="w-[min(400px,calc(100vw-2rem))] p-0"
+              align="start"
+            >
+              <Command shouldFilter={false}>
                 <CommandList>
-                  <CommandEmpty>Nenhum protocolo encontrado.</CommandEmpty>
+                  <CommandEmpty>Nenhum documento encontrado.</CommandEmpty>
                   <CommandGroup heading="Sugestões">
-                    {filteredProtocols.slice(0, 10).map((protocol) => {
-                      const highlightText = (text: string, term: string) => {
-                        if (!term) return text;
-                        const parts = text.split(new RegExp(`(${term})`, 'gi'));
-                        return parts.map((part, i) => 
-                          part.toLowerCase() === term.toLowerCase() 
-                            ? <strong key={i} className="font-bold text-primary">{part}</strong>
-                            : part
-                        );
-                      };
-
-                      return (
-                        <CommandItem
-                          key={protocol.id}
-                          value={protocol.id}
-                          onSelect={() => {
-                            setSearchTerm(protocol.name);
-                            setShowSuggestions(false);
-                            onProtocolChange(protocol);
-                          }}
-                          className="cursor-pointer"
-                        >
-                          <div className="flex flex-col gap-1">
-                            <div className="font-medium">
-                              {highlightText(protocol.name, searchTerm)}
-                            </div>
-                            <div className="text-xs text-muted-foreground line-clamp-1">
-                              {highlightText(protocol.indication, searchTerm)}
-                            </div>
+                    {filteredProtocols.slice(0, 10).map(protocol => (
+                      <CommandItem
+                        key={protocol.id}
+                        value={protocol.id}
+                        onSelect={() => choose(protocol)}
+                      >
+                        <div className="min-w-0">
+                          <div className="font-medium">
+                            {highlight(protocol.name)}
                           </div>
-                        </CommandItem>
-                      );
-                    })}
+                          <div className="text-xs text-muted-foreground line-clamp-1">
+                            {highlight(protocol.indication)}
+                          </div>
+                        </div>
+                      </CommandItem>
+                    ))}
                   </CommandGroup>
                 </CommandList>
               </Command>
             </PopoverContent>
           </Popover>
-          {searchTerm && (
-            <p className="text-xs text-muted-foreground">
-              {filteredProtocols.length} protocolo(s) encontrado(s)
-            </p>
-          )}
+          <p className="text-xs text-muted-foreground">
+            {filteredProtocols.length} documento(s) nesta biblioteca
+          </p>
         </div>
-
         <div className="space-y-2">
-          <Label htmlFor="protocol">Protocolo Quimioterápico</Label>
+          <Label htmlFor="protocol">Protocolo</Label>
           <Select
-            value={selectedProtocol ? selectedProtocol.id : undefined}
-            onValueChange={(id) => {
-              console.log('[ProtocolSelector] onValueChange called', { id, currentId: selectedProtocol?.id });
-              const protocol = protocolList.find((p) => p.id === id);
-              // Só chamar onProtocolChange se o protocolo realmente mudou
-              if (protocol && protocol.id !== selectedProtocol?.id) {
-                console.log('[ProtocolSelector] Calling onProtocolChange - protocol changed');
-                onProtocolChange(protocol);
-              } else {
-                console.log('[ProtocolSelector] Skipping onProtocolChange - same protocol');
-              }
+            value={
+              selectedProtocol &&
+              protocolList.some(p => p.id === selectedProtocol.id)
+                ? selectedProtocol.id
+                : undefined
+            }
+            onValueChange={id => {
+              const p = protocolList.find(p => p.id === id);
+              if (p) choose(p);
             }}
           >
             <SelectTrigger id="protocol">
               <SelectValue placeholder="Selecione um protocolo" />
             </SelectTrigger>
             <SelectContent>
-              {filteredProtocols.length > 0 ? (
-                filteredProtocols.map((protocol) => (
-                  <SelectItem key={protocol.id} value={protocol.id}>
-                    {protocol.name}
-                  </SelectItem>
-                ))
-              ) : (
-                <div className="px-2 py-6 text-center text-sm text-muted-foreground">
-                  Nenhum protocolo encontrado
-                </div>
+              {filteredProtocols.map(protocol => (
+                <SelectItem key={protocol.id} value={protocol.id}>
+                  {protocol.name}
+                </SelectItem>
+              ))}
+              {!filteredProtocols.length && (
+                <p className="p-3 text-sm text-muted-foreground">
+                  Nenhum protocolo nesta seleção.
+                </p>
               )}
             </SelectContent>
           </Select>
         </div>
-
         {selectedProtocol && (
-          <>
-            <div className="p-4 bg-muted/50 rounded-lg space-y-2">
-              <p className="text-sm font-semibold text-foreground">Indicação:</p>
-              <p className="text-sm text-muted-foreground">{selectedProtocol.indication}</p>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="cycle">Ciclo Atual</Label>
-              <Select
-                value={String(selectedCycle)}
-                onValueChange={(v) => onCycleChange(parseInt(v))}
-              >
-                <SelectTrigger id="cycle">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {Array.from({ length: selectedProtocol.cycles }, (_, i) => i + 1).map((cycle) => (
-                    <SelectItem key={cycle} value={String(cycle)}>
-                      Ciclo {cycle}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </>
+          <div className="rounded-lg bg-muted/50 p-3 text-sm">
+            <strong>Indicação: </strong>
+            {selectedProtocol.indication}
+          </div>
         )}
+        {selectedProtocol &&
+          !selectedProtocol.clinicalDocument &&
+          kind === "custom" && (
+            <div className="space-y-2">
+              <Label htmlFor="cycle">Ciclo atual</Label>
+              <Input
+                id="cycle"
+                type="number"
+                min={1}
+                max={
+                  selectedProtocol.cycles === 999
+                    ? undefined
+                    : selectedProtocol.cycles
+                }
+                value={selectedCycle}
+                onChange={e => {
+                  const value = Number(e.target.value);
+                  if (Number.isInteger(value) && value >= 1)
+                    onCycleChange(value);
+                }}
+              />
+            </div>
+          )}
       </CardContent>
     </Card>
   );
