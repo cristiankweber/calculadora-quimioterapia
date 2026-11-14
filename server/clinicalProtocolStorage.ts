@@ -4,6 +4,7 @@ import library from "../shared/data/clinicalProtocols.json";
 import { getDb } from "./db";
 import {
   convertImportToDbRecords,
+  convertToUserTemplatePackage,
   exportProtocolPackage,
   parseProtocolImport,
   type AnyProtocolExport,
@@ -65,8 +66,16 @@ export async function syncClinicalLibrary(userId: number) {
   return { ...result, version: library.version, sourceSha256: CLINICAL_LIBRARY_SOURCE_SHA256 };
 }
 
-export async function importClinicalProtocols(userId: number, jsonData: string) {
-  const data = parseProtocolImport(jsonData);
+export async function importClinicalProtocols(
+  userId: number, jsonData: string, options: { importMode?: "user_template" } = {},
+) {
+  let data: AnyProtocolExport;
+  if (options.importMode === "user_template") {
+    let raw: unknown;
+    try { raw = JSON.parse(jsonData); }
+    catch { throw new Error("JSON inválido. Verifique o formato do arquivo."); }
+    data = convertToUserTemplatePackage(raw);
+  } else data = parseProtocolImport(jsonData);
   return persistClinicalProtocolRecords(userId, convertImportToDbRecords(data, userId));
 }
 

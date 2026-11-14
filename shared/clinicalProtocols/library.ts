@@ -1,5 +1,6 @@
 import originalPackage from "../data/clinicalProtocols.json";
 import { protocols as legacyProtocols } from "../../client/src/data/protocols";
+import { isActiveTemplateDocument } from "./templates";
 
 export const CLINICAL_SOURCE_SHA256 =
   "3eb9e462aac5359ac42016d25ef3280517a5784ce78604c6334f75a73201fbe8";
@@ -94,6 +95,12 @@ export function getPrescriptionBlockReason(
     | null
     | undefined
 ): string | null {
+  if (
+    typeof input === "object" &&
+    input?.id?.startsWith("template-") &&
+    isActiveTemplateDocument(input.clinicalDocument)
+  )
+    return null;
   const document = getKnownClinicalDocument(input);
   if (document)
     return "Rascunho clínico: disponível somente para consulta e simulação. Prescrição bloqueada até homologação médica e farmacêutica em fluxo institucional próprio.";

@@ -7,23 +7,42 @@
  * REGRA: Nenhuma função aqui deve importar React, DOM, ou qualquer dependência de UI.
  */
 
-export { isPositiveFinite, isNonNegativeFinite, safeRound, clamp, toSafeNumber } from './safemath';
+export {
+  isPositiveFinite,
+  isNonNegativeFinite,
+  safeRound,
+  clamp,
+  toSafeNumber,
+} from "./safemath";
 
-import { isPositiveFinite, safeRound, clamp } from './safemath';
+import { isPositiveFinite, safeRound, clamp } from "./safemath";
 
 // ─── Tipos ──────────────────────────────────────────────────────────────────
 
-export type Sex = 'M' | 'F';
+export type Sex = "M" | "F";
 export type ECOGScore = 0 | 1 | 2 | 3 | 4;
-export type RenalStatus = 'green' | 'yellow' | 'red';
-export type DoseUnit = 'mg/m²' | 'mg/kg' | 'mg' | 'AUC' | 'mcg/kg' | 'cGy';
-export type CumulativeAlertLevel = 'safe' | 'warning' | 'near-limit' | 'exceeded';
+export type RenalStatus = "green" | "yellow" | "red";
+export type DoseUnit =
+  | "mg/m²"
+  | "mg/kg"
+  | "mg"
+  | "AUC"
+  | "mcg/kg"
+  | "cGy"
+  | "mcg/m²"
+  | "mcg"
+  | "UI/m²";
+export type CumulativeAlertLevel =
+  | "safe"
+  | "warning"
+  | "near-limit"
+  | "exceeded";
 
 export interface PatientMetrics {
   age: number;
   sex: Sex;
-  weight: number;   // kg
-  height: number;    // cm
+  weight: number; // kg
+  height: number; // cm
   creatinine: number; // mg/dL
   ecog: ECOGScore;
 }
@@ -77,13 +96,17 @@ export function calculateBSA(weight: number, height: number): number {
  *
  * Retorna 0 se creatinina, idade ou sexo forem inválidos.
  */
-export function calculateEGFR(creatinine: number, age: number, sex: Sex): number {
+export function calculateEGFR(
+  creatinine: number,
+  age: number,
+  sex: Sex
+): number {
   if (!isPositiveFinite(creatinine) || !isPositiveFinite(age)) return 0;
-  if (sex !== 'M' && sex !== 'F') return 0;
+  if (sex !== "M" && sex !== "F") return 0;
 
-  const kappa = sex === 'F' ? 0.7 : 0.9;
-  const alpha = sex === 'F' ? -0.241 : -0.302;
-  const sexFactor = sex === 'F' ? 1.012 : 1.0;
+  const kappa = sex === "F" ? 0.7 : 0.9;
+  const alpha = sex === "F" ? -0.241 : -0.302;
+  const sexFactor = sex === "F" ? 1.012 : 1.0;
 
   const creatRatio = creatinine / kappa;
   const minTerm = Math.min(creatRatio, 1);
@@ -106,15 +129,21 @@ export function classifyRenalFunction(egfr: number): {
   label: string;
 } {
   if (!Number.isFinite(egfr) || egfr < 0) {
-    return { status: 'red', label: 'Valor inválido de eGFR' };
+    return { status: "red", label: "Valor inválido de eGFR" };
   }
   if (egfr >= 60) {
-    return { status: 'green', label: 'Normal (≥60 mL/min) - Dose completa' };
+    return { status: "green", label: "Normal (≥60 mL/min) - Dose completa" };
   }
   if (egfr >= 30) {
-    return { status: 'yellow', label: 'Moderada (30-59 mL/min) - Cautela, possível redução' };
+    return {
+      status: "yellow",
+      label: "Moderada (30-59 mL/min) - Cautela, possível redução",
+    };
   }
-  return { status: 'red', label: 'Grave (<30 mL/min) - Evitar ou reduzir fortemente' };
+  return {
+    status: "red",
+    label: "Grave (<30 mL/min) - Evitar ou reduzir fortemente",
+  };
 }
 
 // ─── Ajuste por ECOG ────────────────────────────────────────────────────────
@@ -143,7 +172,10 @@ export function calculateAgeAdjustment(age: number, ecog: ECOGScore): number {
 
 // ─── Ajuste Global (ECOG + Idade) ──────────────────────────────────────────
 
-export function calculateGlobalAdjustment(age: number, ecog: ECOGScore): number {
+export function calculateGlobalAdjustment(
+  age: number,
+  ecog: ECOGScore
+): number {
   return calculateECOGAdjustment(ecog) * calculateAgeAdjustment(age, ecog);
 }
 
@@ -153,10 +185,17 @@ export function calculateGlobalAdjustment(age: number, ecog: ECOGScore): number 
  * Calcula todos os valores derivados do paciente de uma vez.
  * Retorna null se os dados mínimos não forem válidos.
  */
-export function calculateDerivedValues(metrics: PatientMetrics): DerivedValues | null {
+export function calculateDerivedValues(
+  metrics: PatientMetrics
+): DerivedValues | null {
   const { age, sex, weight, height, creatinine, ecog } = metrics;
 
-  if (!isPositiveFinite(weight) || !isPositiveFinite(height) || !isPositiveFinite(creatinine) || !isPositiveFinite(age)) {
+  if (
+    !isPositiveFinite(weight) ||
+    !isPositiveFinite(height) ||
+    !isPositiveFinite(creatinine) ||
+    !isPositiveFinite(age)
+  ) {
     return null;
   }
 
@@ -183,33 +222,44 @@ export function calculateDerivedValues(metrics: PatientMetrics): DerivedValues |
  * Retorna 0 se os dados forem insuficientes para o tipo de dose.
  */
 export function calculateDrugDose(input: DrugDoseInput): number {
-  const { baseDose, doseUnit, bsa, weight, adjustmentFactor = 1.0, maxDose, egfr } = input;
+  const {
+    baseDose,
+    doseUnit,
+    bsa,
+    weight,
+    adjustmentFactor = 1.0,
+    maxDose,
+    egfr,
+  } = input;
 
   if (!Number.isFinite(baseDose) || baseDose <= 0) return 0;
 
   let calculatedDose = baseDose;
 
   switch (doseUnit) {
-    case 'mg/m²':
+    case "mg/m²":
+    case "mcg/m²":
+    case "UI/m²":
       if (!isPositiveFinite(bsa)) return 0;
       calculatedDose = baseDose * bsa;
       break;
-    case 'mg/kg':
+    case "mg/kg":
       if (!isPositiveFinite(weight)) return 0;
       calculatedDose = baseDose * weight;
       break;
-    case 'AUC':
+    case "AUC":
       if (egfr === undefined || !Number.isFinite(egfr)) return baseDose;
       calculatedDose = baseDose * (egfr + 25);
       break;
-    case 'mg':
+    case "mg":
+    case "mcg":
       // Dose fixa, sem cálculo
       break;
-    case 'mcg/kg':
+    case "mcg/kg":
       if (!isPositiveFinite(weight)) return 0;
       calculatedDose = baseDose * weight; // resultado em mcg
       break;
-    case 'cGy':
+    case "cGy":
       // Procedimento de radioterapia — dose fixa, sem cálculo
       break;
     default:
@@ -218,7 +268,11 @@ export function calculateDrugDose(input: DrugDoseInput): number {
 
   calculatedDose *= adjustmentFactor;
 
-  if (maxDose !== undefined && isPositiveFinite(maxDose) && calculatedDose > maxDose) {
+  if (
+    maxDose !== undefined &&
+    isPositiveFinite(maxDose) &&
+    calculatedDose > maxDose
+  ) {
     calculatedDose = maxDose;
   }
 
@@ -238,7 +292,15 @@ export function calculateDrugDoseLegacy(
   maxDose?: number,
   egfr?: number
 ): number {
-  return calculateDrugDose({ baseDose, doseUnit, bsa, weight, adjustmentFactor, maxDose, egfr });
+  return calculateDrugDose({
+    baseDose,
+    doseUnit,
+    bsa,
+    weight,
+    adjustmentFactor,
+    maxDose,
+    egfr,
+  });
 }
 
 // ─── Dose Cumulativa de Antraciclinas ───────────────────────────────────────
@@ -259,16 +321,17 @@ export function validateCumulativeDose(
   const drugLower = drug.toLowerCase();
   const limit = ANTHRACYCLINE_LIMITS[drugLower] || 0;
 
-  const totalDose = (Number.isFinite(currentDose) ? currentDose : 0) +
-                    (Number.isFinite(previousDose) ? previousDose : 0);
+  const totalDose =
+    (Number.isFinite(currentDose) ? currentDose : 0) +
+    (Number.isFinite(previousDose) ? previousDose : 0);
 
   if (limit === 0) {
     return {
       totalDose,
       limit: 0,
       percentage: 0,
-      alertLevel: 'safe',
-      message: 'Sem limite estabelecido',
+      alertLevel: "safe",
+      message: "Sem limite estabelecido",
     };
   }
 
@@ -278,16 +341,16 @@ export function validateCumulativeDose(
   let message: string;
 
   if (totalDose > limit) {
-    alertLevel = 'exceeded';
+    alertLevel = "exceeded";
     message = `DOSE EXCEDIDA! Total: ${totalDose.toFixed(1)} mg/m² (limite: ${limit} mg/m²)`;
   } else if (percentage >= 90) {
-    alertLevel = 'near-limit';
+    alertLevel = "near-limit";
     message = `Próximo do limite: ${totalDose.toFixed(1)} mg/m² de ${limit} mg/m² (${percentage.toFixed(1)}%)`;
   } else if (percentage >= 60) {
-    alertLevel = 'warning';
+    alertLevel = "warning";
     message = `Atenção: ${totalDose.toFixed(1)} mg/m² de ${limit} mg/m² (${percentage.toFixed(1)}%)`;
   } else {
-    alertLevel = 'safe';
+    alertLevel = "safe";
     message = `Dose segura: ${totalDose.toFixed(1)} mg/m² de ${limit} mg/m² (${percentage.toFixed(1)}%)`;
   }
 

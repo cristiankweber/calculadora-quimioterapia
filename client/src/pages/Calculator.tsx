@@ -34,6 +34,12 @@ import type {
   ClinicalProtocolDocument,
   ClinicalContext,
 } from "@shared/clinicalProtocols/types";
+import {
+  isActiveTemplateDocument,
+  getTemplateExecutionDocument,
+  getTemplatePrescriptionIssues,
+  mapResolvedTemplateDrugs,
+} from "@shared/clinicalProtocols/templates";
 import { useAuth } from "@/_core/hooks/useAuth";
 
 // Lazy load PrintablePrescription para evitar travamento ao selecionar protocolo
@@ -108,9 +114,18 @@ export default function Calculator() {
   const [clinicalSelection, setClinicalSelection] = useState<ClinicalContext>({
     cycle: 1,
   });
-  const clinicalDocument = getKnownClinicalDocument(selectedProtocol) as
-    | ClinicalProtocolDocument
-    | undefined;
+  const clinicalDocument = useMemo(() => {
+    const doc = getKnownClinicalDocument(selectedProtocol) as
+      | ClinicalProtocolDocument
+      | undefined;
+    return doc && isActiveTemplateDocument(doc)
+      ? getTemplateExecutionDocument(doc)
+      : doc;
+  }, [selectedProtocol]);
+  const isUserTemplate = Boolean(
+    selectedProtocol?.isUserTemplate &&
+      isActiveTemplateDocument(clinicalDocument)
+  );
   const prescriptionBlock = getPrescriptionBlockReason(selectedProtocol);
   const clinicalContext = useMemo<ClinicalContext>(
     () => ({
@@ -164,6 +179,50 @@ export default function Calculator() {
       patientSex: patientData.sex,
       patientCreatinine: patientData.creatinine,
     });
+  const templateIssues = useMemo(
+    () =>
+      isUserTemplate && clinicalDocument && clinicalResolution
+        ? getTemplatePrescriptionIssues(
+            clinicalDocument,
+            clinicalContext,
+            clinicalResolution
+          )
+        : [],
+    [isUserTemplate, clinicalDocument, clinicalContext, clinicalResolution]
+  );
+  const prescriptionDrugs = useMemo(
+    () =>
+      isUserTemplate && clinicalResolution
+        ? (mapResolvedTemplateDrugs(clinicalResolution) as Drug[])
+        : calculatedDrugs,
+    [isUserTemplate, clinicalResolution, calculatedDrugs]
+  );
+  const prescriptionProtocol = useMemo(
+    () =>
+      selectedProtocol && isUserTemplate
+        ? {
+            ...selectedProtocol,
+            templateContext: {
+              cycle: selectedCycle,
+              phaseId: clinicalSelection.phaseId,
+              day: clinicalSelection.day,
+              gfrForCalvert: clinicalSelection.gfrForCalvert,
+            },
+          }
+        : selectedProtocol,
+    [selectedProtocol, isUserTemplate, selectedCycle, clinicalSelection]
+  );
+  const prescriptionValues = useMemo(
+    () =>
+      calculatedValues && isUserTemplate
+        ? {
+            ...calculatedValues,
+            ecogAdjustmentFactor: 1,
+            globalAdjustmentFactor: 1,
+          }
+        : calculatedValues,
+    [calculatedValues, isUserTemplate]
+  );
   const effectiveSupportDrugs = useMemo(
     () =>
       clinicalResolution
@@ -200,6 +259,21 @@ export default function Calculator() {
     if (!selectedProtocol || clinicalDocument) return null;
     return generateAntiemeticProphylaxis(selectedProtocol.emetogenicRisk);
   }, [selectedProtocol?.emetogenicRisk, clinicalDocument]);
+  const outputAntiemetics = useMemo(
+    () =>
+      isUserTemplate
+        ? {
+            risk: selectedProtocol!.emetogenicRisk,
+            day1: [],
+            days2to4: [],
+            rescue: [],
+            alerts: [
+              "Antiemese e demais ordens de suporte do template devem ser conferidas pelo prescritor; não foram preenchidas por esquema genérico.",
+            ],
+          }
+        : antiemetics,
+    [isUserTemplate, selectedProtocol, antiemetics]
+  );
 
   // ── Configurações Institucionais ────────────────────────────────────────
   const { isAuthenticated } = useAuth();
@@ -211,6 +285,7 @@ export default function Calculator() {
   const {
     prescriptionId,
     showPrint,
+    printSections,
     handleSaveToHistory,
     handleCopyPrescription,
     handleExportPDF,
@@ -219,14 +294,15 @@ export default function Calculator() {
     validateBeforeAction,
   } = usePrescriptionActions({
     patientData,
-    calculatedValues,
-    selectedProtocol,
+    calculatedValues: prescriptionValues,
+    selectedProtocol: prescriptionProtocol,
     selectedCycle,
-    calculatedDrugs,
-    antiemetics,
+    calculatedDrugs: prescriptionDrugs,
+    antiemetics: outputAntiemetics,
     toxicities,
     institutionSettings,
     hydrationSupportData,
+    clinicalIssues: templateIssues,
   });
 
   // ── Dados do Paciente para Emergência ───────────────────────────────────
@@ -441,7 +517,7 @@ export default function Calculator() {
         !prescriptionBlock &&
         selectedProtocol &&
         calculatedValues &&
-        antiemetics && (
+        outputAntiemetics && (
           <Suspense
             fallback={
               <div className="print:hidden">Preparando impressão...</div>
@@ -449,11 +525,12 @@ export default function Calculator() {
           >
             <PrintablePrescription
               patient={patientData}
-              calculatedValues={calculatedValues}
-              protocol={selectedProtocol}
+              calculatedValues={prescriptionValues!}
+              protocol={prescriptionProtocol!}
               cycle={selectedCycle}
-              drugs={calculatedDrugs}
-              antiemetics={antiemetics}
+              drugs={prescriptionDrugs}
+              antiemetics={outputAntiemetics}
+              sections={printSections}
               prescriptionId={prescriptionId}
               institutionName={
                 institutionSettings?.institutionName ?? undefined
@@ -481,16 +558,16 @@ export default function Calculator() {
       {!prescriptionBlock &&
         selectedProtocol &&
         calculatedValues &&
-        antiemetics && (
+        outputAntiemetics && (
           <PdfPreviewModal
             open={showPdfPreview}
             onOpenChange={setShowPdfPreview}
             patient={patientData}
-            calculatedValues={calculatedValues}
-            protocol={selectedProtocol}
+            calculatedValues={prescriptionValues!}
+            protocol={prescriptionProtocol!}
             cycle={selectedCycle}
-            drugs={calculatedDrugs}
-            antiemetics={antiemetics}
+            drugs={prescriptionDrugs}
+            antiemetics={outputAntiemetics}
             prescriptionId={prescriptionId}
             institutionName={institutionSettings?.institutionName ?? undefined}
             institutionLogo={institutionSettings?.institutionLogo ?? undefined}

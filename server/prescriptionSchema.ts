@@ -16,11 +16,9 @@ import { getPrescriptionBlockReason } from "../shared/clinicalProtocols/library"
 // ─── Refinamentos numéricos seguros ──────────────────────────────────────────
 
 /** Número finito (rejeita NaN e Infinity) */
-const safeNumber = z
-  .number()
-  .refine(n => Number.isFinite(n), {
-    message: "Valor numérico inválido (NaN ou Infinity)",
-  });
+const safeNumber = z.number().refine(n => Number.isFinite(n), {
+  message: "Valor numérico inválido (NaN ou Infinity)",
+});
 
 /** Número finito não-negativo (dose, peso, etc.) */
 const nonNegativeNumber = safeNumber.refine(n => n >= 0, {
@@ -81,6 +79,11 @@ const drugSchema = z.object({
   route: z.string().optional(),
   schedule: z.string().optional(),
   days: z.union([z.string(), z.array(z.number())]).optional(),
+  resultUnit: z.string().optional(),
+  frequency: positiveNumber.nullable().optional(),
+  dailyDose: nonNegativeNumber.nullable().optional(),
+  timeOrigin: z.string().optional(),
+  doseRepresents: z.string().optional(),
   diluent: z.string().optional(),
   diluentVolume: z.string().optional(),
   infusionTime: z.string().optional(),
@@ -154,6 +157,14 @@ export const prescriptionDataSchemaV2 = z.object({
     clinicalDocument: z.record(z.string(), z.unknown()).optional(),
     calculationPolicy: z.record(z.string(), z.unknown()).optional(),
     review: z.record(z.string(), z.unknown()).optional(),
+    templateContext: z
+      .object({
+        cycle: z.number().int().positive(),
+        day: z.number().int().optional(),
+        phaseId: z.string().min(1).optional(),
+        gfrForCalvert: positiveNumber.optional(),
+      })
+      .optional(),
   }),
 
   // Valores calculados
@@ -184,6 +195,25 @@ export const prescriptionDataSchemaV2 = z.object({
 
   // Notas adicionais
   notes: z.string().optional(),
+  templateAudit: z
+    .object({
+      recordId: z.number().int().positive(),
+      protocolId: z.string().min(1),
+      packageVersion: z.literal("user-protocol-template-1.0"),
+      context: z.object({
+        cycle: z.number().int().positive(),
+        day: z.number().int().optional(),
+        phaseId: z.string().optional(),
+        gfrForCalvert: positiveNumber.optional(),
+        bsa: positiveNumber.optional(),
+        weight: positiveNumber.optional(),
+        egfr: nonNegativeNumber.optional(),
+      }),
+      validatedByUserId: z.number().int().positive(),
+      validatedAt: nonNegativeNumber,
+      status: z.literal("user_template_requires_prescriber_validation"),
+    })
+    .optional(),
 });
 
 export type PrescriptionDataV2 = z.infer<typeof prescriptionDataSchemaV2>;
@@ -305,10 +335,27 @@ export const createPrescriptionInputSchema = z
     bsa: positiveNumber,
     egfr: nonNegativeNumber,
     renalStatus: z.string().min(1),
-    prescriptionData: prescriptionDataSchemaV2,
+    // O registro autoritativo de templateAudit é produzido somente pelo servidor.
+    prescriptionData: prescriptionDataSchemaV2.omit({ templateAudit: true }),
   })
   .superRefine((input, ctx) => {
     const protocol = input.prescriptionData.protocol;
+    // Apenas encaminha para a autoridade do registro armazenado; prefixo não é autorização.
+    if (protocol.id?.startsWith("template-")) {
+      if (
+        !protocol.templateContext ||
+        protocol.templateContext.cycle !== input.cycle ||
+        protocol.name !== input.protocolName
+      ) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["prescriptionData", "protocol"],
+          message:
+            "Contexto de template obrigatório e coerente com a prescrição.",
+        });
+      }
+      return;
+    }
     const reason =
       getPrescriptionBlockReason(protocol) ??
       getPrescriptionBlockReason(input.protocolName);

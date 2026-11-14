@@ -16,6 +16,7 @@ import {
   syncClinicalLibrary,
 } from "./clinicalProtocolStorage";
 import { clinicalProtocolsRouter } from "./routers/clinicalProtocols";
+import { validateActiveTemplatePrescription } from "./activeTemplatePrescription";
 import {
   createPrescriptionInputSchema,
   validateDoseSafety,
@@ -264,16 +265,22 @@ export const appRouter = router({
             message: "Protocolo não encontrado para este usuário.",
           });
         }
-        const clinicalBlock =
-          getPrescriptionBlockReason(input.prescriptionData.protocol) ??
-          getPrescriptionBlockReason(input.protocolName) ??
-          (storedProtocol
-            ? getPrescriptionBlockReason({
-                id: storedProtocol.protocolId,
-                name: storedProtocol.name,
-                clinicalDocument: storedProtocol.clinicalDocument,
-              })
-            : null);
+        const validatedTemplate = validateActiveTemplatePrescription(
+          input,
+          storedProtocol,
+          ctx.user.id
+        );
+        const clinicalBlock = validatedTemplate
+          ? null
+          : (getPrescriptionBlockReason(input.prescriptionData.protocol) ??
+            getPrescriptionBlockReason(input.protocolName) ??
+            (storedProtocol
+              ? getPrescriptionBlockReason({
+                  id: storedProtocol.protocolId,
+                  name: storedProtocol.name,
+                  clinicalDocument: storedProtocol.clinicalDocument,
+                })
+              : null));
         if (clinicalBlock)
           throw new TRPCError({ code: "FORBIDDEN", message: clinicalBlock });
         const prescriptionId = `RX-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -334,6 +341,21 @@ export const appRouter = router({
           serverBSA,
           serverEGFR
         );
+        if (validatedTemplate && enrichedData.audit?.formulaVersions)
+          enrichedData.audit.formulaVersions.dose =
+            "schedule-aware-template-1.0";
+        if (validatedTemplate)
+          Object.assign(enrichedData, {
+            templateAudit: {
+              recordId: storedProtocol!.id,
+              protocolId: storedProtocol!.protocolId,
+              packageVersion: storedProtocol!.clinicalPackage?.version,
+              context: validatedTemplate.context,
+              validatedByUserId: ctx.user.id,
+              validatedAt: Date.now(),
+              status: "user_template_requires_prescriber_validation",
+            },
+          });
 
         // ── 4. Persistir ──
         const prescriptionRecord = {

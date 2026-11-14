@@ -41,11 +41,13 @@ interface PrescriptionContext {
     prescriberCRM?: string | null;
   } | null;
   hydrationSupportData?: HydrationSupportData | null;
+  clinicalIssues?: string[];
 }
 
 interface UsePrescriptionActionsReturn {
   prescriptionId: string;
   showPrint: boolean;
+  printSections?: PdfSections;
   handleSaveToHistory: () => Promise<void>;
   handleCopyPrescription: () => void;
   handleExportPDF: (sections?: PdfSections) => Promise<void>;
@@ -58,10 +60,12 @@ interface UsePrescriptionActionsReturn {
  * Mapeia os dados do frontend para o formato prescriptionData v2
  * com metadados de auditoria completos.
  */
-function buildPrescriptionDataV2(ctx: PrescriptionContext) {
+export function buildPrescriptionDataV2(ctx: PrescriptionContext) {
   const protocol = ctx.selectedProtocol!;
   const calculatedValues = ctx.calculatedValues!;
-  const adjustmentFactor = getDoseAdjustmentFactor(ctx.toxicities);
+  const adjustmentFactor = protocol.isUserTemplate
+    ? 1
+    : getDoseAdjustmentFactor(ctx.toxicities);
 
   // Identificar doses manuais
   const manualDoseOverrides = ctx.calculatedDrugs
@@ -107,6 +111,7 @@ function buildPrescriptionDataV2(ctx: PrescriptionContext) {
       emetogenicRisk: protocol.emetogenicRisk,
       cycle: ctx.selectedCycle,
       totalCycles: protocol.cycles,
+      templateContext: protocol.templateContext,
     },
     calculatedValues: {
       bsa: calculatedValues.bsa,
@@ -127,6 +132,11 @@ function buildPrescriptionDataV2(ctx: PrescriptionContext) {
       days: d.days,
       notes: d.observations,
       isManualDose: false,
+      resultUnit: d.resultUnit,
+      frequency: d.frequency,
+      dailyDose: d.dailyDose,
+      timeOrigin: d.timeOrigin,
+      doseRepresents: d.doseRepresents,
     })),
     preMedications: ctx.antiemetics
       ? [
@@ -146,14 +156,20 @@ function buildPrescriptionDataV2(ctx: PrescriptionContext) {
       formulaVersions: {
         bsa: "DuBois",
         egfr: "CKD-EPI-2021",
-        dose: "standard",
+        dose: protocol.isUserTemplate
+          ? "schedule-aware-template-1.0"
+          : "standard",
       },
       generatedAt: Date.now(),
       globalAdjustmentFactor: adjustmentFactor,
       toxicityAdjustments:
-        toxicityAdjustments.length > 0 ? toxicityAdjustments : undefined,
+        !protocol.isUserTemplate && toxicityAdjustments.length > 0
+          ? toxicityAdjustments
+          : undefined,
       manualDoseOverrides:
-        manualDoseOverrides.length > 0 ? manualDoseOverrides : undefined,
+        !protocol.isUserTemplate && manualDoseOverrides.length > 0
+          ? manualDoseOverrides
+          : undefined,
       clinicalInputs: {
         weight: ctx.patientData.weight,
         height: ctx.patientData.height,
@@ -172,6 +188,7 @@ export function usePrescriptionActions(
 ): UsePrescriptionActionsReturn {
   const [prescriptionId, setPrescriptionId] = useState("");
   const [showPrint, setShowPrint] = useState(false);
+  const [printSections, setPrintSections] = useState<PdfSections | undefined>();
 
   const createPatientMutation = trpc.patients.create.useMutation();
   const savePrescriptionMutation = trpc.prescriptions.create.useMutation();
@@ -187,9 +204,31 @@ export function usePrescriptionActions(
         toast.error(`Preencha todos os dados antes de ${actionName}`);
         return false;
       }
+      if (
+        ctx.selectedProtocol.isUserTemplate &&
+        ((ctx.clinicalIssues?.length ?? 0) > 0 ||
+          !ctx.calculatedDrugs.length ||
+          ctx.calculatedDrugs.some(
+            d =>
+              typeof d.calculatedDose !== "number" ||
+              !Number.isFinite(d.calculatedDose) ||
+              d.calculatedDose <= 0
+          ))
+      ) {
+        toast.error(
+          ctx.clinicalIssues?.join("; ") ||
+            "Selecione as drogas e resolva as doses do template antes de gerar uma prescrição."
+        );
+        return false;
+      }
       return true;
     },
-    [ctx.selectedProtocol, ctx.calculatedValues]
+    [
+      ctx.selectedProtocol,
+      ctx.calculatedValues,
+      ctx.clinicalIssues,
+      ctx.calculatedDrugs,
+    ]
   );
 
   const warnIfNoInstitution = useCallback(() => {
@@ -284,10 +323,16 @@ export function usePrescriptionActions(
 
     text += `PROTOCOLO: ${selectedProtocol!.name}\nCiclo: ${selectedCycle}/${selectedProtocol!.cycles}\n`;
     text += `Indicação: ${selectedProtocol!.indication}\n\n`;
+    if (selectedProtocol!.isUserTemplate) {
+      const c = selectedProtocol!.templateContext;
+      text += `Template do usuário — validar antes de administrar.\nFase: ${c?.phaseId ?? "não aplicável"} | Dia: ${c?.day ?? "agenda completa do ciclo"}\n\n`;
+    }
 
     text += `DROGAS:\n`;
     calculatedDrugs.forEach(d => {
-      text += `• ${d.name}: ${d.calculatedDose?.toFixed(1)} mg ${d.route} (Dias ${d.days})\n`;
+      text += `• ${d.name}: ${d.calculatedDose?.toFixed(1)} ${d.resultUnit ?? (d.doseUnit.startsWith("mcg") ? "mcg" : d.doseUnit.startsWith("UI") ? "UI" : d.doseUnit === "cGy" ? "cGy" : "mg")} ${d.route} (Dias ${d.days})\n`;
+      if (selectedProtocol!.isUserTemplate && d.observations)
+        text += `  ${d.observations}\n`;
     });
 
     navigator.clipboard.writeText(text);
@@ -325,6 +370,7 @@ export function usePrescriptionActions(
     (sections?: PdfSections) => {
       if (!validateBeforeAction("imprimir")) return;
       warnIfNoInstitution();
+      setPrintSections(sections);
       setShowPrint(true);
       setTimeout(() => window.print(), 80);
     },
@@ -334,6 +380,7 @@ export function usePrescriptionActions(
   return {
     prescriptionId,
     showPrint,
+    printSections,
     handleSaveToHistory,
     handleCopyPrescription,
     handleExportPDF,

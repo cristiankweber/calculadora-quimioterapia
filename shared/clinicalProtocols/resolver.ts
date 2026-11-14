@@ -8,6 +8,7 @@ import type {
   ResolvedClinicalDrug,
   ResolvedClinicalProtocol,
 } from "./types";
+import { getTemplateExecutionDocument, isActiveTemplateDocument } from "./templates";
 
 const own = (value: object, key: string) =>
   Object.prototype.hasOwnProperty.call(value, key);
@@ -83,6 +84,7 @@ function selectionIssues(
 export function getClinicalPrescriptionBlock(
   document: ClinicalProtocolDocument
 ): string[] {
+  if (isActiveTemplateDocument(document)) return [];
   const issues: string[] = [];
   if (
     document.calculationPolicy?.automaticPrescriptionAllowed !== true ||
@@ -631,9 +633,19 @@ export function resolveClinicalProtocol(
   document: ClinicalProtocolDocument,
   context: ClinicalContext
 ): ResolvedClinicalProtocol {
+  const template = isActiveTemplateDocument(document);
+  if (template) document = getTemplateExecutionDocument(document);
   const prescriptionIssues = getClinicalPrescriptionBlock(document);
   const selected = selectDrugs(document, context);
   const globalIssues = selectionIssues(document, "Documento");
+  if (template) {
+    if (Array.isArray(document.templateExecutionIssues))
+      globalIssues.push(...document.templateExecutionIssues.filter((issue): issue is string => typeof issue === "string"));
+    if (document.referenceOnly === true || document.calculationPolicy?.referenceOnly === true)
+      globalIssues.push("Documento referenceOnly: somente consulta, sem prescrição.");
+    for (const key of ["doseDecision", "ageTable"])
+      if (present(document[key])) globalIssues.push(`Documento: ${key} exige decisão explícita; não inferir dose.`);
+  }
   if (!positiveInteger(context.cycle))
     globalIssues.push("cycle deve ser inteiro positivo explícito.");
   if (context.day !== undefined && !integer(context.day))
@@ -690,6 +702,11 @@ export function resolveClinicalProtocol(
       ...selectedDrug.issues,
       ...selectionIssues(source, `Droga ${source.id}`),
     ];
+    if (template)
+      for (const key of ["doseDecision", "ageTable"])
+        if (present(source[key])) drugIssues.push(`Droga ${source.id}: ${key} exige decisão explícita; não inferir dose.`);
+    if (template && source.dose === 0)
+      drugIssues.push(`Droga ${source.id}: dose zero não é uma ordem válida.`);
     const schedules = selectedDrug.schedules ?? source.schedule ?? [];
     for (const schedule of schedules) {
       if (
@@ -755,7 +772,7 @@ export function resolveClinicalProtocol(
       )
         continue;
       const settings = getFrequency(source, schedule);
-      const dose = validDose(schedule.dose) ? schedule.dose : null;
+      const dose = validDose(schedule.dose) && !(template && schedule.dose === 0) ? schedule.dose : null;
       const calculated = calculate(
         dose,
         schedule.doseUnit ?? source.doseUnit,

@@ -1,7 +1,17 @@
-import type { PatientData, Protocol, Drug, CalculatedValues } from '@/types/calculator';
-import type { AntiemeticProphylaxis } from '@/types/calculator';
-import type { HydrationResult, ElectrolyteReplacement, TransfusionRecommendation } from '@/lib/hydrationSupport';
-import type { PdfSections } from '@/components/PdfPreviewModal';
+import type {
+  PatientData,
+  Protocol,
+  Drug,
+  CalculatedValues,
+} from "@/types/calculator";
+import type { AntiemeticProphylaxis } from "@/types/calculator";
+import type {
+  HydrationResult,
+  ElectrolyteReplacement,
+  TransfusionRecommendation,
+} from "@/lib/hydrationSupport";
+import type { PdfSections } from "@/components/PdfPreviewModal";
+import { isActiveTemplateDocument } from "@shared/clinicalProtocols/templates";
 
 interface PrescriptionData {
   patient: PatientData;
@@ -18,26 +28,157 @@ interface PrescriptionData {
 
 // ── Sanitização HTML para evitar XSS ──────────────────────────────────────
 function escapeHtml(text: string | number | undefined | null): string {
-  if (text == null) return '';
+  if (text == null) return "";
   return String(text)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;');
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
 }
 
 function renderList(items: string[]): string {
-  if (!items || items.length === 0) return '<li>Nenhum</li>';
-  return items.map(item => `<li>${escapeHtml(item)}</li>`).join('');
+  if (!items || items.length === 0) return "<li>Nenhum</li>";
+  return items.map(item => `<li>${escapeHtml(item)}</li>`).join("");
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+function providedText(value: unknown, fallback = "não informado"): string {
+  if (value === undefined || value === null || value === "") return fallback;
+  if (typeof value === "string" || typeof value === "number")
+    return String(value);
+  return JSON.stringify(value) ?? fallback;
+}
+
+/** Output metadata only. This discriminator never grants prescription permission. */
+export function templatePrescriptionMetadata(protocol: Protocol): string[] {
+  const doc = asRecord(protocol.clinicalDocument);
+  if (!isActiveTemplateDocument(doc)) return [];
+  const original = asRecord(doc.sourceDocument ?? doc);
+  const context = protocol.templateContext;
+  const phases =
+    original.phaseLibrary ?? asRecord(original.extensions).phaseLibrary;
+  const phase = Array.isArray(phases)
+    ? phases.map(asRecord).find(entry => entry.id === context?.phaseId)
+    : undefined;
+  const version =
+    doc.sourceVersion ??
+    asRecord(doc.sourceEnvelope).version ??
+    asRecord(protocol.clinicalPackage?.metadata).sourceVersion ??
+    asRecord(protocol.clinicalPackage?.sourceEnvelope).version ??
+    protocol.clinicalPackage?.sourceVersion ??
+    protocol.clinicalPackage?.version ??
+    doc.version;
+  return [
+    "Template do usuário — validar antes de administrar",
+    "Uso do template não equivale a homologação institucional. Revisar doses, calendário e dados farmacêuticos antes de administrar.",
+    `Versão de origem: ${providedText(version)}`,
+    `Ciclo selecionado: ${providedText(context?.cycle)}`,
+    ...(context?.phaseId
+      ? [
+          `Fase: ${phase ? providedText(phase.name, context.phaseId) : context.phaseId} (${context.phaseId})`,
+        ]
+      : []),
+    ...(context?.day !== undefined ? [`Dia selecionado: ${context.day}`] : []),
+    ...(context?.gfrForCalvert !== undefined
+      ? [`GFR para Calvert: ${context.gfrForCalvert} mL/min`]
+      : []),
+  ];
+}
+
+/** Display resolved values verbatim: no dose fallback, daily multiplication or rate conversion. */
+export function drugPrescriptionOutput(
+  drug: Drug,
+  protocol: Protocol
+): {
+  calculated: string;
+  details: string[];
+  pharmaceutical: string[];
+} {
+  const structured = isActiveTemplateDocument(protocol.clinicalDocument);
+  // Unit conversion belongs to the resolver. This fallback supports legacy records only.
+  const unit =
+    drug.resultUnit ||
+    (structured
+      ? "unidade não informada"
+      : drug.doseUnit === "mcg/kg"
+        ? "mcg"
+        : drug.doseUnit === "cGy"
+          ? "cGy"
+          : "mg");
+  const calculated =
+    typeof drug.calculatedDose === "number" &&
+    Number.isFinite(drug.calculatedDose)
+      ? `${drug.calculatedDose.toFixed(1)} ${unit}`
+      : "Não calculada";
+  const details: string[] = [];
+  if (
+    typeof drug.frequency === "number" &&
+    Number.isFinite(drug.frequency) &&
+    drug.frequency > 0
+  )
+    details.push(
+      `${drug.frequency} ${drug.frequency === 1 ? "administração" : "administrações"}/24h`
+    );
+  else if (structured) details.push("Frequência não definida");
+  if (typeof drug.dailyDose === "number" && Number.isFinite(drug.dailyDose))
+    details.push(`Total de 24h: ${drug.dailyDose.toFixed(1)} ${unit}/24h`);
+  if (drug.doseRepresents === "total_for_this_infusion")
+    details.push("Total desta infusão, não taxa horária");
+  else if (drug.doseRepresents === "per_24_hours")
+    details.push(
+      "Dose resolvida a partir do total de 24h; não multiplicar novamente"
+    );
+  if (drug.timeOrigin) details.push(`Origem temporal: ${drug.timeOrigin}`);
+
+  const pharmaceutical: string[] = [];
+  if (structured) {
+    const doc = asRecord(protocol.clinicalDocument);
+    const original = asRecord(doc.sourceDocument ?? doc);
+    const entries = original.dilutionInfo ?? doc.dilutionInfo;
+    const matches = Array.isArray(entries)
+      ? entries
+          .map(asRecord)
+          .filter(
+            entry => entry.drugName === drug.name || entry.name === drug.name
+          )
+      : [];
+    if (matches.length === 0)
+      pharmaceutical.push(
+        "Dados farmacêuticos não fornecidos para este medicamento; validar com a farmácia. Nenhum parâmetro universal aplicado."
+      );
+    for (const entry of matches) {
+      pharmaceutical.push(
+        `Status farmacêutico: ${providedText(entry.validationStatus ?? entry.status)}`
+      );
+      for (const [key, label] of [
+        ["diluent", "Diluente"],
+        ["volume", "Volume"],
+        ["infusionTime", "Tempo de infusão"],
+        ["stability", "Estabilidade específica"],
+        ["specialInstructions", "Instruções específicas"],
+      ])
+        pharmaceutical.push(`${label}: ${providedText(entry[key])}`);
+    }
+  }
+  return { calculated, details, pharmaceutical };
 }
 
 function renalStatusClass(status: string): string {
   switch (status) {
-    case 'green': return 'status-green';
-    case 'yellow': return 'status-yellow';
-    case 'red': return 'status-red';
-    default: return '';
+    case "green":
+      return "status-green";
+    case "yellow":
+      return "status-yellow";
+    case "red":
+      return "status-red";
+    default:
+      return "";
   }
 }
 
@@ -91,18 +232,32 @@ const PDF_STYLES = `
 
 // ── Seção de Hidratação para PDF ──────────────────────────────────────────
 function buildHydrationSection(hydration?: HydrationResult | null): string {
-  if (!hydration || hydration.protocolType === 'none' || hydration.schemes.length === 0) return '';
+  if (
+    !hydration ||
+    hydration.protocolType === "none" ||
+    hydration.schemes.length === 0
+  )
+    return "";
 
-  const alertsHtml = hydration.alerts.length > 0 ? hydration.alerts.map(a => `
-    <div class="alert-box" style="border-left-color: ${a.type === 'danger' ? '#dc2626' : a.type === 'warning' ? '#f59e0b' : '#3b82f6'};">
-      <div class="alert-title" style="color: ${a.type === 'danger' ? '#dc2626' : a.type === 'warning' ? '#92400e' : '#1e40af'};">
-        ${a.type === 'danger' ? 'PERIGO' : a.type === 'warning' ? 'ATENÇÃO' : 'INFO'}
+  const alertsHtml =
+    hydration.alerts.length > 0
+      ? hydration.alerts
+          .map(
+            a => `
+    <div class="alert-box" style="border-left-color: ${a.type === "danger" ? "#dc2626" : a.type === "warning" ? "#f59e0b" : "#3b82f6"};">
+      <div class="alert-title" style="color: ${a.type === "danger" ? "#dc2626" : a.type === "warning" ? "#92400e" : "#1e40af"};">
+        ${a.type === "danger" ? "PERIGO" : a.type === "warning" ? "ATENÇÃO" : "INFO"}
       </div>
       <div>${escapeHtml(a.message)}</div>
     </div>
-  `).join('') : '';
+  `
+          )
+          .join("")
+      : "";
 
-  const schemesHtml = hydration.schemes.map(s => `
+  const schemesHtml = hydration.schemes
+    .map(
+      s => `
     <div class="hydration-scheme ${s.phase}">
       <h4>${escapeHtml(s.phaseLabel)}</h4>
       <table style="margin-bottom: 5px;">
@@ -113,17 +268,22 @@ function buildHydrationSection(hydration?: HydrationResult | null): string {
           <td style="width: 25%;"><strong>Duração:</strong> ${s.duration}h</td>
         </tr>
       </table>
-      ${s.additives && s.additives.length > 0 ? `<div style="font-size: 10pt;"><strong>Aditivos:</strong> ${s.additives.map(a => escapeHtml(a)).join(', ')}</div>` : ''}
-      ${s.notes && s.notes.length > 0 ? `<div style="font-size: 10pt; color: #475569;"><strong>Notas:</strong> ${s.notes.map(n => escapeHtml(n)).join('; ')}</div>` : ''}
+      ${s.additives && s.additives.length > 0 ? `<div style="font-size: 10pt;"><strong>Aditivos:</strong> ${s.additives.map(a => escapeHtml(a)).join(", ")}</div>` : ""}
+      ${s.notes && s.notes.length > 0 ? `<div style="font-size: 10pt; color: #475569;"><strong>Notas:</strong> ${s.notes.map(n => escapeHtml(n)).join("; ")}</div>` : ""}
     </div>
-  `).join('');
+  `
+    )
+    .join("");
 
-  const monitoringHtml = hydration.monitoring.length > 0 ? `
+  const monitoringHtml =
+    hydration.monitoring.length > 0
+      ? `
     <div style="margin-top: 10px;">
       <strong>Monitorização:</strong>
-      <ul class="monitoring-list">${hydration.monitoring.map(m => `<li>${escapeHtml(m)}</li>`).join('')}</ul>
+      <ul class="monitoring-list">${hydration.monitoring.map(m => `<li>${escapeHtml(m)}</li>`).join("")}</ul>
     </div>
-  ` : '';
+  `
+      : "";
 
   return `
     <div class="section">
@@ -137,15 +297,20 @@ function buildHydrationSection(hydration?: HydrationResult | null): string {
 }
 
 // ── Seção de Eletrólitos para PDF ────────────────────────────────────────
-function buildElectrolytesSection(electrolytes?: ElectrolyteReplacement[]): string {
-  if (!electrolytes || electrolytes.length === 0) return '';
+function buildElectrolytesSection(
+  electrolytes?: ElectrolyteReplacement[]
+): string {
+  if (!electrolytes || electrolytes.length === 0) return "";
 
   // Filtrar apenas eletrólitos que precisam de reposição (não normais)
-  const abnormal = electrolytes.filter(e => e.status !== 'normal');
-  if (abnormal.length === 0) return '';
+  const abnormal = electrolytes.filter(e => e.status !== "normal");
+  if (abnormal.length === 0) return "";
 
-  const cardsHtml = abnormal.map(e => {
-    const replacementsHtml = e.replacements.length > 0 ? `
+  const cardsHtml = abnormal
+    .map(e => {
+      const replacementsHtml =
+        e.replacements.length > 0
+          ? `
       <table style="margin-top: 8px;">
         <thead>
           <tr>
@@ -158,7 +323,9 @@ function buildElectrolytesSection(electrolytes?: ElectrolyteReplacement[]): stri
           </tr>
         </thead>
         <tbody>
-          ${e.replacements.map(r => `
+          ${e.replacements
+            .map(
+              r => `
             <tr>
               <td>${escapeHtml(r.solution)}</td>
               <td><strong>${escapeHtml(r.dose)}</strong></td>
@@ -167,26 +334,39 @@ function buildElectrolytesSection(electrolytes?: ElectrolyteReplacement[]): stri
               <td>${escapeHtml(r.duration)}</td>
               <td>${escapeHtml(r.frequency)}</td>
             </tr>
-            ${r.notes ? `<tr><td colspan="6" style="font-size: 9pt; color: #475569; border-top: none;">📋 ${escapeHtml(r.notes)}</td></tr>` : ''}
-          `).join('')}
+            ${r.notes ? `<tr><td colspan="6" style="font-size: 9pt; color: #475569; border-top: none;">📋 ${escapeHtml(r.notes)}</td></tr>` : ""}
+          `
+            )
+            .join("")}
         </tbody>
       </table>
-    ` : '';
+    `
+          : "";
 
-    const alertsHtml = e.alerts.length > 0 ? e.alerts.map(a => `
+      const alertsHtml =
+        e.alerts.length > 0
+          ? e.alerts
+              .map(
+                a => `
       <div class="alert-box" style="margin-top: 8px;">
         <div>${escapeHtml(a)}</div>
       </div>
-    `).join('') : '';
+    `
+              )
+              .join("")
+          : "";
 
-    const monitoringHtml = e.monitoring.length > 0 ? `
+      const monitoringHtml =
+        e.monitoring.length > 0
+          ? `
       <div style="margin-top: 5px;">
         <strong style="font-size: 10pt;">Monitorização:</strong>
-        <ul class="monitoring-list">${e.monitoring.map(m => `<li>${escapeHtml(m)}</li>`).join('')}</ul>
+        <ul class="monitoring-list">${e.monitoring.map(m => `<li>${escapeHtml(m)}</li>`).join("")}</ul>
       </div>
-    ` : '';
+    `
+          : "";
 
-    return `
+      return `
       <div class="elec-card">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
           <strong style="font-size: 12pt;">${escapeHtml(e.electrolyte)}</strong>
@@ -201,7 +381,8 @@ function buildElectrolytesSection(electrolytes?: ElectrolyteReplacement[]): stri
         ${monitoringHtml}
       </div>
     `;
-  }).join('');
+    })
+    .join("");
 
   return `
     <div class="section">
@@ -212,46 +393,65 @@ function buildElectrolytesSection(electrolytes?: ElectrolyteReplacement[]): stri
 }
 
 // ── Seção de Transfusão para PDF ─────────────────────────────────────────
-function buildTransfusionSection(transfusion?: TransfusionRecommendation[]): string {
-  if (!transfusion || transfusion.length === 0) return '';
+function buildTransfusionSection(
+  transfusion?: TransfusionRecommendation[]
+): string {
+  if (!transfusion || transfusion.length === 0) return "";
 
   // Filtrar apenas produtos indicados
   const indicated = transfusion.filter(t => t.indicated);
-  if (indicated.length === 0) return '';
+  if (indicated.length === 0) return "";
 
-  const cardsHtml = indicated.map(t => {
-    const reqsHtml = t.specialRequirements.length > 0 ? `
+  const cardsHtml = indicated
+    .map(t => {
+      const reqsHtml =
+        t.specialRequirements.length > 0
+          ? `
       <div style="margin-top: 5px;">
         <strong>Requisitos Especiais:</strong>
-        <ul class="prophylaxis-list">${t.specialRequirements.map(r => `<li>${escapeHtml(r)}</li>`).join('')}</ul>
+        <ul class="prophylaxis-list">${t.specialRequirements.map(r => `<li>${escapeHtml(r)}</li>`).join("")}</ul>
       </div>
-    ` : '';
+    `
+          : "";
 
-    const premedHtml = t.premedication.length > 0 ? `
+      const premedHtml =
+        t.premedication.length > 0
+          ? `
       <div style="margin-top: 5px;">
         <strong>Pré-Medicação:</strong>
-        <ul class="prophylaxis-list">${t.premedication.map(p => `<li>${escapeHtml(p)}</li>`).join('')}</ul>
+        <ul class="prophylaxis-list">${t.premedication.map(p => `<li>${escapeHtml(p)}</li>`).join("")}</ul>
       </div>
-    ` : '';
+    `
+          : "";
 
-    const alertsHtml = t.alerts.length > 0 ? t.alerts.map(a => `
+      const alertsHtml =
+        t.alerts.length > 0
+          ? t.alerts
+              .map(
+                a => `
       <div class="alert-box" style="margin-top: 5px;">
         <div>${escapeHtml(a)}</div>
       </div>
-    `).join('') : '';
+    `
+              )
+              .join("")
+          : "";
 
-    const monitoringHtml = t.monitoring.length > 0 ? `
+      const monitoringHtml =
+        t.monitoring.length > 0
+          ? `
       <div style="margin-top: 5px;">
         <strong style="font-size: 10pt;">Monitorização:</strong>
-        <ul class="monitoring-list">${t.monitoring.map(m => `<li>${escapeHtml(m)}</li>`).join('')}</ul>
+        <ul class="monitoring-list">${t.monitoring.map(m => `<li>${escapeHtml(m)}</li>`).join("")}</ul>
       </div>
-    ` : '';
+    `
+          : "";
 
-    return `
+      return `
       <div class="transfusion-card ${t.urgency}">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
           <strong style="font-size: 12pt;">${escapeHtml(t.productLabel)}</strong>
-          <span class="hydration-badge ${t.urgency === 'immediate' ? 'badge-danger' : 'badge-warning'}">${escapeHtml(t.urgencyLabel)}</span>
+          <span class="hydration-badge ${t.urgency === "immediate" ? "badge-danger" : "badge-warning"}">${escapeHtml(t.urgencyLabel)}</span>
         </div>
         <div class="info-grid">
           <div class="info-item"><span class="info-label">Valor Atual:</span> ${t.currentValue} ${escapeHtml(t.unit)}</div>
@@ -265,7 +465,8 @@ function buildTransfusionSection(transfusion?: TransfusionRecommendation[]): str
         ${monitoringHtml}
       </div>
     `;
-  }).join('');
+    })
+    .join("");
 
   return `
     <div class="section">
@@ -275,74 +476,125 @@ function buildTransfusionSection(transfusion?: TransfusionRecommendation[]): str
   `;
 }
 
-export async function generatePrescriptionPDF(data: PrescriptionData): Promise<void> {
-  const { patient, calculatedValues, protocol, cycle, drugs, antiemetics, sections } = data;
+export async function generatePrescriptionPDF(
+  data: PrescriptionData
+): Promise<void> {
+  const {
+    patient,
+    calculatedValues,
+    protocol,
+    cycle,
+    drugs,
+    antiemetics,
+    sections,
+  } = data;
 
   // Se sections não for fornecido, incluir tudo (comportamento padrão)
   const s = sections ?? {
-    patientData: true, calculatedValues: true, protocol: true, drugs: true,
-    specialAlerts: true, prophylaxis: true, antiemetics: true, nursingCare: true,
-    doseAdjustments: true, hydration: true, electrolytes: true, transfusion: true,
+    patientData: true,
+    calculatedValues: true,
+    protocol: true,
+    drugs: true,
+    specialAlerts: true,
+    prophylaxis: true,
+    antiemetics: true,
+    nursingCare: true,
+    doseAdjustments: true,
+    hydration: true,
+    electrolytes: true,
+    transfusion: true,
   };
 
   const now = new Date();
-  const dateStr = now.toLocaleDateString('pt-BR');
-  const timeStr = now.toLocaleTimeString('pt-BR');
+  const dateStr = now.toLocaleDateString("pt-BR");
+  const timeStr = now.toLocaleTimeString("pt-BR");
 
-  const drugsRows = drugs.map(drug => `
+  const metadata = templatePrescriptionMetadata(protocol);
+  const selectedCycle = protocol.templateContext?.cycle ?? cycle;
+  const drugsRows = drugs
+    .map(drug => {
+      const output = drugPrescriptionOutput(drug, protocol);
+      return `
     <tr>
       <td><strong>${escapeHtml(drug.name)}</strong></td>
       <td>${escapeHtml(drug.dose)} ${escapeHtml(drug.doseUnit)}</td>
-      <td><strong>${(drug.calculatedDose || 0).toFixed(1)} mg</strong></td>
+      <td><strong>${escapeHtml(output.calculated)}</strong>${output.details.map(line => `<div>${escapeHtml(line)}</div>`).join("")}</td>
       <td>${escapeHtml(drug.route)}</td>
       <td>${escapeHtml(drug.days)}</td>
-      <td>${escapeHtml(drug.observations) || '-'}</td>
+      <td>${escapeHtml(drug.observations) || "-"}${output.pharmaceutical.map(line => `<div>${escapeHtml(line)}</div>`).join("")}</td>
     </tr>
-  `).join('');
+  `;
+    })
+    .join("");
 
-  const specialAlertsSection = protocol.specialAlerts.length > 0 ? `
+  const specialAlertsSection =
+    protocol.specialAlerts.length > 0
+      ? `
     <div class="section">
       <div class="section-title">⚠️ ALERTAS ESPECIAIS</div>
-      ${protocol.specialAlerts.map(alert => `
+      ${protocol.specialAlerts
+        .map(
+          alert => `
         <div class="alert-box">
           <div class="alert-title">ATENÇÃO</div>
           <div>${escapeHtml(alert)}</div>
         </div>
-      `).join('')}
+      `
+        )
+        .join("")}
     </div>
-  ` : '';
+  `
+      : "";
 
-  const adjustmentsSection = (
+  const adjustmentsSection =
     protocol.renalAdjustments.length > 0 ||
     protocol.hepaticAdjustments.length > 0 ||
     protocol.hematologicAdjustments.length > 0
-  ) ? `
+      ? `
     <div class="section">
       <div class="section-title">AJUSTES DE DOSE</div>
-      ${protocol.renalAdjustments.length > 0 ? `
+      ${
+        protocol.renalAdjustments.length > 0
+          ? `
         <div style="margin-bottom: 10px;">
           <strong>Ajustes Renais:</strong>
           <ul class="prophylaxis-list">${renderList(protocol.renalAdjustments)}</ul>
         </div>
-      ` : ''}
-      ${protocol.hepaticAdjustments.length > 0 ? `
+      `
+          : ""
+      }
+      ${
+        protocol.hepaticAdjustments.length > 0
+          ? `
         <div style="margin-bottom: 10px;">
           <strong>Ajustes Hepáticos:</strong>
           <ul class="prophylaxis-list">${renderList(protocol.hepaticAdjustments)}</ul>
         </div>
-      ` : ''}
-      ${protocol.hematologicAdjustments.length > 0 ? `
+      `
+          : ""
+      }
+      ${
+        protocol.hematologicAdjustments.length > 0
+          ? `
         <div>
           <strong>Ajustes Hematológicos:</strong>
           <ul class="prophylaxis-list">${renderList(protocol.hematologicAdjustments)}</ul>
         </div>
-      ` : ''}
+      `
+          : ""
+      }
     </div>
-  ` : '';
+  `
+      : "";
 
-  const antiemeticRiskLabel = antiemetics.risk === 'high' ? 'Alto'
-    : antiemetics.risk === 'moderate' ? 'Moderado'
-    : antiemetics.risk === 'low' ? 'Baixo' : 'Mínimo';
+  const antiemeticRiskLabel =
+    antiemetics.risk === "high"
+      ? "Alto"
+      : antiemetics.risk === "moderate"
+        ? "Moderado"
+        : antiemetics.risk === "low"
+          ? "Baixo"
+          : "Mínimo";
 
   const htmlContent = `<!DOCTYPE html>
 <html lang="pt-BR">
@@ -357,39 +609,55 @@ export async function generatePrescriptionPDF(data: PrescriptionData): Promise<v
     <p>Data de Emissão: ${dateStr} às ${timeStr}</p>
   </div>
 
-  ${s.patientData ? `<div class="section">
+  ${metadata.length ? `<div class="section">${metadata.map(line => `<div>${escapeHtml(line)}</div>`).join("")}</div>` : ""}
+
+  ${
+    s.patientData
+      ? `<div class="section">
     <div class="section-title">DADOS DO PACIENTE</div>
     <div class="info-grid">
-      <div class="info-item"><span class="info-label">Nome/Identificador:</span> ${escapeHtml(patient.name) || 'Não informado'}</div>
+      <div class="info-item"><span class="info-label">Nome/Identificador:</span> ${escapeHtml(patient.name) || "Não informado"}</div>
       <div class="info-item"><span class="info-label">Idade:</span> ${escapeHtml(patient.age)} anos</div>
-      <div class="info-item"><span class="info-label">Sexo:</span> ${patient.sex === 'M' ? 'Masculino' : 'Feminino'}</div>
+      <div class="info-item"><span class="info-label">Sexo:</span> ${patient.sex === "M" ? "Masculino" : "Feminino"}</div>
       <div class="info-item"><span class="info-label">ECOG:</span> ${escapeHtml(patient.ecog)}</div>
       <div class="info-item"><span class="info-label">Peso:</span> ${escapeHtml(patient.weight)} kg</div>
       <div class="info-item"><span class="info-label">Altura:</span> ${escapeHtml(patient.height)} cm</div>
       <div class="info-item"><span class="info-label">Creatinina:</span> ${escapeHtml(patient.creatinine)} mg/dL</div>
       <div class="info-item"><span class="info-label">Bilirrubina:</span> ${escapeHtml(patient.bilirubin)} mg/dL</div>
     </div>
-    ${patient.comorbidities ? `<div class="info-item"><span class="info-label">Comorbidades:</span> ${escapeHtml(patient.comorbidities)}</div>` : ''}
-  </div>` : ''}
+    ${patient.comorbidities ? `<div class="info-item"><span class="info-label">Comorbidades:</span> ${escapeHtml(patient.comorbidities)}</div>` : ""}
+  </div>`
+      : ""
+  }
 
-  ${s.calculatedValues ? `<div class="section">
+  ${
+    s.calculatedValues
+      ? `<div class="section">
     <div class="section-title">VALORES CALCULADOS</div>
     <div class="info-grid">
       <div class="info-item"><span class="info-label">Superfície Corporal (SC):</span> <span class="calculated-badge">${calculatedValues.bsa.toFixed(2)} m²</span></div>
-      <div class="info-item"><span class="info-label">eGFR (CKD-EPI 2021):</span> <span class="calculated-badge">${calculatedValues.egfr.toFixed(1)} mL/min</span></div>
-      <div class="info-item"><span class="info-label">Função Renal:</span> <span class="${renalStatusClass(calculatedValues.renalStatus)}">${escapeHtml(calculatedValues.renalStatusLabel)}</span></div>
-      <div class="info-item"><span class="info-label">Fator de Ajuste Global:</span> <span class="calculated-badge">${(calculatedValues.globalAdjustmentFactor * 100).toFixed(0)}%</span></div>
+      <div class="info-item"><span class="info-label">eGFR (CKD-EPI 2021):</span> <span class="calculated-badge">${calculatedValues.egfr.toFixed(1)} mL/min/1.73 m²</span></div>
+      <div class="info-item"><span class="info-label">Função Renal:</span> <span class="${renalStatusClass(calculatedValues.renalStatus)}">${metadata.length ? "Estimativa renal indexada — não determina ajuste automático" : escapeHtml(calculatedValues.renalStatusLabel)}</span></div>
+      <div class="info-item"><span class="info-label">${metadata.length ? "Ajuste automático:" : "Fator de Ajuste Global:"}</span> <span class="calculated-badge">${metadata.length ? "Não aplicado" : `${(calculatedValues.globalAdjustmentFactor * 100).toFixed(0)}%`}</span></div>
     </div>
-  </div>` : ''}
+  </div>`
+      : ""
+  }
 
-  ${s.protocol ? `<div class="section">
+  ${
+    s.protocol
+      ? `<div class="section">
     <div class="section-title">PROTOCOLO QUIMIOTERÁPICO</div>
-    <div class="info-item"><span class="info-label">Protocolo:</span> ${escapeHtml(protocol.name)} - Ciclo ${escapeHtml(cycle)}/${escapeHtml(protocol.cycles)}</div>
+    <div class="info-item"><span class="info-label">Protocolo:</span> ${escapeHtml(protocol.name)} - Ciclo ${escapeHtml(selectedCycle)}/${escapeHtml(protocol.cycles)}</div>
     <div class="info-item"><span class="info-label">Indicação:</span> ${escapeHtml(protocol.indication)}</div>
     <div class="info-item"><span class="info-label">Duração do Ciclo:</span> ${escapeHtml(protocol.cycleLength)} dias</div>
-  </div>` : ''}
+  </div>`
+      : ""
+  }
 
-  ${s.drugs ? `<div class="section">
+  ${
+    s.drugs
+      ? `<div class="section">
     <div class="section-title">DROGAS PRESCRITAS</div>
     <table>
       <thead>
@@ -397,16 +665,24 @@ export async function generatePrescriptionPDF(data: PrescriptionData): Promise<v
       </thead>
       <tbody>${drugsRows}</tbody>
     </table>
-  </div>` : ''}
+  </div>`
+      : ""
+  }
 
-  ${s.specialAlerts ? specialAlertsSection : ''}
+  ${s.specialAlerts ? specialAlertsSection : ""}
 
-  ${s.prophylaxis ? `<div class="section">
+  ${
+    s.prophylaxis
+      ? `<div class="section">
     <div class="section-title">PROFILAXIAS OBRIGATÓRIAS/RECOMENDADAS</div>
     <ul class="prophylaxis-list">${renderList(protocol.prophylaxis)}</ul>
-  </div>` : ''}
+  </div>`
+      : ""
+  }
 
-  ${s.antiemetics ? `<div class="section">
+  ${
+    s.antiemetics
+      ? `<div class="section">
     <div class="section-title">PROFILAXIA ANTIEMÉTICA (Risco ${antiemeticRiskLabel})</div>
     <div style="margin-bottom: 15px;">
       <strong>Dia 1 (Pré-QT):</strong>
@@ -420,20 +696,26 @@ export async function generatePrescriptionPDF(data: PrescriptionData): Promise<v
       <strong>Medicações de Resgate:</strong>
       <ul class="prophylaxis-list">${renderList(antiemetics.rescue)}</ul>
     </div>
-  </div>` : ''}
+  </div>`
+      : ""
+  }
 
-  ${s.nursingCare ? `<div class="section">
+  ${
+    s.nursingCare
+      ? `<div class="section">
     <div class="section-title">CUIDADOS DE ENFERMAGEM</div>
     <ul class="prophylaxis-list">${renderList(protocol.nursingCare)}</ul>
-  </div>` : ''}
+  </div>`
+      : ""
+  }
 
-  ${s.doseAdjustments ? adjustmentsSection : ''}
+  ${s.doseAdjustments ? adjustmentsSection : ""}
 
-  ${s.hydration ? buildHydrationSection(data.hydration) : ''}
+  ${s.hydration ? buildHydrationSection(data.hydration) : ""}
 
-  ${s.electrolytes ? buildElectrolytesSection(data.electrolytes) : ''}
+  ${s.electrolytes ? buildElectrolytesSection(data.electrolytes) : ""}
 
-  ${s.transfusion ? buildTransfusionSection(data.transfusion) : ''}
+  ${s.transfusion ? buildTransfusionSection(data.transfusion) : ""}
 
   <div class="footer">
     <p><strong>Calculadora de Prescrição Quimioterápica</strong></p>
@@ -444,11 +726,11 @@ export async function generatePrescriptionPDF(data: PrescriptionData): Promise<v
 </html>`;
 
   // Criar blob e abrir para impressão
-  const blob = new Blob([htmlContent], { type: 'text/html' });
+  const blob = new Blob([htmlContent], { type: "text/html" });
   const url = URL.createObjectURL(blob);
 
   try {
-    const printWindow = window.open(url, '_blank');
+    const printWindow = window.open(url, "_blank");
     if (printWindow) {
       printWindow.onload = () => {
         setTimeout(() => {
@@ -458,10 +740,12 @@ export async function generatePrescriptionPDF(data: PrescriptionData): Promise<v
       };
     } else {
       // Fallback: download como HTML se popup bloqueado
-      const safeName = (patient.name || 'paciente').replace(/[^a-zA-Z0-9\s]/g, '').replace(/\s+/g, '_');
-      const link = document.createElement('a');
+      const safeName = (patient.name || "paciente")
+        .replace(/[^a-zA-Z0-9\s]/g, "")
+        .replace(/\s+/g, "_");
+      const link = document.createElement("a");
       link.href = url;
-      link.download = `prescricao_${safeName}_${new Date().toISOString().split('T')[0]}.html`;
+      link.download = `prescricao_${safeName}_${new Date().toISOString().split("T")[0]}.html`;
       link.click();
       URL.revokeObjectURL(url);
     }

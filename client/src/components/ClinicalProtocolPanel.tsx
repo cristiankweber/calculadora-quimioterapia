@@ -1,5 +1,9 @@
 import * as React from "react";
 import { useId } from "react";
+import {
+  getTemplateExecutionDocument,
+  isActiveTemplateDocument,
+} from "@shared/clinicalProtocols/templates";
 import type {
   ClinicalContext,
   ClinicalProtocolDocument,
@@ -306,10 +310,12 @@ function DoseGroup({
   title,
   rows,
   status,
+  isTemplate = false,
 }: {
   title: string;
   rows: ResolvedRow[];
   status: ResolvedRow["status"];
+  isTemplate?: boolean;
 }) {
   if (rows.length === 0) return null;
   return (
@@ -328,7 +334,10 @@ function DoseGroup({
       >
         <table className="w-full min-w-[880px] text-left text-sm">
           <caption className="sr-only">
-            {title}. Resultados de referência, não liberados para administração.
+            {title}.{" "}
+            {isTemplate
+              ? "Template do usuário; validar antes de administrar."
+              : "Resultados de referência, não liberados para administração."}
           </caption>
           <thead className="border-b bg-muted/50 text-xs text-muted-foreground">
             <tr>
@@ -349,7 +358,15 @@ function DoseGroup({
           <tbody>
             {rows.map((row, index) => {
               const source = record(row.source);
-              const frequency: Record<string,unknown> = {...record(source.administrationFrequency), ...(row.doseRepresents !== undefined ? {doseRepresents:row.doseRepresents} : {}), ...(row.continuousInfusion !== undefined ? {continuousInfusion:row.continuousInfusion} : {})};
+              const frequency: Record<string, unknown> = {
+                ...record(source.administrationFrequency),
+                ...(row.doseRepresents !== undefined
+                  ? { doseRepresents: row.doseRepresents }
+                  : {}),
+                ...(row.continuousInfusion !== undefined
+                  ? { continuousInfusion: row.continuousInfusion }
+                  : {}),
+              };
               const continuous = frequency.continuousInfusion === true;
               const totalInfusion =
                 frequency.doseRepresents === "total_for_this_infusion";
@@ -482,21 +499,51 @@ export default function ClinicalProtocolPanel({
 }: ClinicalProtocolPanelProps) {
   const id = useId();
   const doc = record(document);
+  const isTemplate = isActiveTemplateDocument(document);
+  const execution = isTemplate
+    ? getTemplateExecutionDocument(document)
+    : document;
+  const original = record(doc.sourceDocument ?? document);
   const review = record(doc.review);
-  const phases = items(doc.phaseLibrary)
+  const phases = items(execution.phaseLibrary)
     .map(record)
     .filter(phase => typeof phase.id === "string" && phase.id !== "");
   const selectedPhase = phases.find(phase => phase.id === context.phaseId);
   const phaseRequired = phases.length > 0;
   const missingPhase = phaseRequired && !selectedPhase;
-  const origins = timeOrigins(resolution.rows, selectedPhase ?? {}, doc);
+  const hasAuc =
+    isTemplate &&
+    [
+      ...items(execution.drugs),
+      ...phases.flatMap(phase => items(phase.drugs)),
+      ...resolution.rows.map(row => row.source),
+    ].some(drug => {
+      const entry = record(drug);
+      return (
+        entry.doseUnit === "AUC" ||
+        items(entry.schedule).some(
+          schedule => record(schedule).doseUnit === "AUC"
+        )
+      );
+    });
+  const origins = timeOrigins(
+    resolution.rows,
+    selectedPhase ?? {},
+    record(execution)
+  );
   const dayLabel =
     origins.length === 1
       ? (originLabels[origins[0]] ?? "Dia do calendário")
       : "Dia do calendário";
   const ambiguousDay =
     origins.length > 1 || (origins.length === 1 && !originLabels[origins[0]]);
-  const version = packageData?.version ?? doc.version;
+  const version =
+    doc.sourceVersion ??
+    record(packageData?.metadata).sourceVersion ??
+    record(packageData?.sourceEnvelope).version ??
+    packageData?.sourceVersion ??
+    packageData?.version ??
+    doc.version;
   const issues = [...items(review.unresolvedItems), ...resolution.issues];
   const ready = missingPhase
     ? []
@@ -532,11 +579,17 @@ export default function ClinicalProtocolPanel({
     >
       <CardHeader className="min-w-0 border-b bg-primary/5">
         <div className="flex flex-wrap items-center gap-2">
-          <Badge variant="destructive">Rascunho bloqueado</Badge>
+          <Badge variant={isTemplate ? "secondary" : "destructive"}>
+            {isTemplate
+              ? "Template do usuário — validar antes de administrar"
+              : "Rascunho bloqueado"}
+          </Badge>
           <Badge variant="outline">
-            {doc.referenceOnly === true
+            {execution.referenceOnly === true
               ? "Somente consulta"
-              : "Simulação para revisão"}
+              : isTemplate
+                ? "Revisão da seleção"
+                : "Simulação para revisão"}
           </Badge>
           <span className="break-words text-xs text-muted-foreground">
             Versão: {text(version, "não informada no pacote")}
@@ -560,29 +613,43 @@ export default function ClinicalProtocolPanel({
           {text(doc.indication, "Biblioteca clínica para consulta técnica")}
         </CardDescription>
         <p className="break-words text-xs text-muted-foreground">
-          Status da revisão: {text(review.status, "não informado")} ·{" "}
+          {isTemplate ? "Status técnico da revisão" : "Status da revisão"}:{" "}
+          {text(review.status, "não informado")} ·{" "}
           {text(doc.id, "sem identificador")}
         </p>
       </CardHeader>
       <CardContent className="min-w-0 space-y-6 pt-2">
         <Alert
-          variant="destructive"
-          className="border-destructive/30 bg-destructive/5"
+          variant={isTemplate ? "default" : "destructive"}
+          className={
+            isTemplate
+              ? "border-primary/30 bg-primary/5"
+              : "border-destructive/30 bg-destructive/5"
+          }
         >
           <ShieldAlert aria-hidden="true" />
           <AlertTitle className="whitespace-normal">
-            Documento não homologado para prescrição
+            {isTemplate
+              ? "Template do usuário — validar antes de administrar"
+              : "Documento não homologado para prescrição"}
           </AlertTitle>
           <AlertDescription>
             <p>
-              Cálculos disponíveis são simulações para revisão médica e
-              farmacêutica. Não autorizam preparo, administração ou reinício de
-              ciclo. O bloqueio de prescrição é permanente neste painel.
+              {isTemplate
+                ? "Template gerenciado pelo usuário: não equivale a homologação institucional. Revisar seleção, calendário, doses e dados farmacêuticos antes de administrar. Pendências técnicas concretas permanecem; nenhuma alternativa é escolhida automaticamente."
+                : "Cálculos disponíveis são simulações para revisão médica e farmacêutica. Não autorizam preparo, administração ou reinício de ciclo. O bloqueio de prescrição é permanente neste painel."}
             </p>
           </AlertDescription>
         </Alert>
-        <section aria-label="Contexto da simulação" className="space-y-3">
-          <h3 className="text-sm font-semibold">Contexto da simulação</h3>
+        <section
+          aria-label={
+            isTemplate ? "Contexto da seleção" : "Contexto da simulação"
+          }
+          className="space-y-3"
+        >
+          <h3 className="text-sm font-semibold">
+            {isTemplate ? "Contexto da seleção" : "Contexto da simulação"}
+          </h3>
           <div className="grid min-w-0 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <div className="min-w-0 space-y-2">
               <Label htmlFor={`${id}-cycle`}>Ciclo numérico</Label>
@@ -687,6 +754,40 @@ export default function ClinicalProtocolPanel({
                   : " Selecione a fase para definir a origem temporal."}
               </p>
             </div>
+            {hasAuc ? (
+              <div className="min-w-0 space-y-2">
+                <Label htmlFor={`${id}-gfr`}>
+                  GFR absoluto para Calvert (mL/min)
+                </Label>
+                <Input
+                  id={`${id}-gfr`}
+                  type="number"
+                  min={0}
+                  step="any"
+                  inputMode="decimal"
+                  title="GFR absoluto explicitamente selecionado para Calvert; não usar eGFR indexado"
+                  aria-describedby={`${id}-gfr-help`}
+                  value={context.gfrForCalvert ?? ""}
+                  onChange={event => {
+                    const value = event.currentTarget.value;
+                    const next = event.currentTarget.valueAsNumber;
+                    if (value === "" || (Number.isFinite(next) && next > 0))
+                      onContextChange({
+                        ...context,
+                        gfrForCalvert: value === "" ? undefined : next,
+                      });
+                  }}
+                />
+                <p
+                  id={`${id}-gfr-help`}
+                  className="text-xs text-muted-foreground"
+                >
+                  Opcional para consulta; necessário para calcular AUC. Informar
+                  GFR absoluto selecionado pelo prescritor; não preencher a
+                  partir do eGFR indexado.
+                </p>
+              </div>
+            ) : null}
           </div>
           <p className="text-xs text-muted-foreground">
             Duração resolvida do ciclo:{" "}
@@ -714,23 +815,41 @@ export default function ClinicalProtocolPanel({
           </Alert>
         ) : null}
         {issues.length > 0 ? (
-          <DataSection title="Pendências de revisão e cálculo" value={issues} />
+          <>
+            <DataSection
+              title="Pendências de revisão e cálculo"
+              value={issues}
+            />
+            {isTemplate ? (
+              <p className="text-sm text-muted-foreground">
+                Revisar o JSON completo para decisões de fase, nível, idade,
+                alternativas ou suporte não resolvidas; nenhuma dose ou escolha
+                é presumida.
+              </p>
+            ) : null}
+          </>
         ) : (
           <p className="text-sm text-muted-foreground">
-            Nenhuma pendência adicional informada. Isso não homologa o documento
-            nem libera a prescrição.
+            {isTemplate
+              ? "Nenhuma pendência adicional informada. Isso não substitui revisão médica e farmacêutica antes de administrar."
+              : "Nenhuma pendência adicional informada. Isso não homologa o documento nem libera a prescrição."}
           </p>
         )}
-        {doc.referenceOnly === true ? (
+        {execution.referenceOnly === true ? (
           <p className="text-sm text-muted-foreground">
             Somente consulta: documento referencial, sem liberação de doses.
           </p>
         ) : (
           <>
             <DoseGroup
-              title="Doses disponíveis para simulação"
+              title={
+                isTemplate
+                  ? "Doses resolvidas para revisão"
+                  : "Doses disponíveis para simulação"
+              }
               rows={ready}
               status="ready"
+              isTemplate={isTemplate}
             />
             <DoseGroup
               title="Doses bloqueadas"
@@ -745,7 +864,7 @@ export default function ClinicalProtocolPanel({
           </>
         )}
         {!missingPhase &&
-        (resolution.rows.length === 0 || doc.referenceOnly === true) ? (
+        (resolution.rows.length === 0 || execution.referenceOnly === true) ? (
           <p className="text-sm text-muted-foreground">
             Nenhuma dose resolvida para esta seleção. O documento permanece
             disponível para consulta.
@@ -772,9 +891,23 @@ export default function ClinicalProtocolPanel({
         ) : null}
         <DataSection
           title="Informações farmacêuticas fornecidas"
-          value={doc.dilutionInfo}
+          value={original.dilutionInfo ?? doc.dilutionInfo}
           empty="Dados farmacêuticos não fornecidos. Validar produto, diluente, concentração, estabilidade e liberação com a farmácia; nenhum parâmetro universal foi aplicado."
         />
+        {isTemplate
+          ? items(original.dilutionInfo ?? doc.dilutionInfo).map(
+              (entry, index) => (
+                <p key={index} className="text-xs text-muted-foreground">
+                  {text(record(entry).drugName, "Item farmacêutico")} · Status
+                  farmacêutico:{" "}
+                  {text(
+                    record(entry).validationStatus ?? record(entry).status,
+                    "não informado"
+                  )}
+                </p>
+              )
+            )
+          : null}
         <p className="text-xs text-muted-foreground">
           Informações farmacêuticas reproduzidas do documento, dependentes de
           produto e validação específica. Não constituem relatório de preparo

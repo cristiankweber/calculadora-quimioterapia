@@ -6,7 +6,11 @@ import {
   isReviewedLegacy,
   isEnrichedClinicalDocument,
 } from "@shared/clinicalProtocols/library";
-export type CatalogueKind = "reviewed" | "custom" | "legacy";
+import {
+  isActiveTemplateDocument,
+  USER_TEMPLATE_VERSION,
+} from "@shared/clinicalProtocols/templates";
+export type CatalogueKind = "reviewed" | "custom" | "legacy" | "templates";
 const { protocols: _documents, ...envelope } = clinicalPackage;
 const risk = (v: unknown): Protocol["emetogenicRisk"] =>
   ["high", "moderate", "low", "minimal"].includes(String(v))
@@ -51,6 +55,23 @@ export function mapClinicalDocument(
 }
 
 export function mapStoredProtocol(record: Record<string, unknown>): Protocol {
+  const packageData = record.clinicalPackage as
+    | Record<string, unknown>
+    | undefined;
+  if (
+    packageData?.version === USER_TEMPLATE_VERSION &&
+    isActiveTemplateDocument(record.clinicalDocument)
+  ) {
+    return {
+      ...mapClinicalDocument(
+        record.clinicalDocument as Record<string, unknown>,
+        packageData,
+        String(record.protocolId)
+      ),
+      libraryKind: "templates",
+      isUserTemplate: true,
+    };
+  }
   if (isEnrichedClinicalDocument(record.clinicalDocument)) {
     return mapClinicalDocument(
       record.clinicalDocument as Record<string, unknown>,
@@ -96,6 +117,8 @@ export function getClinicalCatalogue(
   const active = records
     .filter(record => record.isActive !== 0)
     .map(mapStoredProtocol);
+  if (kind === "templates")
+    return active.filter(protocol => protocol.libraryKind === "templates");
   if (kind === "reviewed")
     return clinicalDocuments.map(doc => mapClinicalDocument(doc));
   if (kind === "custom")

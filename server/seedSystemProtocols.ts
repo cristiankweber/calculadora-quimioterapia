@@ -1,10 +1,11 @@
 import { createHash } from "node:crypto";
 import type { InsertCustomProtocol } from "../drizzle/schema";
 import clinicalLibrary from "../shared/data/clinicalProtocols.json";
+import { isActiveTemplateDocument, USER_TEMPLATE_VERSION } from "../shared/clinicalProtocols/templates";
 
 export const CLINICAL_PROTOCOL_VERSION = "2.1-source-reconciled-clinical-draft" as const;
 export const PROTOCOL_COLLECTION_VERSION = "clinical-protocol-collection-1.0" as const;
-export type ProtocolPackageVersion = "1.0" | typeof CLINICAL_PROTOCOL_VERSION;
+export type ProtocolPackageVersion = "1.0" | typeof CLINICAL_PROTOCOL_VERSION | typeof USER_TEMPLATE_VERSION;
 export type JsonObject = Record<string, unknown>;
 
 /** Extensible JSON contracts: never parse through a schema that strips unknown keys. */
@@ -134,6 +135,10 @@ function inspectClinicalTree(node: unknown, errors: string[], path: string, deci
 }
 
 function validatePackage(data: JsonObject, errors: string[], prefix = ""): void {
+  if (data.version === USER_TEMPLATE_VERSION) {
+    validateTemplatePackage(data, errors, prefix);
+    return;
+  }
   if (data.version !== "1.0" && data.version !== CLINICAL_PROTOCOL_VERSION) {
     errors.push(`Versão não suportada: ${String(data.version)}. Esperado: 1.0 ou ${CLINICAL_PROTOCOL_VERSION}`);
     return;
@@ -154,6 +159,7 @@ function validatePackage(data: JsonObject, errors: string[], prefix = ""): void 
   data.protocols.forEach((protocol, i) => {
     const label = `${prefix}Protocolo ${i + 1}`;
     if (!isObject(protocol)) { errors.push(`${label}: esperado um objeto.`); return; }
+    if (Object.hasOwn(protocol, "templateUsage")) errors.push(`${label}: templateUsage exige versão de template; não libera documentos legados/rascunhos.`);
     if (!nonempty(protocol.name)) errors.push(`${label}: nome é obrigatório.`);
     if (!nonempty(protocol.indication)) errors.push(`${label}: indicação é obrigatória.`);
     if (clinical && !nonempty(protocol.id)) errors.push(`${label}: id é obrigatório.`);
@@ -259,7 +265,9 @@ export function convertImportToDbRecords(
       (summaryArrays as JsonObject)[key] = clone(protocol[key] ?? []);
     }
     return {
-      userId, protocolId: `imported-${slug}-${identity}`,
+      userId, protocolId: data.version === USER_TEMPLATE_VERSION
+        ? `template-${slug}-${protocolContentSha256({ userId, document: templateIdentityContent(protocol), envelope: templateIdentityContent(envelope) })}`
+        : `imported-${slug}-${identity}`,
       name: protocol.name.slice(0, 255), indication: protocol.indication.slice(0, 512),
       cycles: protocol.cycles === null || protocol.cycles === 999 ? 1 : protocol.cycles || 1,
       cycleLength: protocol.cycleLength || (data.version === "1.0" ? 21 : 1),
@@ -312,4 +320,151 @@ export function exportProtocolPackage(records: ExportableRecord[]): AnyProtocolE
   if (groups.size === 0) return { version: "1.0", protocols: [] };
   if (groups.size === 1) return Array.from(groups.values())[0];
   return { version: PROTOCOL_COLLECTION_VERSION, packages: Array.from(groups.values()) };
+}
+
+/** Identity excludes export timestamps/checksums derived from them, not source content. */
+function templateIdentityContent(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(templateIdentityContent);
+  if (!isObject(value)) return value;
+  return Object.fromEntries(Object.entries(value).filter(([key]) => key !== "exportedAt" && key !== "sourceSha256")
+    .map(([key, child]) => [key, templateIdentityContent(child)]));
+}
+
+const templateDoseUnits = new Set([...Array.from(doseUnits), "UI", "UI/kg", "mg/m2", "mcg/m2", "UI/m2"]);
+/** Clinical structure only; sourceDocument/sourceEnvelope are archival, not executable draft policy. */
+function inspectTemplateTree(node: unknown, errors: string[], path: string, sourced: boolean): void {
+  if (Array.isArray(node)) {
+    node.forEach((child, index) => inspectTemplateTree(child, errors, `${path}[${index}]`, sourced));
+    return;
+  }
+  if (!isObject(node)) return;
+  for (const [key, value] of Object.entries(node)) {
+    if (["sourceDocument", "sourceEnvelope"].includes(key)) continue;
+    if (key === "dose" && !(typeof value === "number" && Number.isFinite(value) && value > 0) && !(sourced && value === null))
+      errors.push(`${path}.dose: dose deve ser finita > 0, ou null preservado da fonte explícita.`);
+    if (key === "maxDose" && value !== null && !(typeof value === "number" && Number.isFinite(value) && value > 0))
+      errors.push(`${path}.maxDose: máximo deve ser finito > 0.`);
+    if (key === "doseUnit" && (typeof value !== "string" || !templateDoseUnits.has(value)))
+      errors.push(`${path}.doseUnit: unidade de dose inválida: ${String(value)}.`);
+    if (["drugs", "phaseLibrary", "schedule"].includes(key) && !Array.isArray(value))
+      errors.push(`${path}.${key}: deve ser um array.`);
+    if (key === "drugs" && Array.isArray(value)) {
+      value.forEach((drug, index) => {
+        const label = `${path}.drugs[${index}]`;
+        if (!isObject(drug)) { errors.push(`${label}: esperado um objeto.`); return; }
+        for (const field of ["id", "name", "doseUnit", "route"])
+          if (!nonempty(drug[field])) errors.push(`${label}.${field}: campo obrigatório.`);
+        if (!Object.hasOwn(drug, "dose")) errors.push(`${label}.dose: dose deve ser explícita.`);
+        if (typeof drug.days !== "string") errors.push(`${label}.days: texto explícito obrigatório.`);
+      });
+      const ids = value.filter(isObject).map(drug => drug.id);
+      if (new Set(ids).size !== ids.length) errors.push(`${path}.drugs: identificadores duplicados.`);
+    }
+    if (key === "phaseLibrary" && Array.isArray(value)) {
+      value.forEach((phase, index) => {
+        if (!isObject(phase) || !nonempty(phase.id) || !nonempty(phase.name)) errors.push(`${path}.phaseLibrary[${index}]: id/nome obrigatórios.`);
+      });
+      const ids = value.filter(isObject).map(phase => phase.id);
+      if (new Set(ids).size !== ids.length) errors.push(`${path}.phaseLibrary: identificadores duplicados.`);
+    }
+    if (key === "schedule" && Array.isArray(value)) value.forEach((stage, index) => {
+      if (!isObject(stage) || !Object.hasOwn(stage, "dose")) errors.push(`${path}.schedule[${index}]: etapa exige dose explícita.`);
+    });
+    inspectTemplateTree(value, errors, `${path}.${key}`, sourced);
+  }
+}
+
+function validateTemplatePackage(data: JsonObject, errors: string[], prefix: string): void {
+  const metadata = data.metadata;
+  if (!isObject(metadata) || metadata.importMode !== "user_template" ||
+    !["2.18", "1.0"].includes(String(metadata.sourceVersion)) ||
+    typeof metadata.sourceSha256 !== "string" || !/^[a-f0-9]{64}$/.test(metadata.sourceSha256))
+    errors.push(`${prefix}metadata de template exige importMode, sourceVersion e sourceSha256 íntegros.`);
+  if (!isObject(data.sourceEnvelope) || (isObject(metadata) && data.sourceEnvelope.version !== metadata.sourceVersion))
+    errors.push(`${prefix}sourceEnvelope original obrigatório e compatível com sourceVersion.`);
+  if (!Array.isArray(data.protocols) || !data.protocols.length) { errors.push(`${prefix}protocols deve conter ao menos um documento.`); return; }
+  data.protocols.forEach((document, index) => {
+    const label = `${prefix}Template ${index + 1}`;
+    if (!isObject(document)) { errors.push(`${label}: esperado um objeto.`); return; }
+    for (const field of ["id", "name", "indication"]) if (!nonempty(document[field])) errors.push(`${label}.${field}: campo obrigatório.`);
+    if (!isActiveTemplateDocument(document)) errors.push(`${label}: templateUsage deve ser user_managed, active, prescriptionEnabled true.`);
+    if (!isObject(document.sourceDocument)) errors.push(`${label}: sourceDocument original integral obrigatório.`);
+    else if (document.sourceDocumentSha256 !== protocolContentSha256(document.sourceDocument))
+      errors.push(`${label}: sourceDocumentSha256 não corresponde ao documento original preservado.`);
+    if (!Array.isArray(document.drugs) || (!document.drugs.length && document.referenceOnly !== true))
+      errors.push(`${label}: drogas obrigatórias salvo referenceOnly.`);
+    for (const key of ["cycles", "cycleLength"]) {
+      const value = document[key];
+      if (value !== null && !(typeof value === "number" && Number.isSafeInteger(value) && value > 0 && value <= 2147483647))
+        errors.push(`${label}.${key}: inteiro positivo ou null obrigatório.`);
+    }
+    if (document.emetogenicRisk && !risks.has(String(document.emetogenicRisk))) errors.push(`${label}: risco emetogênico inválido.`);
+    inspectTemplateTree(document, errors, label, isObject(document.sourceDocument));
+  });
+}
+
+/** Only deterministic explicit numeric days; no optional/rescue/clinical text is converted. */
+function staticTemplateDays(text: unknown): number[] | null {
+  if (typeof text !== "string" || !/^\s*\d+(?:\s*-\s*\d+)?(?:\s*[,;]\s*\d+(?:\s*-\s*\d+)?)*\s*$/.test(text)) return null;
+  const days: number[] = [];
+  for (const token of text.split(/[,;]/)) {
+    const [start, finish = start] = token.trim().split(/\s*-\s*/).map(Number);
+    if (!Number.isSafeInteger(start) || !Number.isSafeInteger(finish) || start <= 0 || finish < start || finish - start > 10000) return null;
+    for (let day = start; day <= finish; day++) days.push(day);
+  }
+  return Array.from(new Set(days)).sort((a, b) => a - b);
+}
+
+/** Explicit authorized converter. No DB, implicit downgrade, institutional approval or source rewrite. */
+export function convertToUserTemplatePackage(raw: unknown): AnyProtocolExport {
+  if (!isObject(raw)) throw new Error("Formato inválido: esperado um objeto JSON.");
+  const jsonErrors: string[] = [];
+  inspectJson(raw, jsonErrors);
+  if (jsonErrors.length) throw new Error(`Erros de validação: ${jsonErrors.join("; ")}`);
+  if (raw.version === USER_TEMPLATE_VERSION) {
+    const errors = validateImportFormat(raw);
+    if (errors.length) throw new Error(`Erros de validação: ${errors.join("; ")}`);
+    return clone(raw) as ProtocolExportFormat;
+  }
+  if (raw.version === PROTOCOL_COLLECTION_VERSION) {
+    if (!Array.isArray(raw.packages) || !raw.packages.length) throw new Error("Coleção deve conter pacotes.");
+    return { ...clone(raw), version: PROTOCOL_COLLECTION_VERSION, packages: raw.packages.map(p => {
+      const converted = convertToUserTemplatePackage(p);
+      if (converted.version === PROTOCOL_COLLECTION_VERSION) throw new Error("Coleções aninhadas não são suportadas.");
+      return converted;
+    }) } as ProtocolCollectionFormat;
+  }
+  if (raw.version !== "2.18" && raw.version !== "1.0") throw new Error(`Versão fonte não autorizada para template: ${String(raw.version)}.`);
+  if (!Array.isArray(raw.protocols) || !raw.protocols.length || !raw.protocols.every(isObject)) throw new Error("protocols deve conter documentos JSON.");
+  const brecadd = raw.version === "1.0";
+  if (brecadd && !raw.protocols.every(document => typeof document.name === "string" && /BrECADD/i.test(document.name)))
+    throw new Error("Fonte 1.0 autorizada somente para planos BrECADD explícitos.");
+  const { protocols, ...sourceEnvelope } = clone(raw);
+  const documents = (protocols as JsonObject[]).map(original => {
+    const document = clone(original);
+    if (Object.hasOwn(document, "templateUsage") || Object.hasOwn(document, "sourceDocument")) throw new Error("Fonte não pode disfarçar um documento de template preexistente.");
+    if (brecadd) {
+      document.id = `brecadd-${protocolContentSha256({ name: document.name, document })}`;
+      if (!Array.isArray(document.drugs)) throw new Error("BrECADD exige drogas explícitas.");
+      document.drugs = document.drugs.map((drug, index) => {
+        if (!isObject(drug)) throw new Error("Droga inválida.");
+        const days = staticTemplateDays(drug.days);
+        return {
+          ...drug, id: `brecadd-drug-${protocolContentSha256({ documentId: document.id, index, drug })}`,
+          ...(days ? { schedule: [{ dose: drug.dose, doseUnit: drug.doseUnit, days, timeOrigin: "cycle_day_one", administrationsPerDay: 1, doseRepresents: "per_administration" }] } : {}),
+        };
+      });
+    }
+    return { ...document, cycles: document.cycles ?? null, cycleLength: document.cycleLength ?? null,
+      sourceDocument: original, sourceDocumentSha256: protocolContentSha256(original),
+      templateUsage: { kind: "user_managed", status: "active", prescriptionEnabled: true } } as unknown as ProtocolDocument;
+  });
+  const normalized: ProtocolExportFormat = {
+    ...clone(sourceEnvelope), version: USER_TEMPLATE_VERSION,
+    metadata: { ...(isObject(sourceEnvelope.metadata) ? sourceEnvelope.metadata : {}), importMode: "user_template", sourceVersion: raw.version, sourceSha256: protocolContentSha256(raw) },
+    sourceEnvelope, protocols: documents,
+  };
+  const errors = validateImportFormat(normalized);
+  if (errors.length) throw new Error(`Erros de validação: ${errors.join("; ")}`);
+  return normalized;
 }

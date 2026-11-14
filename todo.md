@@ -801,3 +801,19 @@ Desenho aprovado pelo usuário: `/home/ubuntu/protocolos-integracao/desenho-inte
 - [x] Vincular hidratação às drogas efetivas; não inferir cisplatina em R-ICE ou ifosfamida em FLAG-Ida; exibir requisitos múltiplos sem somar esquemas.
 - [x] Auditar determinísticamente os 52 documentos, rodar suíte completa/TypeScript/build e validar navegador com dados fictícios. Dez verificações de interface passaram. Testes legados de CRUD isolados do banco; revertidos estritamente oito registros fictícios criados pela execução anterior, com backup; nenhum paciente ou prescrição alterado.
 - [x] Preparar entrega com documento exportável intacto, relatório de integração e auditoria de calendários; 648 testes/28 arquivos, TypeScript, build e round-trip aprovados. Checkpoint restaurável salva o estado de entrega.
+
+---
+
+## Templates ativos e importação de 53 protocolos — 14/11/2026
+
+Desenho aprovado: `/home/ubuntu/protocolos-integracao/desenho-templates-utilizaveis-2026-11-14.md`. Não implementar página IndexedDB ou checklists; não liberar rascunhos antigos.
+
+- [x] Criar formato de template gerenciado pelo usuário, normalização lossless 2.18/BrECADD 1.0, rastreabilidade e importação idempotente; preservar arquivos originais e cadastros existentes.
+- [x] Separar templates ativos de rascunhos; resolver extensões/fases sem escolhas inferidas; mapear doses/unidades/frequências/contexto às saídas.
+- [x] Confirmar autoridade do registro armazenado e propriedade; revalidar contexto/doses no backend e impedir spoof de templates para liberar rascunhos antigos. Auditoria server-side preservada no histórico, sem confiança em flags do cliente.
+- [x] Integrar catálogo, painel, salvamento, cópia/PDF/impressão e suporte; impedir saída parcial, vazia ou não resolvida. Impressão respeita PdfSections.
+- [x] Executar testes RED/GREEN: 733 testes/40 arquivos, TypeScript e build aprovados. Navegador: 13 verificações em interface real, zero gravações externas. Fixture original incluída no projeto para reproduzir os testes. Documentos usam eGFR indexado e não indicam ajuste automático/dose completa pelo status renal do template. Gerenciador rotula corretamente os 53 templates ativos.
+- [x] Autenticar conta e importar efetivamente: 53 importados, zero ignorados; 53 ativos confirmados no banco. Conta não possuía cadastros customizados anteriores. Nenhum paciente ou prescrição médica criado durante a validação.
+- [x] Preparar entrega com arquivo compatível, comprovante de importação e limites remanescentes. Checkpoint restaurável será salvo na entrega; publicação deve ser acionada no painel do Manus para atualizar o domínio existente.
+
+Limites: decisões de idade/nível/alternativas ainda não interpretadas exigem revisão do JSON completo; não existe editor gráfico avançado novo. Fase e GFR absoluto possuem controles explícitos. Antiemese e resgates não são preenchidos por esquema genérico. A biblioteca antiga permanece bloqueada e separada dos templates ativos.

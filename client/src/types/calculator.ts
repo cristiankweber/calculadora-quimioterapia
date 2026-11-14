@@ -3,7 +3,7 @@
 export interface PatientData {
   name: string;
   age: number;
-  sex: 'M' | 'F';
+  sex: "M" | "F";
   weight: number; // kg
   height: number; // cm
   creatinine: number; // mg/dL
@@ -15,7 +15,7 @@ export interface PatientData {
 export interface CalculatedValues {
   bsa: number; // m² - Body Surface Area
   egfr: number; // mL/min/1.73m² - eGFR CKD-EPI 2021
-  renalStatus: 'green' | 'yellow' | 'red';
+  renalStatus: "green" | "yellow" | "red";
   renalStatusLabel: string;
   ecogAdjustmentFactor: number;
   globalAdjustmentFactor: number;
@@ -24,13 +24,27 @@ export interface CalculatedValues {
 export interface Drug {
   name: string;
   dose: number;
-  doseUnit: 'mg/m²' | 'mg/kg' | 'mg' | 'AUC' | 'mcg/kg' | 'cGy';
+  doseUnit:
+    | "mg/m²"
+    | "mg/kg"
+    | "mg"
+    | "AUC"
+    | "mcg/kg"
+    | "cGy"
+    | "mcg/m²"
+    | "mcg"
+    | "UI/m²";
   maxDose?: number; // Dose máxima absoluta em mg
   calculatedDose?: number;
+  resultUnit?: string;
+  frequency?: number | null;
+  dailyDose?: number | null;
+  timeOrigin?: string;
+  doseRepresents?: string;
   route: string;
   days: string;
   observations?: string;
-  emetogenicRisk?: 'high' | 'moderate' | 'low' | 'minimal';
+  emetogenicRisk?: "high" | "moderate" | "low" | "minimal";
   renalAdjustment?: string;
   hepaticAdjustment?: string;
 }
@@ -48,11 +62,18 @@ export interface Protocol {
   prophylaxis: string[];
   nursingCare: string[];
   specialAlerts: string[];
-  emetogenicRisk: 'high' | 'moderate' | 'low' | 'minimal';
+  emetogenicRisk: "high" | "moderate" | "low" | "minimal";
   /** Documento fonte preservado: não é uma prescrição automaticamente liberada. */
   clinicalDocument?: Record<string, unknown>;
   clinicalPackage?: Record<string, unknown>;
-  libraryKind?: 'reviewed' | 'custom' | 'legacy';
+  libraryKind?: "reviewed" | "custom" | "legacy" | "templates";
+  isUserTemplate?: boolean;
+  templateContext?: {
+    cycle: number;
+    phaseId?: string;
+    day?: number;
+    gfrForCalvert?: number;
+  };
 }
 
 export interface CumulativeDose {
@@ -62,11 +83,11 @@ export interface CumulativeDose {
   totalDose: number;
   limit: number;
   percentage: number;
-  alertLevel: 'safe' | 'warning' | 'near-limit' | 'exceeded';
+  alertLevel: "safe" | "warning" | "near-limit" | "exceeded";
 }
 
 export interface AntiemeticProphylaxis {
-  risk: 'high' | 'moderate' | 'low' | 'minimal';
+  risk: "high" | "moderate" | "low" | "minimal";
   day1: string[];
   days2to4: string[];
   rescue: string[];

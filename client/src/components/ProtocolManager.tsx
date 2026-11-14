@@ -2,6 +2,7 @@ import React, { useState, useCallback, useMemo, useRef } from "react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { isEnrichedClinicalDocument } from "@shared/clinicalProtocols/library";
+import { isActiveTemplateDocument } from "@shared/clinicalProtocols/templates";
 import {
   Card,
   CardContent,
@@ -849,7 +850,11 @@ export default function ProtocolManager() {
                           variant="outline"
                           className="text-xs border-amber-300 text-amber-900"
                         >
-                          Rascunho · somente consulta
+                          {isActiveTemplateDocument(protocol.clinicalDocument)
+                            ? protocol.isActive === 1
+                              ? "Template ativo · validar antes de administrar"
+                              : "Template do usuário"
+                            : "Rascunho · somente consulta"}
                         </Badge>
                       )}
                       {(protocol as any).isSystem === 1 && (
@@ -909,10 +914,11 @@ export default function ProtocolManager() {
                           )}
                         </summary>
                         <p className="my-2 text-muted-foreground">
-                          Para simular calendário e doses, selecione este
-                          protocolo na calculadora. Revisões devem ser
-                          importadas em JSON completo, sem remover políticas de
-                          segurança.
+                          {isActiveTemplateDocument(protocol.clinicalDocument)
+                            ? "Selecione este template na calculadora para consultar a agenda e prescrever após resolver as decisões necessárias. Revise antes de administrar."
+                            : "Para simular calendário e doses, selecione este protocolo na calculadora."}{" "}
+                          Revisões devem ser importadas em JSON completo, sem
+                          remover decisões e calendários.
                         </p>
                         <pre className="max-h-80 overflow-auto rounded-md bg-muted p-3 text-xs">
                           {JSON.stringify(protocol.clinicalDocument, null, 2)}

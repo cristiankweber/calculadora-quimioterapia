@@ -50,6 +50,7 @@ export default function ProtocolSelector({
   onCycleChange,
 }: ProtocolSelectorProps) {
   const [kind, setKind] = useState<CatalogueKind>("reviewed");
+  const [libraryChosen, setLibraryChosen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [showSuggestions, setShowSuggestions] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -67,6 +68,17 @@ export default function ProtocolSelector({
       ),
     [kind, storedProtocols]
   );
+  useEffect(() => {
+    if (
+      !libraryChosen &&
+      !selectedProtocol &&
+      getClinicalCatalogue(
+        "templates",
+        (storedProtocols ?? []) as unknown as Record<string, unknown>[]
+      ).length > 0
+    )
+      setKind("templates");
+  }, [libraryChosen, selectedProtocol, storedProtocols]);
   const filteredProtocols = useMemo(
     () =>
       protocolList.filter(
@@ -111,8 +123,9 @@ export default function ProtocolSelector({
       <CardHeader>
         <CardTitle>Seleção de protocolo</CardTitle>
         <CardDescription>
-          52 documentos revisados para consulta e simulação. Homologação clínica
-          não concedida.
+          {kind === "templates"
+            ? "Templates ativos da sua conta. Revise a seleção antes de administrar."
+            : "Bibliotecas de consulta e protocolos da conta, preservadas separadamente."}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -121,6 +134,7 @@ export default function ProtocolSelector({
           <Select
             value={kind}
             onValueChange={value => {
+              setLibraryChosen(true);
               setKind(value as CatalogueKind);
               setSearchTerm("");
               onProtocolChange(null);
@@ -130,6 +144,9 @@ export default function ProtocolSelector({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
+              <SelectItem value="templates">
+                Templates ativos do usuário
+              </SelectItem>
               <SelectItem value="reviewed">
                 Revisados — rascunhos clínicos
               </SelectItem>
@@ -150,10 +167,10 @@ export default function ProtocolSelector({
             antiga.
           </p>
         )}
-        {kind === "custom" && !isAuthenticated && (
+        {(kind === "custom" || kind === "templates") && !isAuthenticated && (
           <p className="text-sm text-muted-foreground">
-            Entre na sua conta pelo Dashboard para consultar seus
-            personalizados. A biblioteca revisada não exige login.
+            Entre na sua conta pelo Dashboard para consultar seus protocolos e
+            templates. A biblioteca revisada não exige login.
           </p>
         )}
         {isError && (
