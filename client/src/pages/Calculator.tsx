@@ -57,6 +57,13 @@ import { trpc } from "@/lib/trpc";
 import { usePatientCalculations } from "@/hooks/usePatientCalculations";
 import { useProtocolDoseCalculation } from "@/hooks/useProtocolDoseCalculation";
 import { usePrescriptionActions } from "@/hooks/usePrescriptionActions";
+import { usePatientSession, emptyPatient } from "@/hooks/usePatientSession";
+import {
+  readPrescriptionHistory,
+  preparePrescriptionReuse,
+  type PrescriptionHistorySnapshot,
+} from "@/hooks/prescriptionHistoryAdapter";
+import { getClinicalCatalogue } from "@/lib/clinicalCatalogue";
 
 import {
   FileDown,
@@ -74,34 +81,22 @@ export default function Calculator() {
   const [, setLocation] = useLocation();
 
   // ── Estado do Paciente ──────────────────────────────────────────────────
-  const [patientData, setPatientData] = useState<PatientData>({
-    name: "",
-    age: 0,
-    sex: "M",
-    weight: 0,
-    height: 0,
-    creatinine: 0,
-    bilirubin: 0,
-    ecog: 0,
-    comorbidities: "",
-  });
-
-  const handlePatientChange = useCallback((newData: PatientData) => {
-    setPatientData(prev => {
-      for (const key in newData) {
-        if (
-          newData[key as keyof PatientData] !== prev[key as keyof PatientData]
-        ) {
-          return newData;
-        }
-      }
-      return prev;
-    });
-  }, []);
+  const {
+    patientData,
+    patientId,
+    sessionKey,
+    editPatient: handlePatientChange,
+    transitionPatient,
+  } = usePatientSession();
+  const [historySnapshot, setHistorySnapshot] =
+    useState<PrescriptionHistorySnapshot | null>(null);
+  const [historyWarning, setHistoryWarning] = useState("");
 
   // ── Cálculos do Paciente (BSA, eGFR, etc.) ─────────────────────────────
-  const { calculatedValues, validationErrors } =
-    usePatientCalculations(patientData);
+  const { calculatedValues, validationErrors } = usePatientCalculations(
+    patientData,
+    sessionKey
+  );
 
   // ── Estado do Protocolo ─────────────────────────────────────────────────
   const [selectedProtocol, setSelectedProtocol] = useState<Protocol | null>(
@@ -178,6 +173,8 @@ export default function Calculator() {
       patientAge: patientData.age,
       patientSex: patientData.sex,
       patientCreatinine: patientData.creatinine,
+      sessionKey,
+      calvertGfrAbsolute: patientData.calvertGfrAbsolute,
     });
   const templateIssues = useMemo(
     () =>
@@ -209,8 +206,19 @@ export default function Calculator() {
               gfrForCalvert: clinicalSelection.gfrForCalvert,
             },
           }
-        : selectedProtocol,
-    [selectedProtocol, isUserTemplate, selectedCycle, clinicalSelection]
+        : selectedProtocol
+          ? {
+              ...selectedProtocol,
+              calvertGfrAbsolute: patientData.calvertGfrAbsolute,
+            }
+          : null,
+    [
+      selectedProtocol,
+      isUserTemplate,
+      selectedCycle,
+      clinicalSelection,
+      patientData.calvertGfrAbsolute,
+    ]
   );
   const prescriptionValues = useMemo(
     () =>
@@ -280,6 +288,25 @@ export default function Calculator() {
   const { data: institutionSettings } = trpc.settings.get.useQuery(undefined, {
     enabled: isAuthenticated,
   });
+  const { data: storedProtocols } = trpc.customProtocols.listActive.useQuery(
+    undefined,
+    {
+      enabled: isAuthenticated,
+      staleTime: 30_000,
+    }
+  );
+  const currentCatalogue = useMemo(() => {
+    const records = (storedProtocols ?? []) as unknown as Record<
+      string,
+      unknown
+    >[];
+    return ["templates", "custom", "reviewed", "legacy"].flatMap(kind =>
+      getClinicalCatalogue(
+        kind as "templates" | "custom" | "reviewed" | "legacy",
+        records
+      )
+    );
+  }, [storedProtocols]);
 
   // ── Ações de Prescrição (salvar, copiar, PDF, imprimir) ─────────────────
   const {
@@ -303,6 +330,8 @@ export default function Calculator() {
     institutionSettings,
     hydrationSupportData,
     clinicalIssues: templateIssues,
+    patientId,
+    sessionKey,
   });
 
   // ── Dados do Paciente para Emergência ───────────────────────────────────
@@ -330,21 +359,39 @@ export default function Calculator() {
 
   // ── Carregar Histórico ──────────────────────────────────────────────────
   const handleLoadPatient = useCallback(
-    (loadedPatient: PatientData, prescriptionData?: any) => {
-      setPatientData(loadedPatient);
-
-      if (prescriptionData) {
-        if (prescriptionData.protocol)
-          setSelectedProtocol(prescriptionData.protocol);
-        if (prescriptionData.cycle) setSelectedCycle(prescriptionData.cycle);
-        setClinicalSelection({ cycle: prescriptionData.cycle || 1 });
-        if (prescriptionData.calculatedDrugs)
-          setCalculatedDrugs(prescriptionData.calculatedDrugs);
-        if (prescriptionData.toxicities)
-          setToxicities(prescriptionData.toxicities);
-      }
+    (
+      loadedPatient: PatientData,
+      prescriptionData?: unknown,
+      loadedId?: number,
+      expectedEpoch?: number
+    ) => {
+      const snapshot =
+        prescriptionData === undefined
+          ? null
+          : readPrescriptionHistory(prescriptionData);
+      const reuse = snapshot
+        ? preparePrescriptionReuse(loadedPatient, snapshot, currentCatalogue)
+        : null;
+      const epoch = transitionPatient(
+        reuse?.patient ?? loadedPatient,
+        loadedId,
+        expectedEpoch
+      );
+      if (epoch === undefined) return undefined;
+      setCalculatedDrugs([]);
+      setSelectedCycle(reuse?.cycle ?? 1);
+      setClinicalSelection(reuse?.context ?? { cycle: 1 });
+      setToxicities({});
+      setHydrationSupportData(null);
+      setShowPdfPreview(false);
+      setShowPrint(false);
+      setShowEmergency(false);
+      setHistorySnapshot(snapshot);
+      setHistoryWarning(reuse?.warning ?? "");
+      if (reuse) setSelectedProtocol(reuse.protocol);
+      return epoch;
     },
-    [setCalculatedDrugs]
+    [setCalculatedDrugs, currentCatalogue, transitionPatient, setShowPrint]
   );
 
   // ── Render ──────────────────────────────────────────────────────────────
@@ -374,7 +421,16 @@ export default function Calculator() {
               >
                 <AlertCircle className="h-4 w-4 mr-2" /> EMERGÊNCIA
               </Button>
-              <PatientHistoryDB onLoadPatient={handleLoadPatient} />
+              <PatientHistoryDB
+                onLoadPatient={handleLoadPatient}
+                sessionKey={sessionKey}
+              />
+              <Button
+                variant="outline"
+                onClick={() => handleLoadPatient(emptyPatient())}
+              >
+                Novo paciente / limpar sessão
+              </Button>
               <Button
                 variant="outline"
                 onClick={handleSaveToHistory}
@@ -427,7 +483,15 @@ export default function Calculator() {
               data={patientData}
               onChange={handlePatientChange}
               validationErrors={validationErrors}
+              showCalvertGfr={
+                !clinicalDocument &&
+                Boolean(selectedProtocol?.drugs.some(d => d.doseUnit === "AUC"))
+              }
             />
+            <p className="text-xs text-muted-foreground">
+              Nome e biometria editam a sessão atual. Para outra pessoa, use
+              Novo paciente ou selecione no histórico.
+            </p>
 
             <ProtocolSelector
               selectedProtocol={selectedProtocol}
@@ -439,6 +503,40 @@ export default function Calculator() {
 
           {/* COLUNA 2 - RESULTADOS */}
           <div className="space-y-6 lg:col-span-2">
+            {historyWarning && (
+              <p
+                role="status"
+                className="rounded-md border border-amber-300 p-3 text-sm"
+              >
+                {historyWarning}
+              </p>
+            )}
+            {historySnapshot && (
+              <details className="rounded-md border p-3">
+                <summary>Snapshot histórico — consulta, sem recálculo</summary>
+                <p>
+                  {historySnapshot.patient.name} —{" "}
+                  {historySnapshot.protocol.name} — Ciclo{" "}
+                  {historySnapshot.cycle}
+                </p>
+                <p>
+                  Fase: {historySnapshot.context.phaseId ?? "não registrada"} |
+                  Dia: {historySnapshot.context.day ?? "agenda completa"} | GFR
+                  de Calvert histórico:{" "}
+                  {historySnapshot.context.gfrForCalvert ?? "não registrado"}{" "}
+                  (não carregado)
+                </p>
+                <ul>
+                  {historySnapshot.drugs.map((d, i) => (
+                    <li key={i}>
+                      {d.name}: {d.finalDose ?? "não registrada"}{" "}
+                      {d.resultUnit ?? "unidade não registrada"} {d.route} —{" "}
+                      {d.days}
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            )}
             {calculatedValues && (
               <CalculatedValuesDisplay
                 referenceOnly={Boolean(clinicalDocument)}
@@ -485,6 +583,8 @@ export default function Calculator() {
             )}
 
             <HydrationCalculator
+              key={`hydration-${sessionKey}`}
+              sessionKey={sessionKey}
               patientData={patientData}
               calculatedValues={calculatedValues}
               selectedProtocol={selectedProtocol}
@@ -495,6 +595,7 @@ export default function Calculator() {
             />
 
             <ToxicityAssessment
+              key={`toxicity-${sessionKey}`}
               toxicities={toxicities}
               onToxicityChange={(tox, grade) =>
                 setToxicities(prev => ({ ...prev, [tox]: grade }))

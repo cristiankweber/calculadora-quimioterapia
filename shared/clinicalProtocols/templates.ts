@@ -7,6 +7,32 @@ const record = (value: unknown): value is Record<string, unknown> =>
 const own = (value: object, key: string) => Object.prototype.hasOwnProperty.call(value, key);
 const positive = (value: unknown): value is number => typeof value === "number" && Number.isFinite(value) && value > 0;
 
+const decisionKeys = new Set([
+  "conditionalDoses", "selectionRequired", "chooseExactlyOneDay", "alternatives", "phaseBreak",
+  "doseSelectionRequired", "ageDoseTable", "ageTable", "doseDecision", "interactionSchedules",
+  "initialTitration", "doseLevelSelection", "arms", "treatmentArms", "arm", "alternativeSchedule",
+  "conditionalExtraDays", "taper", "programSelection", "doseVariants", "ageDoseVariants",
+  "agePerformanceVariants", "optionalAntibody", "infusionStages", "context", "condition", "selection",
+  "requiresRiskArmPhaseSelection", "requiresRiskLineageArmAndCNS", "requiresResponseBranchSelection",
+  "requiresPhaseAndResponseSelection",
+]);
+export const isClinicalDecisionKey = (key: string): boolean => decisionKeys.has(key) ||
+  /selection|selector|alternativ|doselevel|conditional|chooseexactly|^(?:arms?|treatmentarms?)$/i.test(key);
+
+/** Same gate at document, selected phase, drug and stage; archival fields are never traversed. */
+export function getClinicalDecisionIssues(value: Record<string, unknown>, scope: string, resolvedKeys: string[] = []): string[] {
+  const issues: string[] = [];
+  for (const [key, child] of Object.entries(value)) {
+    if (resolvedKeys.includes(key)) continue;
+    if (isClinicalDecisionKey(key) && child !== undefined && child !== null && child !== false &&
+      (!Array.isArray(child) || child.length > 0))
+      issues.push(`${scope}: ${key} exige seleção/ordem explícita não suportada neste contexto.`);
+    if (["extensions", "calculationPolicy"].includes(key) && record(child))
+      issues.push(...getClinicalDecisionIssues(child, `${scope}.${key}`, resolvedKeys));
+  }
+  return Array.from(new Set(issues));
+}
+
 /** UX/execution discriminator only. Ownership and stored package version are backend responsibilities. */
 export function isActiveTemplateDocument(document: unknown): boolean {
   if (!record(document) || !record(document.templateUsage)) return false;
@@ -46,7 +72,8 @@ export function getTemplateExecutionDocument(document: ClinicalProtocolDocument)
     }
     if (record(value.extensions)) {
       for (const [key, child] of Object.entries(value.extensions)) {
-        if (!clinicalExtensions.has(key)) continue;
+        if (!clinicalExtensions.has(key) && !isClinicalDecisionKey(key) &&
+          !["frequency", "administrationsPerDay", "continuousInfusion"].includes(key)) continue;
         if (own(value, key)) {
           if (canonical(value[key]) !== canonical(child))
             conflicts.push(`${path}.${key}: conflito explícito entre raiz e extensions; nenhuma variante escolhida.`);

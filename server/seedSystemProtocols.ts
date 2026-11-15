@@ -1,7 +1,8 @@
 import { createHash } from "node:crypto";
 import type { InsertCustomProtocol } from "../drizzle/schema";
 import clinicalLibrary from "../shared/data/clinicalProtocols.json";
-import { isActiveTemplateDocument, USER_TEMPLATE_VERSION } from "../shared/clinicalProtocols/templates";
+import { getTemplateExecutionDocument, isActiveTemplateDocument, USER_TEMPLATE_VERSION } from "../shared/clinicalProtocols/templates";
+import type { ClinicalProtocolDocument } from "../shared/clinicalProtocols/types";
 
 export const CLINICAL_PROTOCOL_VERSION = "2.1-source-reconciled-clinical-draft" as const;
 export const PROTOCOL_COLLECTION_VERSION = "clinical-protocol-collection-1.0" as const;
@@ -446,14 +447,46 @@ export function convertToUserTemplatePackage(raw: unknown): AnyProtocolExport {
     if (brecadd) {
       document.id = `brecadd-${protocolContentSha256({ name: document.name, document })}`;
       if (!Array.isArray(document.drugs)) throw new Error("BrECADD exige drogas explícitas.");
+      const execution = getTemplateExecutionDocument(document as unknown as ClinicalProtocolDocument);
+      const issues: string[] = [];
       document.drugs = document.drugs.map((drug, index) => {
         if (!isObject(drug)) throw new Error("Droga inválida.");
         const days = staticTemplateDays(drug.days);
+        const effective = execution.drugs[index];
+        const has = (key: string) => Object.hasOwn(effective, key);
+        const hasSchedule = has("schedule");
+        if (hasSchedule && days) {
+          const declaredDays = Array.isArray(effective.schedule) ? effective.schedule.flatMap(stage => {
+            const origin = stage.timeOrigin ?? effective.timeOrigin ?? "cycle_day_one";
+            if (!["cycle_day_one", "cycle_start"].includes(origin)) return [NaN];
+            if (Array.isArray(stage.days)) return stage.days;
+            if (typeof stage.days === "string") return staticTemplateDays(stage.days) ?? [NaN];
+            if (Number.isSafeInteger(stage.dayFrom) && Number.isSafeInteger(stage.dayTo) &&
+              Number(stage.dayTo) >= Number(stage.dayFrom) && Number(stage.dayTo) - Number(stage.dayFrom) <= 10000 &&
+              !Object.hasOwn(stage, "repeatEveryDays"))
+              return staticTemplateDays(`${stage.dayFrom}-${stage.dayTo}`) ?? [NaN];
+            return [NaN];
+          }) : [NaN];
+          const union = Array.from(new Set(declaredDays)).sort((a, b) => a - b);
+          if (canonicalProtocolJson(union) !== canonicalProtocolJson(days))
+            issues.push(`BrECADD droga ${index + 1}: days legado e schedule explícito incompatíveis ou sem compatibilidade demonstrada; não substituir agenda.`);
+        }
+        const frequencyDeclared = ["administrationFrequency", "frequency", "administrationsPerDay"].some(has);
+        const policy = isObject(execution.calculationPolicy) ? execution.calculationPolicy : {};
+        const representationDeclared = has("doseRepresents") || Object.hasOwn(policy, "doseRepresents") ||
+          [effective.administrationFrequency, effective.frequency].some(value => isObject(value) && Object.hasOwn(value, "doseRepresents"));
         return {
-          ...drug, id: `brecadd-drug-${protocolContentSha256({ documentId: document.id, index, drug })}`,
-          ...(days ? { schedule: [{ dose: drug.dose, doseUnit: drug.doseUnit, days, timeOrigin: "cycle_day_one", administrationsPerDay: 1, doseRepresents: "per_administration" }] } : {}),
+          ...drug, id: Object.hasOwn(drug, "id") ? drug.id : `brecadd-drug-${protocolContentSha256({ documentId: document.id, index, drug })}`,
+          ...(!hasSchedule && days ? { schedule: [{ dose: drug.dose, doseUnit: drug.doseUnit, days,
+            ...(!has("timeOrigin") ? { timeOrigin: "cycle_day_one" } : {}),
+            ...(!frequencyDeclared ? { administrationsPerDay: 1 } : {}),
+            ...(!representationDeclared ? { doseRepresents: "per_administration" } : {}),
+          }] } : {}),
         };
       });
+      if (issues.length) document.templateExecutionIssues = [
+        ...(Array.isArray(document.templateExecutionIssues) ? document.templateExecutionIssues : []), ...issues,
+      ];
     }
     return { ...document, cycles: document.cycles ?? null, cycleLength: document.cycleLength ?? null,
       sourceDocument: original, sourceDocumentSha256: protocolContentSha256(original),

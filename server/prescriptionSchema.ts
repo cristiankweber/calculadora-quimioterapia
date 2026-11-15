@@ -152,6 +152,7 @@ export const prescriptionDataSchemaV2 = z.object({
     category: z.string().optional(),
     indication: z.string().optional(),
     emetogenicRisk: z.string().optional(),
+    calvertGfrAbsolute: positiveNumber.optional(),
     cycle: z.number().int().min(1).optional(),
     totalCycles: z.number().int().min(1).optional(),
     clinicalDocument: z.record(z.string(), z.unknown()).optional(),
@@ -355,6 +356,16 @@ export const createPrescriptionInputSchema = z
         });
       }
       return;
+    }
+    if (
+      input.prescriptionData.drugs.some(drug => drug.doseUnit === "AUC") &&
+      protocol.calvertGfrAbsolute === undefined
+    ) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["prescriptionData", "protocol", "calvertGfrAbsolute"],
+        message: "Calvert exige GFR absoluto explícito em mL/min; eGFR indexado não é uma entrada de dose.",
+      });
     }
     const reason =
       getPrescriptionBlockReason(protocol) ??

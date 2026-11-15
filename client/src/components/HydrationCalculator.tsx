@@ -84,6 +84,7 @@ interface HydrationCalculatorProps {
   selectionResolved?: boolean;
   proposalOnly?: boolean;
   onDataChange?: (data: HydrationSupportData) => void;
+  sessionKey?: string | number;
 }
 
 const SupportProposalContext = createContext(false);
@@ -92,7 +93,11 @@ const SupportProposalContext = createContext(false);
 // COMPONENTE PRINCIPAL
 // ═══════════════════════════════════════════════════════════════════════════════
 
-export default function HydrationCalculator({
+export default function HydrationCalculator(props: HydrationCalculatorProps) {
+  return <HydrationSession key={props.sessionKey ?? 0} {...props} />;
+}
+
+function HydrationSession({
   patientData,
   calculatedValues,
   selectedProtocol,

@@ -1,84 +1,60 @@
-/**
- * Hook que encapsula o cálculo de valores derivados do paciente (BSA, eGFR, etc.).
- *
- * Responsabilidades:
- * - Calcular BSA, eGFR, classificação renal, fatores de ajuste
- * - Debounce de 300ms para evitar recálculos durante digitação
- * - Validação de campos obrigatórios
- * - Proteção contra NaN/Infinity
- */
-
-import { useState, useEffect, useRef, useMemo } from 'react';
-import type { PatientData, CalculatedValues } from '@/types/calculator';
-import { calculateDerivedValues } from '@shared/clinicalDoseEngine';
+import { useState, useEffect } from "react";
+import type { PatientData, CalculatedValues } from "@/types/calculator";
+import { calculateDerivedValues } from "@shared/clinicalDoseEngine";
 
 interface UsePatientCalculationsReturn {
   calculatedValues: CalculatedValues | null;
   validationErrors: Set<keyof PatientData>;
 }
 
-const DEBOUNCE_MS = 300;
-
+/** Results are tagged with their clinical inputs: stale debounced values never escape. */
 export function usePatientCalculations(
-  patientData: PatientData
+  patientData: PatientData,
+  sessionKey: string | number = 0
 ): UsePatientCalculationsReturn {
-  const [calculatedValues, setCalculatedValues] = useState<CalculatedValues | null>(null);
-  const [validationErrors, setValidationErrors] = useState<Set<keyof PatientData>>(new Set());
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // Extrair apenas campos relevantes para cálculo (evita recálculo ao mudar nome/comorbidades)
   const { age, sex, weight, height, creatinine, ecog } = patientData;
+  const inputKey = JSON.stringify([
+    sessionKey,
+    age,
+    sex,
+    weight,
+    height,
+    creatinine,
+    ecog,
+  ]);
+  const [result, setResult] = useState<{
+    key: string;
+    values: CalculatedValues | null;
+  } | null>(null);
+  const validationErrors = new Set<keyof PatientData>();
+  if (!Number.isFinite(weight) || weight <= 0) validationErrors.add("weight");
+  if (!Number.isFinite(height) || height <= 0) validationErrors.add("height");
+  if (!Number.isFinite(creatinine) || creatinine <= 0)
+    validationErrors.add("creatinine");
+  const valid = validationErrors.size === 0 && Number.isFinite(age) && age > 0;
 
   useEffect(() => {
-    // Validação de campos obrigatórios
-    const errors = new Set<keyof PatientData>();
-    if (!weight || weight <= 0) errors.add('weight');
-    if (!height || height <= 0) errors.add('height');
-    if (!creatinine || creatinine <= 0) errors.add('creatinine');
-
-    if (errors.size > 0) {
-      setValidationErrors(errors);
-      setCalculatedValues(null);
-      return;
-    }
-
-    setValidationErrors(new Set());
-
-    // Debounce para evitar recálculos durante digitação rápida
-    if (debounceRef.current) {
-      clearTimeout(debounceRef.current);
-    }
-
-    debounceRef.current = setTimeout(() => {
-      if (age > 0 && weight > 0 && height > 0 && creatinine > 0) {
-        const result = calculateDerivedValues({ age, sex, weight, height, creatinine, ecog });
-        if (result) {
-          setCalculatedValues(prev => {
-            // Comparação rasa para evitar re-renders desnecessários
-            if (
-              prev &&
-              prev.bsa === result.bsa &&
-              prev.egfr === result.egfr &&
-              prev.renalStatus === result.renalStatus &&
-              prev.ecogAdjustmentFactor === result.ecogAdjustmentFactor &&
-              prev.globalAdjustmentFactor === result.globalAdjustmentFactor
-            ) {
-              return prev;
-            }
-            return result;
-          });
-        } else {
-          setCalculatedValues(null);
-        }
-      } else {
-        setCalculatedValues(null);
-      }
-    }, DEBOUNCE_MS);
-
+    if (!valid) return;
+    let cancelled = false;
+    const timeout = setTimeout(() => {
+      const values = calculateDerivedValues({
+        age,
+        sex,
+        weight,
+        height,
+        creatinine,
+        ecog,
+      });
+      if (!cancelled) setResult({ key: inputKey, values });
+    }, 300);
     return () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
+      cancelled = true;
+      clearTimeout(timeout);
     };
-  }, [age, sex, weight, height, creatinine, ecog]);
+  }, [inputKey, valid, age, sex, weight, height, creatinine, ecog]);
 
-  return { calculatedValues, validationErrors };
+  return {
+    calculatedValues: valid && result?.key === inputKey ? result.values : null,
+    validationErrors,
+  };
 }

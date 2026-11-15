@@ -63,7 +63,10 @@ export interface DrugDoseInput {
   weight: number;
   adjustmentFactor?: number;
   maxDose?: number;
+  /** Estimativa indexada; nunca utilizada como entrada de Calvert. */
   egfr?: number;
+  /** GFR absoluto explicitamente validado, em mL/min (não indexado). */
+  gfrAbsolute?: number;
 }
 
 export interface CumulativeResult {
@@ -239,7 +242,7 @@ export function calculateDrugDose(input: DrugDoseInput): number {
     weight,
     adjustmentFactor = 1.0,
     maxDose,
-    egfr,
+    gfrAbsolute,
   } = input;
 
   if (!Number.isFinite(baseDose) || baseDose <= 0) return 0;
@@ -258,8 +261,8 @@ export function calculateDrugDose(input: DrugDoseInput): number {
       calculatedDose = baseDose * weight;
       break;
     case "AUC":
-      if (egfr === undefined || !Number.isFinite(egfr)) return baseDose;
-      calculatedDose = baseDose * (egfr + 25);
+      if (!isPositiveFinite(gfrAbsolute ?? NaN)) return 0;
+      calculatedDose = baseDose * (gfrAbsolute! + 25);
       break;
     case "mg":
     case "mcg":
@@ -286,7 +289,10 @@ export function calculateDrugDose(input: DrugDoseInput): number {
     calculatedDose = maxDose;
   }
 
-  return safeRound(calculatedDose, 1);
+  // A resolução de 0,1 não representa doses menores: preservar seu valor em vez de promover/zerar.
+  if (isPositiveFinite(calculatedDose) && calculatedDose < 0.1) return calculatedDose;
+  const rounded = safeRound(calculatedDose, 1);
+  return maxDose !== undefined && isPositiveFinite(maxDose) ? Math.min(rounded, maxDose) : rounded;
 }
 
 /**
@@ -300,7 +306,7 @@ export function calculateDrugDoseLegacy(
   weight: number,
   adjustmentFactor: number = 1.0,
   maxDose?: number,
-  egfr?: number
+  gfrAbsolute?: number
 ): number {
   return calculateDrugDose({
     baseDose,
@@ -309,7 +315,7 @@ export function calculateDrugDoseLegacy(
     weight,
     adjustmentFactor,
     maxDose,
-    egfr,
+    gfrAbsolute,
   });
 }
 

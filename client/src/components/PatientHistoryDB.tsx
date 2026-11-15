@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Button } from '@/components/ui/button';
+import React, { useState, useRef, useEffect } from "react";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -7,44 +7,66 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Search } from 'lucide-react';
-import { Label } from '@/components/ui/label';
-import { toast } from 'sonner';
-import type { PatientData } from '@/types/calculator';
-import { trpc } from '@/lib/trpc';
-import PatientHistorySkeleton from '@/components/PatientHistorySkeleton';
-import PatientPrescriptionHistory from '@/components/PatientPrescriptionHistory';
-import { normalizeLabValue } from '@/lib/normalizeLabValue';
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Search } from "lucide-react";
+import { Label } from "@/components/ui/label";
+import { toast } from "sonner";
+import type { PatientData } from "@/types/calculator";
+import { trpc } from "@/lib/trpc";
+import PatientHistorySkeleton from "@/components/PatientHistorySkeleton";
+import PatientPrescriptionHistory from "@/components/PatientPrescriptionHistory";
+import { normalizeLabValue } from "@/lib/normalizeLabValue";
 
 interface PatientHistoryDBProps {
-  onLoadPatient: (patient: PatientData, prescriptionData?: any) => void;
+  onLoadPatient: (
+    patient: PatientData,
+    prescriptionData?: unknown,
+    patientId?: number,
+    expectedEpoch?: number
+  ) => number | undefined;
+  sessionKey?: number;
 }
 
-export default function PatientHistoryDB({ onLoadPatient }: PatientHistoryDBProps) {
+export default function PatientHistoryDB({
+  onLoadPatient,
+  sessionKey,
+}: PatientHistoryDBProps) {
   const [open, setOpen] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
+  const loadRequest = useRef(0);
+  const latest = useRef({ onLoadPatient, sessionKey });
+  latest.current = { onLoadPatient, sessionKey };
+  useEffect(
+    () => () => {
+      loadRequest.current++;
+    },
+    []
+  );
   const ITEMS_PER_PAGE = 10;
 
   // Buscar pacientes do banco de dados
-  const { data: patients = [], refetch, isLoading } = trpc.patients.list.useQuery(undefined, {
+  const {
+    data: patients = [],
+    refetch,
+    isLoading,
+  } = trpc.patients.list.useQuery(undefined, {
     enabled: open, // Só busca quando o dialog está aberto
   });
 
   const deleteMutation = trpc.patients.delete.useMutation({
     onSuccess: () => {
-      toast.success('Paciente removido do histórico');
+      toast.success("Paciente removido do histórico");
       refetch();
     },
-    onError: (error) => {
+    onError: error => {
       toast.error(`Erro ao remover paciente: ${error.message}`);
     },
   });
 
   // Filtrar por nome
-  const filteredPatients = patients.filter((p) =>
+  const filteredPatients = patients.filter(p =>
     p.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
@@ -72,28 +94,53 @@ export default function PatientHistoryDB({ onLoadPatient }: PatientHistoryDBProp
       creatinine: normalizeLabValue(Number(patient.creatinine)), // Normalizar valores legados
       bilirubin: normalizeLabValue(Number(patient.bilirubin)),
       ecog: patient.ecog,
-      comorbidities: patient.comorbidities || '',
+      comorbidities: patient.comorbidities || "",
     };
 
+    const request = ++loadRequest.current;
+    // Switch identity NOW, not when history I/O finishes. The parent clears all old clinical state.
+    const epoch = latest.current.onLoadPatient(
+      patientData,
+      undefined,
+      patient.id
+    );
+    setOpen(false);
+    if (epoch === undefined) return;
+    const isCurrent = () =>
+      request === loadRequest.current &&
+      (latest.current.sessionKey === undefined ||
+        latest.current.sessionKey === epoch);
     // Tentar buscar última prescrição
     try {
-      const prescriptions = await utils.prescriptions.getByPatient.fetch({ patientId: patient.id });
-      const lastPrescription = prescriptions && prescriptions.length > 0 ? prescriptions[0] : null;
-      
-      onLoadPatient(patientData, lastPrescription?.prescriptionData);
-      
+      const prescriptions = await utils.prescriptions.getByPatient.fetch({
+        patientId: patient.id,
+      });
+      if (!isCurrent()) return;
+      const lastPrescription = [...(prescriptions ?? [])].sort(
+        (a, b) =>
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      )[0];
       if (lastPrescription) {
-        toast.success(`Paciente ${patient.name} carregado com última prescrição (${lastPrescription.protocolName})`);
+        const applied = latest.current.onLoadPatient(
+          patientData,
+          lastPrescription.prescriptionData,
+          patient.id,
+          epoch
+        );
+        if (applied === undefined) return;
+        toast.success(
+          `Paciente ${patient.name}: snapshot histórico disponível; cadastro atual preparado para nova prescrição`
+        );
       } else {
-        toast.success(`Paciente ${patient.name} carregado (sem prescrições anteriores)`);
+        toast.success(
+          `Paciente ${patient.name} carregado (sem prescrições anteriores)`
+        );
       }
     } catch (error) {
-      // Se falhar ao buscar prescrição, carregar apenas dados do paciente
-      onLoadPatient(patientData);
+      if (!isCurrent()) return;
+      // Patient was already switched safely; do not restore the old session on I/O failure.
       toast.success(`Paciente ${patient.name} carregado`);
     }
-    
-    setOpen(false);
   };
 
   const handleDeletePatient = (id: number, name: string) => {
@@ -128,7 +175,8 @@ export default function PatientHistoryDB({ onLoadPatient }: PatientHistoryDBProp
         <DialogHeader>
           <DialogTitle>Histórico de Pacientes</DialogTitle>
           <DialogDescription>
-            Selecione um paciente para carregar seus dados ou remova registros antigos
+            Selecione um paciente para carregar seus dados ou remova registros
+            antigos
           </DialogDescription>
         </DialogHeader>
 
@@ -142,7 +190,7 @@ export default function PatientHistoryDB({ onLoadPatient }: PatientHistoryDBProp
                 type="text"
                 placeholder="Digite o nome do paciente..."
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                onChange={e => setSearchTerm(e.target.value)}
                 className="pl-9"
               />
             </div>
@@ -158,56 +206,63 @@ export default function PatientHistoryDB({ onLoadPatient }: PatientHistoryDBProp
           ) : filteredPatients.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               {searchTerm
-                ? 'Nenhum paciente encontrado com esse nome'
-                : 'Nenhum paciente salvo no histórico'}
+                ? "Nenhum paciente encontrado com esse nome"
+                : "Nenhum paciente salvo no histórico"}
             </div>
           ) : (
             <>
               <div className="space-y-2">
-                {paginatedPatients.map((patient) => (
-                <div
-                  key={patient.id}
-                  className="flex items-center justify-between p-4 border rounded-lg hover:bg-accent/50 transition-colors"
-                >
-                  <div className="flex-1">
-                    <div className="font-medium">{patient.name}</div>
-                    <div className="text-sm text-muted-foreground">
-                      {patient.age} anos • {patient.sex === 'M' ? 'Masculino' : 'Feminino'} •{' '}
-                      {patient.weight}kg • {patient.height}cm
+                {paginatedPatients.map(patient => (
+                  <div
+                    key={patient.id}
+                    className="flex items-center justify-between p-4 border rounded-lg hover:bg-accent/50 transition-colors"
+                  >
+                    <div className="flex-1">
+                      <div className="font-medium">{patient.name}</div>
+                      <div className="text-sm text-muted-foreground">
+                        {patient.age} anos •{" "}
+                        {patient.sex === "M" ? "Masculino" : "Feminino"} •{" "}
+                        {patient.weight}kg • {patient.height}cm
+                      </div>
+                      <div className="text-xs text-muted-foreground mt-1">
+                        Última atualização:{" "}
+                        {new Date(patient.updatedAt).toLocaleDateString(
+                          "pt-BR"
+                        )}
+                      </div>
                     </div>
-                    <div className="text-xs text-muted-foreground mt-1">
-                      Última atualização: {new Date(patient.updatedAt).toLocaleDateString('pt-BR')}
+                    <div className="flex gap-2">
+                      <PatientPrescriptionHistory
+                        patientId={patient.id}
+                        patientName={patient.name}
+                      />
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleLoadPatient(patient)}
+                      >
+                        Carregar
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        onClick={() =>
+                          handleDeletePatient(patient.id, patient.name)
+                        }
+                      >
+                        Remover
+                      </Button>
                     </div>
                   </div>
-                  <div className="flex gap-2">
-                    <PatientPrescriptionHistory 
-                      patientId={patient.id} 
-                      patientName={patient.name}
-                    />
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => handleLoadPatient(patient)}
-                    >
-                      Carregar
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="destructive"
-                      onClick={() => handleDeletePatient(patient.id, patient.name)}
-                    >
-                      Remover
-                    </Button>
-                  </div>
-                </div>
-              ))}
+                ))}
               </div>
 
               {/* Controles de paginação */}
               {totalPages > 1 && (
                 <div className="flex items-center justify-between pt-4 border-t">
                   <div className="text-sm text-muted-foreground">
-                    Página {currentPage} de {totalPages} ({filteredPatients.length} pacientes)
+                    Página {currentPage} de {totalPages} (
+                    {filteredPatients.length} pacientes)
                   </div>
                   <div className="flex gap-2">
                     <Button
@@ -221,7 +276,9 @@ export default function PatientHistoryDB({ onLoadPatient }: PatientHistoryDBProp
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                      onClick={() =>
+                        setCurrentPage(p => Math.min(totalPages, p + 1))
+                      }
                       disabled={currentPage === totalPages}
                     >
                       Próxima

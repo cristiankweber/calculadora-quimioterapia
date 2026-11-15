@@ -286,9 +286,9 @@ describe('calculateDrugDose', () => {
       doseUnit: 'AUC',
       bsa: 1.8,
       weight: 70,
-      egfr: 90,
+      gfrAbsolute: 90,
     });
-    // AUC 5 * (90 + 25) = 575
+    // GFR absoluto 90 mL/min: AUC 5 * (90 + 25) = 575.
     expect(dose).toBeCloseTo(575, 0);
   });
 

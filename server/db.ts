@@ -144,7 +144,7 @@ export async function createPatient(
   const inserted = await db
     .select()
     .from(patients)
-    .where(eq(patients.id, insertedId))
+    .where(and(eq(patients.id, insertedId), eq(patients.userId, patient.userId)))
     .limit(1);
   return inserted[0]!;
 }
@@ -163,7 +163,8 @@ export async function getPatientsByUserId(
 }
 
 export async function getPatientById(
-  id: number
+  id: number,
+  userId: number
 ): Promise<Patient | undefined> {
   const db = await getDb();
   if (!db) return undefined;
@@ -171,22 +172,23 @@ export async function getPatientById(
   const result = await db
     .select()
     .from(patients)
-    .where(eq(patients.id, id))
+    .where(and(eq(patients.id, id), eq(patients.userId, userId)))
     .limit(1);
   return result[0];
 }
 
 export async function updatePatient(
   id: number,
-  data: Partial<InsertPatient>
+  data: Partial<InsertPatient>,
+  userId: number
 ): Promise<void> {
   const db = await requireDb();
-  await db.update(patients).set(data).where(eq(patients.id, id));
+  await db.update(patients).set(data).where(and(eq(patients.id, id), eq(patients.userId, userId)));
 }
 
-export async function deletePatient(id: number): Promise<void> {
+export async function deletePatient(id: number, userId: number): Promise<void> {
   const db = await requireDb();
-  await db.delete(patients).where(eq(patients.id, id));
+  await db.delete(patients).where(and(eq(patients.id, id), eq(patients.userId, userId)));
 }
 
 // ─── Prescrições ────────────────────────────────────────────────────────────
@@ -202,7 +204,7 @@ export async function createPrescription(
   const inserted = await db
     .select()
     .from(prescriptions)
-    .where(eq(prescriptions.id, insertedId))
+    .where(and(eq(prescriptions.id, insertedId), eq(prescriptions.userId, prescription.userId)))
     .limit(1);
   return inserted[0]!;
 }
@@ -223,7 +225,8 @@ export async function getPrescriptionsByUserId(
 }
 
 export async function getPrescriptionsByPatientId(
-  patientId: number
+  patientId: number,
+  userId: number
 ): Promise<Prescription[]> {
   const db = await getDb();
   if (!db) return [];
@@ -231,12 +234,13 @@ export async function getPrescriptionsByPatientId(
   return await db
     .select()
     .from(prescriptions)
-    .where(eq(prescriptions.patientId, patientId))
+    .where(and(eq(prescriptions.patientId, patientId), eq(prescriptions.userId, userId)))
     .orderBy(desc(prescriptions.createdAt));
 }
 
 export async function getPrescriptionById(
-  id: number
+  id: number,
+  userId: number
 ): Promise<Prescription | undefined> {
   const db = await getDb();
   if (!db) return undefined;
@@ -244,13 +248,14 @@ export async function getPrescriptionById(
   const result = await db
     .select()
     .from(prescriptions)
-    .where(eq(prescriptions.id, id))
+    .where(and(eq(prescriptions.id, id), eq(prescriptions.userId, userId)))
     .limit(1);
   return result[0];
 }
 
 export async function getPrescriptionByPrescriptionId(
-  prescriptionId: string
+  prescriptionId: string,
+  userId: number
 ): Promise<Prescription | undefined> {
   const db = await getDb();
   if (!db) return undefined;
@@ -258,7 +263,7 @@ export async function getPrescriptionByPrescriptionId(
   const result = await db
     .select()
     .from(prescriptions)
-    .where(eq(prescriptions.prescriptionId, prescriptionId))
+    .where(and(eq(prescriptions.prescriptionId, prescriptionId), eq(prescriptions.userId, userId)))
     .limit(1);
   return result[0];
 }
@@ -440,14 +445,15 @@ export async function getCustomProtocolsByUserId(
 }
 
 export async function getCustomProtocolById(
-  id: number
+  id: number,
+  userId: number
 ): Promise<CustomProtocol | undefined> {
   const db = await getDb();
   if (!db) return undefined;
   const result = await db
     .select()
     .from(customProtocols)
-    .where(eq(customProtocols.id, id))
+    .where(and(eq(customProtocols.id, id), eq(customProtocols.userId, userId)))
     .limit(1);
   return result[0];
 }

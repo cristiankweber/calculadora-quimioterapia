@@ -9,7 +9,7 @@
  * - Validação antes de cada ação
  */
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { toast } from "sonner";
 import type {
   PatientData,
@@ -20,7 +20,11 @@ import type {
 } from "@/types/calculator";
 import type { ToxicityGrade } from "@/data/ctcae";
 import { getDoseAdjustmentFactor } from "@/data/ctcae";
-import { generatePrescriptionPDF } from "@/lib/pdfGenerator";
+import {
+  generatePrescriptionPDF,
+  formatDoseQuantity,
+  templatePrescriptionMetadata,
+} from "@/lib/pdfGenerator";
 import { trpc } from "@/lib/trpc";
 import type { HydrationSupportData } from "@/components/HydrationCalculator";
 import type { PdfSections } from "@/components/PdfPreviewModal";
@@ -42,6 +46,8 @@ interface PrescriptionContext {
   } | null;
   hydrationSupportData?: HydrationSupportData | null;
   clinicalIssues?: string[];
+  patientId?: number;
+  sessionKey?: string | number;
 }
 
 interface UsePrescriptionActionsReturn {
@@ -112,6 +118,7 @@ export function buildPrescriptionDataV2(ctx: PrescriptionContext) {
       cycle: ctx.selectedCycle,
       totalCycles: protocol.cycles,
       templateContext: protocol.templateContext,
+      calvertGfrAbsolute: protocol.calvertGfrAbsolute,
     },
     calculatedValues: {
       bsa: calculatedValues.bsa,
@@ -186,9 +193,36 @@ export function buildPrescriptionDataV2(ctx: PrescriptionContext) {
 export function usePrescriptionActions(
   ctx: PrescriptionContext
 ): UsePrescriptionActionsReturn {
-  const [prescriptionId, setPrescriptionId] = useState("");
+  const snapshotKey = JSON.stringify([
+    ctx.sessionKey,
+    ctx.patientId,
+    ctx.patientData,
+    ctx.calculatedValues,
+    ctx.selectedProtocol,
+    ctx.selectedCycle,
+    ctx.calculatedDrugs,
+    ctx.antiemetics,
+    ctx.toxicities,
+    ctx.hydrationSupportData,
+    ctx.institutionSettings,
+  ]);
+  const live = useRef({ key: snapshotKey, revision: 0 });
+  if (live.current.key !== snapshotKey)
+    live.current = { key: snapshotKey, revision: live.current.revision + 1 };
+  const [saved, setSaved] = useState<{
+    key: string;
+    revision: number;
+    id: string;
+  } | null>(null);
+  const prescriptionId =
+    saved?.key === snapshotKey && saved.revision === live.current.revision
+      ? saved.id
+      : "";
   const [showPrint, setShowPrint] = useState(false);
   const [printSections, setPrintSections] = useState<PdfSections | undefined>();
+  useEffect(() => {
+    setShowPrint(false);
+  }, [snapshotKey]);
 
   const createPatientMutation = trpc.patients.create.useMutation();
   const savePrescriptionMutation = trpc.prescriptions.create.useMutation();
@@ -203,6 +237,18 @@ export function usePrescriptionActions(
       if (!ctx.selectedProtocol || !ctx.calculatedValues) {
         toast.error(`Preencha todos os dados antes de ${actionName}`);
         return false;
+      }
+      if (
+        !ctx.selectedProtocol.clinicalDocument &&
+        ctx.selectedProtocol.drugs.some(d => d.doseUnit === "AUC")
+      ) {
+        const gfr = ctx.selectedProtocol.calvertGfrAbsolute;
+        if (typeof gfr !== "number" || !Number.isFinite(gfr) || gfr <= 0) {
+          toast.error(
+            "Informe explicitamente o GFR absoluto em mL/min para Calvert antes de gerar uma prescrição."
+          );
+          return false;
+        }
       }
       if (
         ctx.selectedProtocol.isUserTemplate &&
@@ -252,18 +298,26 @@ export function usePrescriptionActions(
       return;
     }
 
+    const request = { ...live.current };
+    const isCurrent = () =>
+      live.current.key === request.key &&
+      live.current.revision === request.revision;
     try {
-      const patient = await createPatientMutation.mutateAsync({
-        name: ctx.patientData.name,
-        age: ctx.patientData.age,
-        sex: ctx.patientData.sex,
-        weight: ctx.patientData.weight,
-        height: ctx.patientData.height,
-        creatinine: ctx.patientData.creatinine,
-        bilirubin: ctx.patientData.bilirubin,
-        ecog: ctx.patientData.ecog,
-        comorbidities: ctx.patientData.comorbidities || undefined,
-      });
+      const patient =
+        ctx.patientId !== undefined
+          ? { id: ctx.patientId }
+          : await createPatientMutation.mutateAsync({
+              name: ctx.patientData.name,
+              age: ctx.patientData.age,
+              sex: ctx.patientData.sex,
+              weight: ctx.patientData.weight,
+              height: ctx.patientData.height,
+              creatinine: ctx.patientData.creatinine,
+              bilirubin: ctx.patientData.bilirubin,
+              ecog: ctx.patientData.ecog,
+              comorbidities: ctx.patientData.comorbidities || undefined,
+            });
+      if (!isCurrent()) return;
 
       // Construir payload v2 com metadados de auditoria
       const prescriptionDataV2 = buildPrescriptionDataV2(ctx);
@@ -279,9 +333,11 @@ export function usePrescriptionActions(
         prescriptionData: prescriptionDataV2,
       });
 
-      setPrescriptionId(prescription.prescriptionId);
+      if (!isCurrent()) return;
+      setSaved({ ...request, id: prescription.prescriptionId });
       toast.success(`Prescrição salva! ID: ${prescription.prescriptionId}`);
     } catch (err: unknown) {
+      if (!isCurrent()) return;
       console.error(err);
       // Exibir mensagem de erro do backend se disponível
       const message = err instanceof Error ? err.message : "Erro ao salvar.";
@@ -299,6 +355,8 @@ export function usePrescriptionActions(
     ctx.calculatedDrugs,
     ctx.antiemetics,
     ctx.toxicities,
+    ctx.patientId,
+    ctx.sessionKey,
     createPatientMutation,
     savePrescriptionMutation,
     validateBeforeAction,
@@ -323,6 +381,8 @@ export function usePrescriptionActions(
 
     text += `PROTOCOLO: ${selectedProtocol!.name}\nCiclo: ${selectedCycle}/${selectedProtocol!.cycles}\n`;
     text += `Indicação: ${selectedProtocol!.indication}\n\n`;
+    const metadata = templatePrescriptionMetadata(selectedProtocol!);
+    if (metadata.length) text += `${metadata.join("\n")}\n\n`;
     if (selectedProtocol!.isUserTemplate) {
       const c = selectedProtocol!.templateContext;
       text += `Template do usuário — validar antes de administrar.\nFase: ${c?.phaseId ?? "não aplicável"} | Dia: ${c?.day ?? "agenda completa do ciclo"}\n\n`;
@@ -330,7 +390,7 @@ export function usePrescriptionActions(
 
     text += `DROGAS:\n`;
     calculatedDrugs.forEach(d => {
-      text += `• ${d.name}: ${d.calculatedDose?.toFixed(1)} ${d.resultUnit ?? (d.doseUnit.startsWith("mcg") ? "mcg" : d.doseUnit.startsWith("UI") ? "UI" : d.doseUnit === "cGy" ? "cGy" : "mg")} ${d.route} (Dias ${d.days})\n`;
+      text += `• ${d.name}: ${d.calculatedDose === undefined ? "não calculada" : formatDoseQuantity(d.calculatedDose)} ${d.resultUnit ?? (d.doseUnit.startsWith("mcg") ? "mcg" : d.doseUnit.startsWith("UI") ? "UI" : d.doseUnit === "cGy" ? "cGy" : "mg")} ${d.route} (Dias ${d.days})\n`;
       if (selectedProtocol!.isUserTemplate && d.observations)
         text += `  ${d.observations}\n`;
     });

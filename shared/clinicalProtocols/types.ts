@@ -2,7 +2,7 @@
 export interface ClinicalAdministrationFrequency {
   administrationsPerDay?: number | null;
   continuousInfusion?: boolean;
-  doseRepresents?: string;
+  doseRepresents?: string | null;
   intervalHours?: number | null;
   [key: string]: unknown;
 }
@@ -23,7 +23,7 @@ export interface ClinicalSchedule {
   administrationsPerDay?: number | null;
   administrationFrequency?: ClinicalAdministrationFrequency;
   frequency?: number | null | ClinicalAdministrationFrequency;
-  doseRepresents?: string;
+  doseRepresents?: string | null;
   continuousInfusion?: boolean;
   [key: string]: unknown;
 }
@@ -71,7 +71,8 @@ export interface ClinicalCalculationPolicy {
   legacyImportSafetyVerified?: boolean;
   requiresScheduleAwareEngine?: boolean;
   unitsMustBeExplicit?: boolean;
-  doseRepresents?: string;
+  /** Stage > drug > selected phase policy > document policy; explicit null blocks execution. */
+  doseRepresents?: string | null;
   renalOrHepaticAdjustmentAutomatic?: boolean;
   [key: string]: unknown;
 }

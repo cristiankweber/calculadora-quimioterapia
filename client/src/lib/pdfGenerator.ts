@@ -56,10 +56,24 @@ function providedText(value: unknown, fallback = "não informado"): string {
   return JSON.stringify(value) ?? fallback;
 }
 
+/** Preserva o valor resolvido; notação científica explícita nunca o reduz a zero. */
+export function formatDoseQuantity(value: number): string {
+  if (!Number.isFinite(value)) return "Não calculada";
+  return Number.isInteger(value) ? value.toFixed(1) : String(value);
+}
+
 /** Output metadata only. This discriminator never grants prescription permission. */
 export function templatePrescriptionMetadata(protocol: Protocol): string[] {
   const doc = asRecord(protocol.clinicalDocument);
-  if (!isActiveTemplateDocument(doc)) return [];
+  if (!isActiveTemplateDocument(doc)) {
+    const gfr = protocol.calvertGfrAbsolute;
+    return typeof gfr === "number" && Number.isFinite(gfr) && gfr > 0
+      ? [
+          `GFR absoluto fornecido para Calvert: ${gfr} mL/min`,
+          "Entrada não indexada; método renal e valor devem ser validados pela equipe antes de administrar.",
+        ]
+      : [];
+  }
   const original = asRecord(doc.sourceDocument ?? doc);
   const context = protocol.templateContext;
   const phases =
@@ -109,7 +123,7 @@ export function drugPrescriptionOutput(
   const calculated =
     typeof drug.calculatedDose === "number" &&
     Number.isFinite(drug.calculatedDose)
-      ? `${drug.calculatedDose.toFixed(1)} ${unit}`
+      ? `${formatDoseQuantity(drug.calculatedDose)} ${unit}`
       : "Não calculada";
   const details: string[] = [];
   if (
@@ -122,7 +136,9 @@ export function drugPrescriptionOutput(
     );
   else if (structured) details.push("Frequência não definida");
   if (typeof drug.dailyDose === "number" && Number.isFinite(drug.dailyDose))
-    details.push(`Total de 24h: ${drug.dailyDose.toFixed(1)} ${unit}/24h`);
+    details.push(
+      `Total de 24h: ${formatDoseQuantity(drug.dailyDose)} ${unit}/24h`
+    );
   if (drug.doseRepresents === "total_for_this_infusion")
     details.push("Total desta infusão, não taxa horária");
   else if (drug.doseRepresents === "per_24_hours")

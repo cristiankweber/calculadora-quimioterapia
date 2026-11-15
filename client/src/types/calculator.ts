@@ -7,6 +7,8 @@ export interface PatientData {
   weight: number; // kg
   height: number; // cm
   creatinine: number; // mg/dL
+  /** Entrada explícita validada pelo médico para Calvert, mL/min não indexados. */
+  calvertGfrAbsolute?: number;
   bilirubin: number; // mg/dL
   ecog: 0 | 1 | 2 | 3 | 4;
   comorbidities: string;
@@ -68,6 +70,8 @@ export interface Protocol {
   clinicalPackage?: Record<string, unknown>;
   libraryKind?: "reviewed" | "custom" | "legacy" | "templates";
   isUserTemplate?: boolean;
+  /** Contexto de AUC no legado; não substituir por eGFR indexado. */
+  calvertGfrAbsolute?: number;
   templateContext?: {
     cycle: number;
     phaseId?: string;

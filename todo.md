@@ -828,3 +828,19 @@ Escopo: restaurar a unidade já suportada pelo motor no cadastro/edição, sem a
 - [x] Incluir UI/m² no seletor e contratos CRUD; preservar UI no resultado do hook, tabela, fallback PDF/impressão e toast de ajuste manual; máximo rotulado na unidade física correta. Fórmula numérica do motor e protocolos armazenados intactos.
 - [x] Verificar import/export JSON, cálculo por SC e teto absoluto em UI: 739 testes/42 arquivos, TypeScript e build aprovados. Navegador selecionou UI/m² e confirmou Dose Máxima (UI), com zero gravações externas.
 - [x] Preparar correção verificada para checkpoint e entrega; atualização do domínio depende da publicação no painel do Manus.
+
+---
+
+## Correções P1 da revisão b9f481aa — 14/11/2026
+
+Pedido explícito do usuário: corrigir os P1 do relatório `/home/ubuntu/code-review/relatorio-revisao-calculadora-2026-11-14.md`. Escopo delimitado: isolamento estrito por usuário; histórico v1/v2 como snapshot, nova execução somente com cadastro íntegro; Calvert exige GFR absoluto explícito sem escolha automática de método. Não alterar protocolos, pacientes ou prescrições armazenados.
+
+- [x] P1-01: consultas/mutações por proprietário, paciente próprio existente antes de criar prescrição e identidade coerente; GET privado de protocolo também corrigido.
+- [x] P1-02: sessão explícita de paciente; overrides/contexto/GFR/toxicidades/suporte limpos na troca; medidas debounced anteriores imediatamente invalidadas; edição biométrica da mesma sessão preserva override.
+- [x] P1-03: adapter v1/v2 para histórico/timeline/carregamento; snapshot somente para consulta e nova execução somente com cadastro íntegro atual. Identidade divergente não reutilizada, idade atual preservada e dias/schedule normalizados.
+- [x] P1-04/05/06: gates uniformes no documento/fase/droga/agenda/extensões; política explícita de 24h respeitada; aliases canonicalizados; conflitos/origens incomparáveis bloqueados sem inventar offsets.
+- [x] P1-07: agendas/frequência/base BrECADD explícitas preservadas; síntese apenas quando ausentes. Documentos armazenados não migrados ou reescritos.
+- [x] P1-08: ordens de template positivas, comparação relativa de precisão de ponto flutuante sem piso absoluto0.01, persistência de números autoritativos e formatação preservando doses pequenas; legado não arredonda acima do teto pequeno.
+- [x] P1-09: Calvert legado usa somente GFR absoluto explícito, com campo/payload/metadados separados de eGFR indexado; sem entrada não há dose administrável/fallback AUC em mg.
+- [x] RED/GREEN incorporados: 1.031 testes/54 arquivos, DATABASE_URL='' durante toda a suíte, TypeScript/build aprovados. Navegador: 15 verificações, sem exceções JS e zero gravações externas. Fixtures/scripts e renderer React de testes incluídos no projeto.
+- [x] Revisão integrada e relatório preparado; checkpoint restaurável salva a entrega. P2-01/02/03 e GET privado adjacentes atendidos. P2-04/05/06 e limites defensivos/concorrência permanecem declarados. Publicação deve ser acionada no painel; nenhum registro clínico alterado.

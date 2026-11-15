@@ -73,7 +73,7 @@ function isFiniteNumber(value: unknown): value is number {
 
 function doseText(value: unknown, unit: unknown, suffix = ""): string {
   return isFiniteNumber(value)
-    ? `${value.toLocaleString("pt-BR", { maximumFractionDigits: 6 })} ${text(unit, "unidade não informada")}${suffix}`
+    ? `${value.toLocaleString("pt-BR", { maximumSignificantDigits: 21 })} ${text(unit, "unidade não informada")}${suffix}`
     : "Não calculada";
 }
 

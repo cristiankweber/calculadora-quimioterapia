@@ -18,6 +18,7 @@ import { Input } from "@/components/ui/input";
 import type { Drug } from "@/types/calculator";
 import { useState, memo, useCallback, useMemo } from "react";
 import { getDoseResultUnit } from "@shared/clinicalDoseEngine";
+import { formatDoseQuantity } from "@/lib/pdfGenerator";
 
 // ── Constantes estáticas (fora do componente para evitar recriação) ──────
 
@@ -58,6 +59,10 @@ const DrugRow = memo(function DrugRow({
   onEditBlur,
   onKeyDown,
 }: DrugRowProps) {
+  const hasDose =
+    typeof drug.calculatedDose === "number" &&
+    Number.isFinite(drug.calculatedDose) &&
+    drug.calculatedDose > 0;
   return (
     <TableRow>
       <TableCell className="font-semibold">{drug.name}</TableCell>
@@ -84,7 +89,7 @@ const DrugRow = memo(function DrugRow({
         {isEditing ? (
           <Input
             type="number"
-            step="0.1"
+            step="any"
             value={editValue}
             onChange={e => onEditChange(e.target.value)}
             onBlur={() => onEditBlur(index)}
@@ -99,8 +104,9 @@ const DrugRow = memo(function DrugRow({
               className="hover:bg-muted px-2 py-1 rounded transition-colors cursor-pointer"
               title="Clique para ajustar manualmente"
             >
-              {(drug.calculatedDose || 0).toFixed(1)}{" "}
-              {drug.resultUnit ?? getDoseResultUnit(drug.doseUnit)}
+              {hasDose
+                ? `${formatDoseQuantity(drug.calculatedDose!)} ${drug.resultUnit ?? getDoseResultUnit(drug.doseUnit)}`
+                : "Não calculada"}
             </button>
             {drug.maxDose &&
               drug.calculatedDose &&
@@ -147,13 +153,13 @@ function DrugsTable({ drugs, onDoseChange }: DrugsTableProps) {
 
   const handleDoseClick = useCallback((index: number, currentDose: number) => {
     setEditingIndex(index);
-    setEditValue(currentDose.toFixed(1));
+    setEditValue(String(currentDose));
   }, []);
 
   const handleDoseBlur = useCallback(
     (index: number) => {
       const newDose = parseFloat(editValue);
-      if (!isNaN(newDose) && newDose > 0 && onDoseChange) {
+      if (Number.isFinite(newDose) && newDose > 0 && onDoseChange) {
         onDoseChange(index, newDose);
       }
       setEditingIndex(null);

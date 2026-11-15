@@ -18,12 +18,14 @@ const object = (v: unknown): v is Record<string, unknown> =>
 const fail = (message: string): never => {
   throw new TRPCError({ code: "BAD_REQUEST", message });
 };
+// No clinical rounding is implied: tolerate only a few relative floating-point ULPs, in any unit.
 const numberMatches = (a: unknown, b: unknown): boolean =>
   typeof a === "number" &&
   typeof b === "number" &&
   Number.isFinite(a) &&
   Number.isFinite(b) &&
-  Math.abs(a - b) <= Math.max(0.01, Math.abs(b) * 0.0001);
+  a > 0 && b > 0 &&
+  (a === b || Math.abs(a - b) / Math.max(Math.abs(a), Math.abs(b)) <= 4 * Number.EPSILON);
 export function validateActiveTemplatePrescription(
   input: CreatePrescriptionInput,
   stored: unknown,

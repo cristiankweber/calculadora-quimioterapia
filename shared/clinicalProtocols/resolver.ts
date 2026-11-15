@@ -8,7 +8,7 @@ import type {
   ResolvedClinicalDrug,
   ResolvedClinicalProtocol,
 } from "./types";
-import { getTemplateExecutionDocument, isActiveTemplateDocument } from "./templates";
+import { getClinicalDecisionIssues, getTemplateExecutionDocument, isActiveTemplateDocument } from "./templates";
 
 const own = (value: object, key: string) =>
   Object.prototype.hasOwnProperty.call(value, key);
@@ -29,55 +29,8 @@ const present = (value: unknown) =>
   value !== false &&
   (!Array.isArray(value) || value.length > 0);
 
-const unsupportedSelectionKeys = new Set([
-  "conditionalDoses",
-  "selectionRequired",
-  "chooseExactlyOneDay",
-  "alternatives",
-  "phaseBreak",
-  "doseSelectionRequired",
-  "ageDoseTable",
-  "interactionSchedules",
-  "initialTitration",
-  "doseLevelSelection",
-  "arms",
-  "treatmentArms",
-  "arm",
-  "alternativeSchedule",
-  "conditionalExtraDays",
-  "taper",
-  "programSelection",
-  "doseVariants",
-  "ageDoseVariants",
-  "agePerformanceVariants",
-  "optionalAntibody",
-  "infusionStages",
-  "context",
-  "condition",
-  "selection",
-  "requiresRiskArmPhaseSelection",
-  "requiresRiskLineageArmAndCNS",
-  "requiresResponseBranchSelection",
-  "requiresPhaseAndResponseSelection",
-]);
-
-function selectionIssues(
-  value: Record<string, unknown>,
-  scope: string
-): string[] {
-  return Object.keys(value)
-    .filter(
-      key =>
-        present(value[key]) &&
-        (unsupportedSelectionKeys.has(key) ||
-          /selection|selector|alternativ|doselevel|conditional|chooseexactly|^(?:arms?|treatmentarms?)$/i.test(
-            key
-          ))
-    )
-    .map(
-      key =>
-        `${scope}: ${key} exige seleção/ordem explícita não suportada neste contexto.`
-    );
+function selectionIssues(value: Record<string, unknown>, scope: string, resolvedKeys: string[] = []): string[] {
+  return getClinicalDecisionIssues(value, scope, resolvedKeys);
 }
 
 /** No state change or approval action; consumes existing explicit release information only. */
@@ -299,6 +252,7 @@ const supportedOrigins = new Set([
   "protocol_II_day_one",
   "maintenance_start",
 ]);
+const canonicalOrigin = (origin: string): string => origin === "cycle_start" ? "cycle_day_one" : origin;
 
 function scheduleIssues(
   schedule: ClinicalSchedule,
@@ -367,8 +321,9 @@ function selectDrugs(
   if (document.phaseLibrary?.filter(p => p.id === phase.id).length !== 1)
     return { drugs: [], issues: ["phaseId duplicado na phaseLibrary."] };
   const phaseIssues = selectionIssues(
-    { ...phase, requiresExplicitSelection: false },
-    `Fase ${phase.id}`
+    phase,
+    `Fase ${phase.id}`,
+    ["requiresExplicitSelection"]
   );
   if (phase.automaticPrescriptionAllowed === false)
     issues.push(`Fase ${phase.id}: prescrição automática não autorizada.`);
@@ -445,53 +400,70 @@ interface Frequency {
   represents: string;
   issues: string[];
 }
+interface ExplicitDeclaration { value: unknown }
 
 function getFrequency(
   source: ClinicalDrug,
-  schedule: ClinicalSchedule
+  schedule: ClinicalSchedule,
+  document: ClinicalProtocolDocument,
+  phase?: ClinicalPhase
 ): Frequency {
-  const base =
-    source.administrationFrequency ??
-    (record(source.frequency) ? source.frequency : undefined);
-  const override =
-    schedule.administrationFrequency ??
-    (record(schedule.frequency) ? schedule.frequency : undefined);
-  const settings: ClinicalAdministrationFrequency = {
-    ...(base ?? {}),
-    ...(override ?? {}),
-  };
-  const invalidContainer =
-    (own(source, "administrationFrequency") &&
-      source.administrationFrequency !== undefined &&
-      !record(source.administrationFrequency)) ||
-    (own(schedule, "administrationFrequency") &&
-      !record(schedule.administrationFrequency));
-  const raw = invalidContainer
-    ? null
-    : own(schedule, "administrationsPerDay")
-      ? schedule.administrationsPerDay
-      : own(schedule, "frequency") && !record(schedule.frequency)
-        ? schedule.frequency
-        : own(settings, "administrationsPerDay")
-          ? settings.administrationsPerDay
-          : source.frequency;
   const issues: string[] = [];
-  if (!positiveInteger(raw))
+  const scopeSettings = (scope: ClinicalDrug | ClinicalSchedule, label: string) => {
+    const containers: Record<string, unknown>[] = [];
+    if (own(scope, "administrationFrequency") && scope.administrationFrequency !== undefined) {
+      if (record(scope.administrationFrequency)) containers.push(scope.administrationFrequency);
+      else issues.push(`${label}: administrationFrequency inválida explícita; não usar fallback.`);
+    }
+    const invalidContainer = own(scope, "administrationFrequency") && scope.administrationFrequency !== undefined && !record(scope.administrationFrequency);
+    if (record(scope.frequency)) containers.push(scope.frequency);
+    const settings: ClinicalAdministrationFrequency = Object.assign({}, ...containers);
+    const pick = (key: string): ExplicitDeclaration | undefined => {
+      const values = containers.filter(c => own(c, key)).map(c => c[key]);
+      if (own(scope, key)) values.unshift(scope[key]);
+      if (key === "administrationsPerDay" && own(scope, "frequency") && !record(scope.frequency) && scope.frequency !== undefined)
+        values.push(scope.frequency);
+      if (values.some(v => !Object.is(v, values[0])))
+        issues.push(`${label}: ${key} conflitante no mesmo escopo; nenhuma declaração escolhida.`);
+      return values.length ? { value: values[0] } : undefined;
+    };
+    return { settings, frequency: invalidContainer ? { value: null } : pick("administrationsPerDay"), represents: pick("doseRepresents"), continuous: pick("continuousInfusion") };
+  };
+  const base = scopeSettings(source, "Droga");
+  const override = scopeSettings(schedule, "Agenda");
+  const settings = { ...base.settings, ...override.settings };
+  const raw = override.frequency ?? base.frequency;
+  const frequency = raw?.value;
+  if (!positiveInteger(frequency))
     issues.push(
       "Frequência administrationsPerDay ausente ou inválida; não aplicada frequência padrão."
     );
-  const continuousValue = own(schedule, "continuousInfusion")
-    ? schedule.continuousInfusion
-    : settings.continuousInfusion;
+  const continuousValue = (override.continuous ?? base.continuous)?.value;
   if (continuousValue !== undefined && typeof continuousValue !== "boolean")
     issues.push("continuousInfusion inválido.");
-  const rawRepresents = own(schedule, "doseRepresents")
-    ? schedule.doseRepresents
-    : own(settings, "doseRepresents")
-      ? settings.doseRepresents
-      : own(source, "doseRepresents")
-        ? source.doseRepresents
-        : "per_administration";
+  const policyRepresentation = (node: ClinicalProtocolDocument | ClinicalPhase | undefined) => {
+    if (!node || !own(node, "calculationPolicy")) return undefined;
+    if (!record(node.calculationPolicy)) {
+      issues.push("calculationPolicy explícita inválida; não usar política padrão.");
+      return undefined;
+    }
+    const value = node.calculationPolicy.doseRepresents;
+    // Existing policy literally declares per-administration unless a more local base is marked.
+    return own(node.calculationPolicy, "doseRepresents") ? {
+      value: value === "per_administration_unless_explicitly_marked" ? "per_administration" : value,
+    } : undefined;
+  };
+  const documentRepresentation = policyRepresentation(document);
+  const phaseRepresentation = policyRepresentation(phase);
+  // Stage > drug > selected phase policy > document policy > historical per-administration default.
+  // A declaration object preserves explicit null instead of treating it as absent.
+  const declarations = [override.represents, base.represents, phaseRepresentation, documentRepresentation];
+  for (const declaration of declarations) {
+    if (declaration && !["per_administration", "per_24_hours", "total_for_this_infusion"].includes(String(declaration.value)))
+      issues.push("doseRepresents explícito inválido: não substituir null/valor desconhecido por fallback.");
+  }
+  const selectedRepresentation = declarations.find(value => value !== undefined);
+  const rawRepresents = selectedRepresentation ? selectedRepresentation.value : "per_administration";
   const represents = typeof rawRepresents === "string" ? rawRepresents : "";
   if (
     !["per_administration", "per_24_hours", "total_for_this_infusion"].includes(
@@ -505,8 +477,8 @@ function getFrequency(
     if (
       !finite(settings.intervalHours) ||
       settings.intervalHours <= 0 ||
-      (positiveInteger(raw) &&
-        Math.abs(settings.intervalHours * raw - 24) > 1e-9)
+      (positiveInteger(frequency) &&
+        Math.abs(settings.intervalHours * frequency - 24) > 1e-9)
     )
       issues.push(
         "intervalHours inválido ou incompatível com administrationsPerDay."
@@ -524,7 +496,7 @@ function getFrequency(
       issues.push(`Frequência: ${key} não suportado.`);
   }
   return {
-    frequency: positiveInteger(raw) ? raw : null,
+    frequency: positiveInteger(frequency) ? frequency : null,
     continuous: continuousValue === true,
     represents,
     issues,
@@ -643,8 +615,6 @@ export function resolveClinicalProtocol(
       globalIssues.push(...document.templateExecutionIssues.filter((issue): issue is string => typeof issue === "string"));
     if (document.referenceOnly === true || document.calculationPolicy?.referenceOnly === true)
       globalIssues.push("Documento referenceOnly: somente consulta, sem prescrição.");
-    for (const key of ["doseDecision", "ageTable"])
-      if (present(document[key])) globalIssues.push(`Documento: ${key} exige decisão explícita; não inferir dose.`);
   }
   if (!positiveInteger(context.cycle))
     globalIssues.push("cycle deve ser inteiro positivo explícito.");
@@ -702,12 +672,15 @@ export function resolveClinicalProtocol(
       ...selectedDrug.issues,
       ...selectionIssues(source, `Droga ${source.id}`),
     ];
-    if (template)
-      for (const key of ["doseDecision", "ageTable"])
-        if (present(source[key])) drugIssues.push(`Droga ${source.id}: ${key} exige decisão explícita; não inferir dose.`);
     if (template && source.dose === 0)
       drugIssues.push(`Droga ${source.id}: dose zero não é uma ordem válida.`);
     const schedules = selectedDrug.schedules ?? source.schedule ?? [];
+    const eligibleSchedules = schedules.filter(schedule =>
+      inCycle(schedule, context.cycle) && !(schedule.phase && context.phaseId && schedule.phase !== context.phaseId));
+    const origins = new Set(eligibleSchedules.map(schedule => canonicalOrigin(
+      schedule.timeOrigin ?? source.timeOrigin ?? (selected.phase ? "phase_day_one" : "cycle_day_one"))));
+    if (origins.size > 1)
+      drugIssues.push("Agendas da mesma droga usam origens distintas sem contexto temporal para provar compatibilidade; não inferir offsets.");
     for (const schedule of schedules) {
       if (
         inCycle(schedule, context.cycle) &&
@@ -746,10 +719,10 @@ export function resolveClinicalProtocol(
       )
         continue;
       const value = calendar(schedule);
-      const origin =
+      const origin = canonicalOrigin(
         schedule.timeOrigin ??
         source.timeOrigin ??
-        (selected.phase ? "phase_day_one" : "cycle_day_one");
+        (selected.phase ? "phase_day_one" : "cycle_day_one"));
       const temporalIssues: string[] = [];
       if (!supportedOrigins.has(origin))
         temporalIssues.push(
@@ -757,6 +730,7 @@ export function resolveClinicalProtocol(
         );
       // Known treatment/transplant/phase origins never use cycleLength to truncate an absolute day.
       if (
+        origins.size <= 1 &&
         context.day !== undefined &&
         integer(context.day) &&
         value.issues.length === 0 &&
@@ -771,7 +745,7 @@ export function resolveClinicalProtocol(
         value.issues.length === 0
       )
         continue;
-      const settings = getFrequency(source, schedule);
+      const settings = getFrequency(source, schedule, document, selected.phase);
       const dose = validDose(schedule.dose) && !(template && schedule.dose === 0) ? schedule.dose : null;
       const calculated = calculate(
         dose,
@@ -852,7 +826,7 @@ export function formatClinicalFrequency(row: ResolvedClinicalDrug): string {
   const schedule = row.source.schedule?.find(
     s =>
       s.dose === row.dose &&
-      (s.timeOrigin ?? row.timeOrigin) === row.timeOrigin &&
+      canonicalOrigin(s.timeOrigin ?? row.timeOrigin) === row.timeOrigin &&
       calendar(s).label === row.days
   );
   const continuous =

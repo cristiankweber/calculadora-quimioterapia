@@ -36,6 +36,21 @@ const CLINICAL_DIVERGENCE_THRESHOLD = 5;
 
 // ─── Helpers de auditoria ───────────────────────────────────────────────────
 
+/** Não distingue recurso inexistente de recurso pertencente a outro usuário. */
+function requireOwned<T extends { userId: number }>(
+  resource: T | undefined,
+  userId: number
+): T {
+  if (!resource || resource.userId !== userId) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "Recurso não encontrado." });
+  }
+  return resource;
+}
+
+async function getOwnedPatient(id: number, userId: number) {
+  return requireOwned(await db.getPatientById(id, userId), userId);
+}
+
 /**
  * Registra divergência clínica em log estruturado.
  * Nunca expõe dados sensíveis do paciente — apenas métricas numéricas.
@@ -93,8 +108,16 @@ function enrichAuditMetadata(
   serverBSA: number,
   serverEGFR: number
 ): PrescriptionDataV2 {
+  const renal = classifyRenalFunction(serverEGFR);
   return {
     ...data,
+    calculatedValues: {
+      ...data.calculatedValues,
+      bsa: serverBSA,
+      egfr: serverEGFR,
+      renalStatus: renal.status,
+      renalStatusLabel: renal.label,
+    },
     audit: {
       ...data.audit,
       version: 2,
@@ -143,8 +166,8 @@ export const appRouter = router({
 
     get: protectedProcedure
       .input(z.object({ id: z.number() }))
-      .query(async ({ input }) => {
-        return await db.getPatientById(input.id);
+      .query(async ({ ctx, input }) => {
+        return await getOwnedPatient(input.id, ctx.user.id);
       }),
 
     create: protectedProcedure
@@ -194,8 +217,9 @@ export const appRouter = router({
           cumulativeEpirubicin: z.number().optional(),
         })
       )
-      .mutation(async ({ input }) => {
+      .mutation(async ({ ctx, input }) => {
         const { id, ...data } = input;
+        await getOwnedPatient(id, ctx.user.id);
         const updateData: Record<string, unknown> = { ...data };
         if (data.creatinine !== undefined) {
           updateData.creatinine = data.creatinine.toFixed(2);
@@ -203,14 +227,15 @@ export const appRouter = router({
         if (data.bilirubin !== undefined) {
           updateData.bilirubin = data.bilirubin.toFixed(2);
         }
-        await db.updatePatient(id, updateData as any);
+        await db.updatePatient(id, updateData as any, ctx.user.id);
         return { success: true };
       }),
 
     delete: protectedProcedure
       .input(z.object({ id: z.number() }))
-      .mutation(async ({ input }) => {
-        await db.deletePatient(input.id);
+      .mutation(async ({ ctx, input }) => {
+        await getOwnedPatient(input.id, ctx.user.id);
+        await db.deletePatient(input.id, ctx.user.id);
         return { success: true };
       }),
   }),
@@ -225,20 +250,22 @@ export const appRouter = router({
 
     getByPatient: protectedProcedure
       .input(z.object({ patientId: z.number() }))
-      .query(async ({ input }) => {
-        return await db.getPrescriptionsByPatientId(input.patientId);
+      .query(async ({ ctx, input }) => {
+        await getOwnedPatient(input.patientId, ctx.user.id);
+        const prescriptions = await db.getPrescriptionsByPatientId(input.patientId, ctx.user.id);
+        return prescriptions.filter(p => p.userId === ctx.user.id && p.patientId === input.patientId);
       }),
 
     getById: protectedProcedure
       .input(z.object({ id: z.number() }))
-      .query(async ({ input }) => {
-        return await db.getPrescriptionById(input.id);
+      .query(async ({ ctx, input }) => {
+        return requireOwned(await db.getPrescriptionById(input.id, ctx.user.id), ctx.user.id);
       }),
 
     getByPrescriptionId: protectedProcedure
       .input(z.object({ prescriptionId: z.string() }))
-      .query(async ({ input }) => {
-        return await db.getPrescriptionByPrescriptionId(input.prescriptionId);
+      .query(async ({ ctx, input }) => {
+        return requireOwned(await db.getPrescriptionByPrescriptionId(input.prescriptionId, ctx.user.id), ctx.user.id);
       }),
 
     /**
@@ -255,6 +282,21 @@ export const appRouter = router({
     create: protectedProcedure
       .input(createPrescriptionInputSchema)
       .mutation(async ({ ctx, input }) => {
+        // Autorizar antes de qualquer escrita, inclusive estatísticas de uso.
+        const ownedPatient = await getOwnedPatient(input.patientId, ctx.user.id);
+        const snapshot = input.prescriptionData.patient;
+        if (
+          input.patientName !== ownedPatient.name ||
+          snapshot.name !== ownedPatient.name ||
+          snapshot.age !== ownedPatient.age ||
+          snapshot.sex !== ownedPatient.sex
+        ) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Identidade do paciente diverge do registro autorizado. Recarregue o paciente.",
+          });
+        }
+        // Peso, altura, ECOG e exames podem refletir a avaliação atual do prescritor.
         const sourceId = input.prescriptionData.protocol.id;
         const storedProtocol = sourceId
           ? await db.getCustomProtocolByProtocolId(sourceId)
@@ -335,7 +377,28 @@ export const appRouter = router({
 
         // ── 3. Enriquecer com metadados de auditoria ──
         const enrichedData = enrichAuditMetadata(
-          input.prescriptionData,
+          {
+            ...input.prescriptionData,
+            ...(validatedTemplate ? {
+              calculatedValues: {
+                ...input.prescriptionData.calculatedValues,
+                globalAdjustmentFactor: 1,
+                ecogAdjustmentFactor: 1,
+              },
+              // Mapeamento numérico: manter notas/diluição e os demais campos validados.
+              drugs: input.prescriptionData.drugs.map((drug, index) => {
+                const authoritative = validatedTemplate.drugs[index];
+                return {
+                  ...drug,
+                  baseDose: authoritative.dose,
+                  calculatedDose: authoritative.calculatedDose,
+                  finalDose: authoritative.calculatedDose,
+                  frequency: authoritative.frequency,
+                  dailyDose: authoritative.dailyDose,
+                };
+              }),
+            } : {}),
+          },
           ctx.user.id,
           ctx.user.name,
           serverBSA,
@@ -362,12 +425,12 @@ export const appRouter = router({
           prescriptionId,
           userId: ctx.user.id,
           patientId: input.patientId,
-          patientName: input.patientName,
+          patientName: ownedPatient.name,
           protocolName: input.protocolName,
           cycle: input.cycle,
-          bsa: input.bsa.toFixed(2),
-          egfr: input.egfr.toFixed(2),
-          renalStatus: input.renalStatus,
+          bsa: serverBSA.toFixed(2),
+          egfr: serverEGFR.toFixed(2),
+          renalStatus: enrichedData.calculatedValues.renalStatus,
           prescriptionData: enrichedData,
         };
 
@@ -387,9 +450,8 @@ export const appRouter = router({
      */
     getWithNormalization: protectedProcedure
       .input(z.object({ id: z.number() }))
-      .query(async ({ input }) => {
-        const prescription = await db.getPrescriptionById(input.id);
-        if (!prescription) return null;
+      .query(async ({ ctx, input }) => {
+        const prescription = requireOwned(await db.getPrescriptionById(input.id, ctx.user.id), ctx.user.id);
 
         // Tentar normalizar payload legado
         const normalized = normalizeLegacyPayload(
@@ -471,8 +533,8 @@ export const appRouter = router({
 
     get: protectedProcedure
       .input(z.object({ id: z.number() }))
-      .query(async ({ input }) => {
-        return await db.getCustomProtocolById(input.id);
+      .query(async ({ ctx, input }) => {
+        return requireOwned(await db.getCustomProtocolById(input.id, ctx.user.id), ctx.user.id);
       }),
 
     create: protectedProcedure
@@ -630,7 +692,7 @@ export const appRouter = router({
       )
       .mutation(async ({ ctx, input }) => {
         // Verificar se o protocolo pertence ao usuário
-        const existing = await db.getCustomProtocolById(input.id);
+        const existing = await db.getCustomProtocolById(input.id, ctx.user.id);
         if (!existing || existing.userId !== ctx.user.id) {
           throw new TRPCError({
             code: "NOT_FOUND",
@@ -668,7 +730,7 @@ export const appRouter = router({
     delete: protectedProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ ctx, input }) => {
-        const existing = await db.getCustomProtocolById(input.id);
+        const existing = await db.getCustomProtocolById(input.id, ctx.user.id);
         if (!existing || existing.userId !== ctx.user.id) {
           throw new TRPCError({
             code: "NOT_FOUND",
@@ -682,7 +744,7 @@ export const appRouter = router({
     restore: protectedProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ ctx, input }) => {
-        const existing = await db.getCustomProtocolById(input.id);
+        const existing = await db.getCustomProtocolById(input.id, ctx.user.id);
         if (!existing || existing.userId !== ctx.user.id) {
           throw new TRPCError({
             code: "NOT_FOUND",
