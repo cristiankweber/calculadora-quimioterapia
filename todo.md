@@ -855,3 +855,14 @@ Erro informado: leitura de length em lista undefined na seleção de protocolo. 
 - [x] Normalizar defensivamente seis listas clínicas e quatro listas de antiemese na apresentação. Textos válidos preservados, fonte não modificada e dados ausentes/inválidos explicitados, sem inferir recomendações ou mudar regras de prescrição.
 - [x] Validar todas as abas com Chromium real: 18 verificações, entradas mínimas/nulas/mistas/completas, sem exceções JS/overflow ou gravações externas. Regressões SSR incorporadas: suíte completa 1.047 testes/55 arquivos, TypeScript/build e diff--check aprovados, DATABASE_URL='' nos testes. Cache apenas da prévia invalidado para evitar componente antigo.
 - [x] Preparar entrega verificada para checkpoint restaurável; publicação da nova versão deve ser acionada no painel do Manus.
+
+---
+
+## Correção WebSocket Vite — 15/11/2026
+
+Erro informado: failed to connect to websocket / closed without opened na prévia. Causa observada: setupVite em middlewareMode sem hmr.server injeta porta 24678; cliente não usa a origem HTTP/HTTPS da aplicação. Nenhuma alteração clínica ou de banco.
+
+- [x] Reproduzir: duas regressões de configuração falharam; navegador local usava 24678 (origem divergente), e HTTPS não obteve handshake. Testes sem dados clínicos e sem gravações externas.
+- [x] Configurar hmr: { server } em setupVite e mesclar viteConfig.server. Mantidas restrições de filesystem e demais opções. Nenhuma porta/hostname externo fixo, alteração de token, dependência ou supressão de logs.
+- [x] Reiniciar prévia e confirmar handshake/frame connected e log [vite] connected em WS local porta3000 e WSS HTTPS na própria origem (443 implícita), zero erros JS/conexão e zero gravações externas. Suíte completa 1.049 testes/56 arquivos, TypeScript/build/diff--check aprovados, DATABASE_URL='' nos testes. Cache apenas da origem de prévia invalidado.
+- [x] Preparar entrega verificada para checkpoint restaurável. Correção de infraestrutura de desenvolvimento; dados, protocolos, cálculos e produção estática não alterados. Recarregar a prévia para atualizar cliente em cache.

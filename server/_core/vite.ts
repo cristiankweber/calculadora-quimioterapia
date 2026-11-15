@@ -8,8 +8,10 @@ import viteConfig from "../../vite.config";
 
 export async function setupVite(app: Express, server: Server) {
   const serverOptions = {
+    ...viteConfig.server,
     middlewareMode: true,
-    hmr: false,
+    // Reutiliza a origem/porta HTTP(S) da prévia, sem um socket separado em 24678.
+    hmr: { server },
     allowedHosts: true as const,
   };
 
