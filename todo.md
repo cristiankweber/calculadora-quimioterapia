@@ -844,3 +844,14 @@ Pedido explícito do usuário: corrigir os P1 do relatório `/home/ubuntu/code-r
 - [x] P1-09: Calvert legado usa somente GFR absoluto explícito, com campo/payload/metadados separados de eGFR indexado; sem entrada não há dose administrável/fallback AUC em mg.
 - [x] RED/GREEN incorporados: 1.031 testes/54 arquivos, DATABASE_URL='' durante toda a suíte, TypeScript/build aprovados. Navegador: 15 verificações, sem exceções JS e zero gravações externas. Fixtures/scripts e renderer React de testes incluídos no projeto.
 - [x] Revisão integrada e relatório preparado; checkpoint restaurável salva a entrega. P2-01/02/03 e GET privado adjacentes atendidos. P2-04/05/06 e limites defensivos/concorrência permanecem declarados. Publicação deve ser acionada no painel; nenhum registro clínico alterado.
+
+---
+
+## Correção ProphylaxisAlerts — 15/11/2026
+
+Erro informado: leitura de length em lista undefined na seleção de protocolo. Escopo: fronteira de exibição, sem alterar protocolos/doses/banco ou regras de liberação de prescrição.
+
+- [x] Reproduzir no componente real as exceções de length/map em campos ausentes/nulos. Catálogo atual já normaliza registros e os 51 estáticos têm listas; não atribuir o incidente a um registro específico sem evidência. Nenhum dado assistencial consultado.
+- [x] Normalizar defensivamente seis listas clínicas e quatro listas de antiemese na apresentação. Textos válidos preservados, fonte não modificada e dados ausentes/inválidos explicitados, sem inferir recomendações ou mudar regras de prescrição.
+- [x] Validar todas as abas com Chromium real: 18 verificações, entradas mínimas/nulas/mistas/completas, sem exceções JS/overflow ou gravações externas. Regressões SSR incorporadas: suíte completa 1.047 testes/55 arquivos, TypeScript/build e diff--check aprovados, DATABASE_URL='' nos testes. Cache apenas da prévia invalidado para evitar componente antigo.
+- [x] Preparar entrega verificada para checkpoint restaurável; publicação da nova versão deve ser acionada no painel do Manus.
