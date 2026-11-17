@@ -38,9 +38,16 @@ export interface Drug {
     | "UI/m²";
   maxDose?: number; // Limite absoluto na unidade do resultado: mg, mcg, UI ou cGy.
   calculatedDose?: number;
+  /** Dose prescrita; calculatedDose permanece a referência calculada. */
+  finalDose?: number;
+  rowKey?: string;
+  adjustmentReason?: string;
+  isManualDose?: boolean;
   resultUnit?: string;
   frequency?: number | null;
   dailyDose?: number | null;
+  /** Total diário prescrito; null explícito não autoriza fallback. */
+  prescribedDailyDose?: number | null;
   timeOrigin?: string;
   doseRepresents?: string;
   route: string;

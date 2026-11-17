@@ -3,6 +3,10 @@ import type { CreatePrescriptionInput } from "./prescriptionSchema";
 import { calculateBSA, calculateEGFR } from "../shared/clinicalDoseEngine";
 import { resolveClinicalProtocol } from "../shared/clinicalProtocols/resolver";
 import {
+  applyTemplateManualAdjustments,
+  type TemplateDoseOverride,
+} from "../shared/clinicalProtocols/manualAdjustments";
+import {
   USER_TEMPLATE_VERSION,
   isActiveTemplateDocument,
   getTemplateExecutionDocument,
@@ -13,6 +17,7 @@ import type {
   ClinicalProtocolDocument,
   ClinicalContext,
 } from "../shared/clinicalProtocols/types";
+
 const object = (v: unknown): v is Record<string, unknown> =>
   Boolean(v) && typeof v === "object" && !Array.isArray(v);
 const fail = (message: string): never => {
@@ -24,17 +29,38 @@ const numberMatches = (a: unknown, b: unknown): boolean =>
   typeof b === "number" &&
   Number.isFinite(a) &&
   Number.isFinite(b) &&
-  a > 0 && b > 0 &&
-  (a === b || Math.abs(a - b) / Math.max(Math.abs(a), Math.abs(b)) <= 4 * Number.EPSILON);
+  a > 0 &&
+  b > 0 &&
+  (a === b ||
+    Math.abs(a - b) / Math.max(Math.abs(a), Math.abs(b)) <= 4 * Number.EPSILON);
+const dailyMatches = (actual: unknown, expected: number | null) =>
+  expected === null ? actual === null : numberMatches(actual, expected);
+
+export interface ValidatedTemplateManualDoseOverride {
+  rowKey: string;
+  drugName: string;
+  originalDose: number;
+  manualDose: number;
+  reason: string;
+}
+export interface ValidatedActiveTemplatePrescription {
+  document: ClinicalProtocolDocument;
+  context: ClinicalContext;
+  drugs: Array<
+    ReturnType<typeof mapResolvedTemplateDrugs>[number] & {
+      baseDose: number;
+      manualDoseValue?: number;
+    }
+  >;
+  manualDoseOverrides: ValidatedTemplateManualDoseOverride[];
+}
+
+/** Reexecutes the stored template. Client flags, audit and maxDose never authorize a dose. */
 export function validateActiveTemplatePrescription(
   input: CreatePrescriptionInput,
   stored: unknown,
   userId: number
-): {
-  document: ClinicalProtocolDocument;
-  context: ClinicalContext;
-  drugs: ReturnType<typeof mapResolvedTemplateDrugs>;
-} | null {
+): ValidatedActiveTemplatePrescription | null {
   const id = input.prescriptionData.protocol.id;
   if (!id?.startsWith("template-")) return null;
   if (
@@ -80,45 +106,97 @@ export function validateActiveTemplatePrescription(
   const issues = getTemplatePrescriptionIssues(document, context, resolution);
   if (issues.length)
     fail("Seleção de template não resolvida: " + issues.join("; "));
-  const drugs = mapResolvedTemplateDrugs(resolution);
+  const baseline = mapResolvedTemplateDrugs(resolution);
   const supplied = input.prescriptionData.drugs;
-  if (!drugs.length || drugs.length !== supplied.length)
+  if (!baseline.length || baseline.length !== supplied.length)
     fail("Lista de doses não corresponde à seleção completa do template.");
-  for (let i = 0; i < drugs.length; i++) {
-    const expected = drugs[i],
+  const overrides: TemplateDoseOverride[] = [];
+  const keys = new Set<string>();
+  for (let i = 0; i < baseline.length; i++) {
+    const expected = baseline[i],
       actual = supplied[i];
+    const manual = !numberMatches(actual.finalDose, expected.calculatedDose);
+    if (actual.rowKey !== undefined) {
+      if (actual.rowKey !== expected.rowKey || keys.has(actual.rowKey))
+        fail(
+          "Identidade rowKey adulterada, órfã ou duplicada na lista de doses."
+        );
+      keys.add(actual.rowKey);
+    } else if (manual)
+      fail("Dose manual exige rowKey explícita e válida da etapa.");
     if (
       actual.name !== expected.name ||
       actual.route !== expected.route ||
       actual.days !== expected.days ||
       actual.doseUnit !== expected.doseUnit ||
       actual.resultUnit !== expected.resultUnit ||
-      actual.timeOrigin !== expected.timeOrigin
+      actual.timeOrigin !== expected.timeOrigin ||
+      (actual.schedule !== undefined && actual.schedule !== expected.days)
     )
       fail(
         "Medicamento, unidade, via ou calendário diverge da seleção do template."
       );
     if (
-      actual.isManualDose ||
       !numberMatches(actual.baseDose, expected.dose) ||
-      !numberMatches(actual.calculatedDose, expected.calculatedDose) ||
-      !numberMatches(actual.finalDose, expected.calculatedDose)
+      !numberMatches(actual.calculatedDose, expected.calculatedDose)
     )
       fail(
-        "Dose de template divergente; revise o template completo em vez de enviar dose presumida."
+        "Dose base ou calculada de template divergente; baseline é imutável."
       );
     if (
       actual.frequency !== expected.frequency ||
-      (expected.dailyDose === null
-        ? actual.dailyDose !== null
-        : !numberMatches(actual.dailyDose, expected.dailyDose))
+      !dailyMatches(actual.dailyDose, expected.dailyDose)
     )
-      fail("Frequência ou dose diária divergente da seleção do template.");
+      fail(
+        "Frequência ou dose diária baseline divergente da seleção do template."
+      );
     if (
-      actual.doseRepresents !== undefined &&
+      (actual.doseRepresents !== undefined || manual) &&
       actual.doseRepresents !== expected.doseRepresents
     )
       fail("Definição de dose divergente da etapa do template.");
+    if (
+      actual.manualDoseValue !== undefined &&
+      !numberMatches(actual.manualDoseValue, actual.finalDose)
+    )
+      fail("Alias manualDoseValue contradiz a dose final explícita.");
+    if (manual)
+      overrides.push({
+        rowKey: actual.rowKey!,
+        finalDose: actual.finalDose as number,
+        reason: actual.adjustmentReason as string,
+      });
   }
-  return { document, context, drugs };
+  const adjusted = applyTemplateManualAdjustments(resolution, overrides);
+  if (adjusted.issues.length)
+    fail("Ajuste manual de dose inválido: " + adjusted.issues.join("; "));
+  for (let i = 0; i < adjusted.drugs.length; i++) {
+    const expected = adjusted.drugs[i],
+      actual = supplied[i];
+    // Baseline-only legacy payloads may omit the new field. A manual dose never may.
+    if (
+      (expected.isManualDose || actual.prescribedDailyDose !== undefined) &&
+      !dailyMatches(actual.prescribedDailyDose, expected.prescribedDailyDose)
+    )
+      fail(
+        "Dose diária prescrita divergente da derivação da baseline do template."
+      );
+  }
+  const drugs = adjusted.drugs.map((drug, i) => ({
+    ...drug,
+    baseDose: drug.dose,
+    ...(supplied[i].manualDoseValue !== undefined
+      ? { manualDoseValue: drug.finalDose }
+      : {}),
+  }));
+  const manualDoseOverrides: ValidatedTemplateManualDoseOverride[] = drugs
+    .filter(drug => drug.isManualDose)
+    .map(drug => ({
+      rowKey: drug.rowKey,
+      drugName: drug.name,
+      originalDose: drug.calculatedDose,
+      manualDose: drug.finalDose,
+      reason: drug.adjustmentReason!,
+    }));
+  return { document, context, drugs, manualDoseOverrides };
 }

@@ -166,6 +166,36 @@ for (const [name, output] of [
   ["preview", preview],
 ] as const) {
   describe(`${name} — contrato real de saída dos templates`, () => {
+    it("dose individual é uma ordem prescrita identificada, mesmo sem a seção geral de ajustes", async () => {
+      const manual = {
+        ...data,
+        drugs: [
+          {
+            ...drug,
+            rowKey: "etapa-fictícia",
+            calculatedDose: 350,
+            finalDose: 175,
+            prescribedDailyDose: 350,
+            isManualDose: true,
+            adjustmentReason: "MOTIVO INDIVIDUAL FICTÍCIO",
+          },
+        ],
+      };
+      const html =
+        name === "PDF"
+          ? await pdf(manual, sections)
+          : name === "impressão"
+            ? print(manual, sections)
+            : preview(manual);
+      const text = visibleText(html);
+      expect(text).toMatch(/Dose [Pp]rescrita/);
+      expect(text).toContain("175.0 mcg");
+      expect(text).toContain("Dose calculada pelo protocolo: 350.0 mcg");
+      expect(text).toContain("MOTIVO INDIVIDUAL FICTÍCIO");
+      expect(text).toContain("350.0 mcg/24h");
+      expect(text).not.toContain("700.0 mcg/24h");
+    });
+
     // Detecta fixar mg, usar a unidade da base ou multiplicar novamente o total diário.
     it("mostra unidade calculada, frequência e total de 24h já resolvido", async () => {
       const text = visibleText(await output());

@@ -205,9 +205,24 @@ export default function PatientPrescriptionHistory({
                                         {drug.notes}
                                       </div>
                                     )}
+                                    {drug.finalDose !== undefined &&
+                                      drug.calculatedDose !== undefined &&
+                                      drug.finalDose !==
+                                        drug.calculatedDose && (
+                                        <div className="text-xs text-muted-foreground">
+                                          Dose calculada pelo protocolo:{" "}
+                                          {formatDoseQuantity(
+                                            drug.calculatedDose
+                                          )}{" "}
+                                          {drug.resultUnit ?? "?"}. Ajuste
+                                          manual — motivo:{" "}
+                                          {drug.adjustmentReason ||
+                                            "não registrado"}
+                                        </div>
+                                      )}
                                     <div className="text-xs text-muted-foreground">
                                       {drug.route} • {drug.days}{" "}
-                                      {drug.frequency !== undefined &&
+                                      {typeof drug.frequency === "number" &&
                                         `• ${drug.frequency} administração(ões)/dia`}{" "}
                                       {drug.timeOrigin}
                                     </div>
@@ -222,10 +237,27 @@ export default function PatientPrescriptionHistory({
                                       {drug.resultUnit ??
                                         "unidade absoluta não registrada"}
                                     </div>
-                                    {drug.dailyDose !== undefined && (
+                                    {typeof (drug.prescribedDailyDose ===
+                                    undefined
+                                      ? drug.dailyDose
+                                      : drug.prescribedDailyDose) ===
+                                      "number" && (
                                       <div className="text-xs">
-                                        {formatDoseQuantity(drug.dailyDose)}{" "}
+                                        {formatDoseQuantity(
+                                          (drug.prescribedDailyDose ===
+                                          undefined
+                                            ? drug.dailyDose
+                                            : drug.prescribedDailyDose) as number
+                                        )}{" "}
                                         {drug.resultUnit ?? "?"} /24h
+                                      </div>
+                                    )}
+                                    {(drug.prescribedDailyDose === null ||
+                                      (drug.prescribedDailyDose === undefined &&
+                                        drug.dailyDose === null)) && (
+                                      <div className="text-xs">
+                                        Total de 24h não definido para esta
+                                        infusão
                                       </div>
                                     )}
                                     {drug.baseDose && (

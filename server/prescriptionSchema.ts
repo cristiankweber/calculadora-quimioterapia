@@ -71,6 +71,8 @@ const toxicityAdjustmentSchema = z.object({
 /** Droga individual na prescrição */
 const drugSchema = z.object({
   name: z.string().min(1),
+  rowKey: z.string().min(1).optional(),
+  adjustmentReason: z.string().trim().min(1).max(1000).optional(),
   baseDose: nonNegativeNumber.optional(),
   doseUnit: z.string().optional(),
   calculatedDose: nonNegativeNumber.optional(),
@@ -82,6 +84,7 @@ const drugSchema = z.object({
   resultUnit: z.string().optional(),
   frequency: positiveNumber.nullable().optional(),
   dailyDose: nonNegativeNumber.nullable().optional(),
+  prescribedDailyDose: nonNegativeNumber.nullable().optional(),
   timeOrigin: z.string().optional(),
   doseRepresents: z.string().optional(),
   diluent: z.string().optional(),
@@ -120,6 +123,7 @@ const auditMetadataSchema = z.object({
     .array(
       z.object({
         drugName: z.string(),
+        rowKey: z.string().min(1).optional(),
         originalDose: nonNegativeNumber,
         manualDose: nonNegativeNumber,
         reason: z.string().optional(),
@@ -364,7 +368,8 @@ export const createPrescriptionInputSchema = z
       ctx.addIssue({
         code: "custom",
         path: ["prescriptionData", "protocol", "calvertGfrAbsolute"],
-        message: "Calvert exige GFR absoluto explícito em mL/min; eGFR indexado não é uma entrada de dose.",
+        message:
+          "Calvert exige GFR absoluto explícito em mL/min; eGFR indexado não é uma entrada de dose.",
       });
     }
     const reason =

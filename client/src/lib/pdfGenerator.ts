@@ -120,12 +120,29 @@ export function drugPrescriptionOutput(
   const unit =
     drug.resultUnit ||
     (structured ? "unidade não informada" : getDoseResultUnit(drug.doseUnit));
+  const prescribed =
+    drug.finalDose === undefined ? drug.calculatedDose : drug.finalDose;
   const calculated =
-    typeof drug.calculatedDose === "number" &&
-    Number.isFinite(drug.calculatedDose)
-      ? `${formatDoseQuantity(drug.calculatedDose)} ${unit}`
+    typeof prescribed === "number" && Number.isFinite(prescribed)
+      ? `${formatDoseQuantity(prescribed)} ${unit}`
       : "Não calculada";
   const details: string[] = [];
+  const adjusted =
+    drug.finalDose !== undefined && drug.finalDose !== drug.calculatedDose;
+  if (
+    adjusted &&
+    typeof drug.calculatedDose === "number" &&
+    Number.isFinite(drug.calculatedDose)
+  ) {
+    details.push(
+      `Dose calculada pelo protocolo: ${formatDoseQuantity(drug.calculatedDose)} ${unit}`
+    );
+    details.push(
+      drug.adjustmentReason?.trim()
+        ? `Ajuste manual — motivo: ${drug.adjustmentReason.trim()}`
+        : "Ajuste manual — motivo não registrado"
+    );
+  }
   if (
     typeof drug.frequency === "number" &&
     Number.isFinite(drug.frequency) &&
@@ -135,9 +152,13 @@ export function drugPrescriptionOutput(
       `${drug.frequency} ${drug.frequency === 1 ? "administração" : "administrações"}/24h`
     );
   else if (structured) details.push("Frequência não definida");
-  if (typeof drug.dailyDose === "number" && Number.isFinite(drug.dailyDose))
+  const prescribedDaily =
+    drug.prescribedDailyDose === undefined
+      ? drug.dailyDose
+      : drug.prescribedDailyDose;
+  if (typeof prescribedDaily === "number" && Number.isFinite(prescribedDaily))
     details.push(
-      `Total de 24h: ${formatDoseQuantity(drug.dailyDose)} ${unit}/24h`
+      `Total de 24h: ${formatDoseQuantity(prescribedDaily)} ${unit}/24h`
     );
   if (drug.doseRepresents === "total_for_this_infusion")
     details.push("Total desta infusão, não taxa horária");
@@ -672,7 +693,7 @@ export async function generatePrescriptionPDF(
     <div class="section-title">DROGAS PRESCRITAS</div>
     <table>
       <thead>
-        <tr><th>Droga</th><th>Dose Base</th><th>Dose Calculada</th><th>Via</th><th>Dias</th><th>Observações</th></tr>
+        <tr><th>Droga</th><th>Dose Base</th><th>Dose Prescrita</th><th>Via</th><th>Dias</th><th>Observações</th></tr>
       </thead>
       <tbody>${drugsRows}</tbody>
     </table>

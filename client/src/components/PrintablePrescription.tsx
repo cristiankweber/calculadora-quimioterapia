@@ -232,7 +232,9 @@ export default function PrintablePrescription({
             <thead className="bg-gray-100">
               <tr>
                 <th className="border border-gray-300 p-2 text-left">Droga</th>
-                <th className="border border-gray-300 p-2 text-left">Dose</th>
+                <th className="border border-gray-300 p-2 text-left">
+                  Dose Prescrita
+                </th>
                 <th className="border border-gray-300 p-2 text-left">Via</th>
                 <th className="border border-gray-300 p-2 text-left">Dias</th>
               </tr>

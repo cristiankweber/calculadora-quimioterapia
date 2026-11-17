@@ -22,7 +22,7 @@ import type { ToxicityGrade } from "@/data/ctcae";
 import { getDoseAdjustmentFactor } from "@/data/ctcae";
 import {
   generatePrescriptionPDF,
-  formatDoseQuantity,
+  drugPrescriptionOutput,
   templatePrescriptionMetadata,
 } from "@/lib/pdfGenerator";
 import { trpc } from "@/lib/trpc";
@@ -74,18 +74,37 @@ export function buildPrescriptionDataV2(ctx: PrescriptionContext) {
     : getDoseAdjustmentFactor(ctx.toxicities);
 
   // Identificar doses manuais
-  const manualDoseOverrides = ctx.calculatedDrugs
-    .filter(
-      d =>
-        d.calculatedDose !== undefined &&
-        d.dose !== undefined &&
-        d.calculatedDose !== d.dose
-    )
-    .map(d => ({
-      drugName: d.name,
-      originalDose: d.dose,
-      manualDose: d.calculatedDose ?? d.dose,
-    }));
+  const manualDoseOverrides = protocol.isUserTemplate
+    ? ctx.calculatedDrugs
+        .filter(
+          (d): d is Drug & { calculatedDose: number; finalDose: number } =>
+            typeof d.calculatedDose === "number" &&
+            Number.isFinite(d.calculatedDose) &&
+            d.calculatedDose > 0 &&
+            typeof d.finalDose === "number" &&
+            Number.isFinite(d.finalDose) &&
+            d.finalDose > 0 &&
+            d.finalDose !== d.calculatedDose
+        )
+        .map(d => ({
+          rowKey: d.rowKey,
+          drugName: d.name,
+          originalDose: d.calculatedDose,
+          manualDose: d.finalDose,
+          reason: d.adjustmentReason,
+        }))
+    : ctx.calculatedDrugs
+        .filter(
+          d =>
+            d.calculatedDose !== undefined &&
+            d.dose !== undefined &&
+            d.calculatedDose !== d.dose
+        )
+        .map(d => ({
+          drugName: d.name,
+          originalDose: d.dose,
+          manualDose: d.calculatedDose ?? d.dose,
+        }));
 
   // Mapear toxicidades para formato de auditoria
   // ToxicityGrade é um número simples (0-5)
@@ -133,15 +152,24 @@ export function buildPrescriptionDataV2(ctx: PrescriptionContext) {
       baseDose: d.dose,
       doseUnit: d.doseUnit,
       calculatedDose: d.calculatedDose,
-      finalDose: d.calculatedDose ?? d.dose,
+      finalDose: d.finalDose ?? d.calculatedDose ?? d.dose,
+      rowKey: d.rowKey,
+      adjustmentReason: d.adjustmentReason,
       maxDose: d.maxDose,
       route: d.route,
       days: d.days,
       notes: d.observations,
-      isManualDose: false,
+      isManualDose:
+        protocol.isUserTemplate &&
+        d.finalDose !== undefined &&
+        d.finalDose !== d.calculatedDose,
       resultUnit: d.resultUnit,
       frequency: d.frequency,
       dailyDose: d.dailyDose,
+      prescribedDailyDose:
+        d.prescribedDailyDose === undefined
+          ? d.dailyDose
+          : d.prescribedDailyDose,
       timeOrigin: d.timeOrigin,
       doseRepresents: d.doseRepresents,
     })),
@@ -174,9 +202,7 @@ export function buildPrescriptionDataV2(ctx: PrescriptionContext) {
           ? toxicityAdjustments
           : undefined,
       manualDoseOverrides:
-        !protocol.isUserTemplate && manualDoseOverrides.length > 0
-          ? manualDoseOverrides
-          : undefined,
+        manualDoseOverrides.length > 0 ? manualDoseOverrides : undefined,
       clinicalInputs: {
         weight: ctx.patientData.weight,
         height: ctx.patientData.height,
@@ -205,6 +231,7 @@ export function usePrescriptionActions(
     ctx.toxicities,
     ctx.hydrationSupportData,
     ctx.institutionSettings,
+    ctx.clinicalIssues,
   ]);
   const live = useRef({ key: snapshotKey, revision: 0 });
   if (live.current.key !== snapshotKey)
@@ -258,7 +285,16 @@ export function usePrescriptionActions(
             d =>
               typeof d.calculatedDose !== "number" ||
               !Number.isFinite(d.calculatedDose) ||
-              d.calculatedDose <= 0
+              d.calculatedDose <= 0 ||
+              (d.finalDose !== undefined &&
+                (typeof d.finalDose !== "number" ||
+                  !Number.isFinite(d.finalDose) ||
+                  d.finalDose <= 0 ||
+                  (d.maxDose !== undefined && d.finalDose > d.maxDose) ||
+                  (d.finalDose !== d.calculatedDose &&
+                    (!d.rowKey?.trim() ||
+                      !d.adjustmentReason?.trim() ||
+                      d.adjustmentReason.trim().length > 1000))))
           ))
       ) {
         toast.error(
@@ -390,7 +426,11 @@ export function usePrescriptionActions(
 
     text += `DROGAS:\n`;
     calculatedDrugs.forEach(d => {
-      text += `• ${d.name}: ${d.calculatedDose === undefined ? "não calculada" : formatDoseQuantity(d.calculatedDose)} ${d.resultUnit ?? (d.doseUnit.startsWith("mcg") ? "mcg" : d.doseUnit.startsWith("UI") ? "UI" : d.doseUnit === "cGy" ? "cGy" : "mg")} ${d.route} (Dias ${d.days})\n`;
+      const output = drugPrescriptionOutput(d, selectedProtocol!);
+      text += `• ${d.name}: ${output.calculated} ${d.route} (Dias ${d.days})\n`;
+      output.details.forEach(line => {
+        text += `  ${line}\n`;
+      });
       if (selectedProtocol!.isUserTemplate && d.observations)
         text += `  ${d.observations}\n`;
     });
@@ -432,7 +472,14 @@ export function usePrescriptionActions(
       warnIfNoInstitution();
       setPrintSections(sections);
       setShowPrint(true);
-      setTimeout(() => window.print(), 80);
+      const request = { ...live.current };
+      setTimeout(() => {
+        if (
+          live.current.key === request.key &&
+          live.current.revision === request.revision
+        )
+          window.print();
+      }, 80);
     },
     [validateBeforeAction, warnIfNoInstitution]
   );

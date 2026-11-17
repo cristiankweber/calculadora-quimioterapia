@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { isEnrichedClinicalDocument } from "@shared/clinicalProtocols/library";
 import { isActiveTemplateDocument } from "@shared/clinicalProtocols/templates";
 import { getDoseResultUnit } from "@shared/clinicalDoseEngine";
+import { TemplateDoseRevisionDialog } from "./TemplateDoseRevisionDialog";
 import {
   Card,
   CardContent,
@@ -386,6 +387,7 @@ export default function ProtocolManager() {
   // State
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [doseRevisionId, setDoseRevisionId] = useState<number | null>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
@@ -943,6 +945,19 @@ export default function ProtocolManager() {
                       </Button>
                     ) : (
                       <>
+                        {protocol.clinicalPackage?.version ===
+                          "user-protocol-template-1.0" &&
+                        isActiveTemplateDocument(protocol.clinicalDocument) ? (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="gap-1"
+                            onClick={() => setDoseRevisionId(protocol.id)}
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                            Editar doses-padrão
+                          </Button>
+                        ) : null}
                         <Button
                           variant="ghost"
                           size="sm"
@@ -980,6 +995,17 @@ export default function ProtocolManager() {
           ))}
         </div>
       )}
+
+      {doseRevisionId !== null ? (
+        <TemplateDoseRevisionDialog
+          key={doseRevisionId}
+          id={doseRevisionId}
+          onClose={() => {
+            setDoseRevisionId(null);
+            setSelectedIds(new Set());
+          }}
+        />
+      ) : null}
 
       {/* Create/Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>

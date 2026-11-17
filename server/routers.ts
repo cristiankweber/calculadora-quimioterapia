@@ -17,6 +17,7 @@ import {
 } from "./clinicalProtocolStorage";
 import { clinicalProtocolsRouter } from "./routers/clinicalProtocols";
 import { validateActiveTemplatePrescription } from "./activeTemplatePrescription";
+import { templateDoseRevisionRouter } from "./templateDoseRevision";
 import {
   createPrescriptionInputSchema,
   validateDoseSafety,
@@ -42,7 +43,10 @@ function requireOwned<T extends { userId: number }>(
   userId: number
 ): T {
   if (!resource || resource.userId !== userId) {
-    throw new TRPCError({ code: "NOT_FOUND", message: "Recurso não encontrado." });
+    throw new TRPCError({
+      code: "NOT_FOUND",
+      message: "Recurso não encontrado.",
+    });
   }
   return resource;
 }
@@ -149,6 +153,7 @@ function enrichAuditMetadata(
 export const appRouter = router({
   system: systemRouter,
   clinicalProtocols: clinicalProtocolsRouter,
+  templateDoseRevision: templateDoseRevisionRouter,
   auth: router({
     me: publicProcedure.query(opts => opts.ctx.user),
     logout: publicProcedure.mutation(({ ctx }) => {
@@ -252,20 +257,34 @@ export const appRouter = router({
       .input(z.object({ patientId: z.number() }))
       .query(async ({ ctx, input }) => {
         await getOwnedPatient(input.patientId, ctx.user.id);
-        const prescriptions = await db.getPrescriptionsByPatientId(input.patientId, ctx.user.id);
-        return prescriptions.filter(p => p.userId === ctx.user.id && p.patientId === input.patientId);
+        const prescriptions = await db.getPrescriptionsByPatientId(
+          input.patientId,
+          ctx.user.id
+        );
+        return prescriptions.filter(
+          p => p.userId === ctx.user.id && p.patientId === input.patientId
+        );
       }),
 
     getById: protectedProcedure
       .input(z.object({ id: z.number() }))
       .query(async ({ ctx, input }) => {
-        return requireOwned(await db.getPrescriptionById(input.id, ctx.user.id), ctx.user.id);
+        return requireOwned(
+          await db.getPrescriptionById(input.id, ctx.user.id),
+          ctx.user.id
+        );
       }),
 
     getByPrescriptionId: protectedProcedure
       .input(z.object({ prescriptionId: z.string() }))
       .query(async ({ ctx, input }) => {
-        return requireOwned(await db.getPrescriptionByPrescriptionId(input.prescriptionId, ctx.user.id), ctx.user.id);
+        return requireOwned(
+          await db.getPrescriptionByPrescriptionId(
+            input.prescriptionId,
+            ctx.user.id
+          ),
+          ctx.user.id
+        );
       }),
 
     /**
@@ -283,7 +302,10 @@ export const appRouter = router({
       .input(createPrescriptionInputSchema)
       .mutation(async ({ ctx, input }) => {
         // Autorizar antes de qualquer escrita, inclusive estatísticas de uso.
-        const ownedPatient = await getOwnedPatient(input.patientId, ctx.user.id);
+        const ownedPatient = await getOwnedPatient(
+          input.patientId,
+          ctx.user.id
+        );
         const snapshot = input.prescriptionData.patient;
         if (
           input.patientName !== ownedPatient.name ||
@@ -293,7 +315,8 @@ export const appRouter = router({
         ) {
           throw new TRPCError({
             code: "BAD_REQUEST",
-            message: "Identidade do paciente diverge do registro autorizado. Recarregue o paciente.",
+            message:
+              "Identidade do paciente diverge do registro autorizado. Recarregue o paciente.",
           });
         }
         // Peso, altura, ECOG e exames podem refletir a avaliação atual do prescritor.
@@ -379,31 +402,60 @@ export const appRouter = router({
         const enrichedData = enrichAuditMetadata(
           {
             ...input.prescriptionData,
-            ...(validatedTemplate ? {
-              calculatedValues: {
-                ...input.prescriptionData.calculatedValues,
-                globalAdjustmentFactor: 1,
-                ecogAdjustmentFactor: 1,
-              },
-              // Mapeamento numérico: manter notas/diluição e os demais campos validados.
-              drugs: input.prescriptionData.drugs.map((drug, index) => {
-                const authoritative = validatedTemplate.drugs[index];
-                return {
-                  ...drug,
-                  baseDose: authoritative.dose,
-                  calculatedDose: authoritative.calculatedDose,
-                  finalDose: authoritative.calculatedDose,
-                  frequency: authoritative.frequency,
-                  dailyDose: authoritative.dailyDose,
-                };
-              }),
-            } : {}),
+            ...(validatedTemplate
+              ? {
+                  calculatedValues: {
+                    ...input.prescriptionData.calculatedValues,
+                    globalAdjustmentFactor: 1,
+                    ecogAdjustmentFactor: 1,
+                  },
+                  // Mapeamento numérico: manter notas/diluição e os demais campos validados.
+                  drugs: input.prescriptionData.drugs.map((drug, index) => {
+                    const authoritative = validatedTemplate.drugs[index];
+                    return {
+                      ...drug,
+                      baseDose: authoritative.dose,
+                      calculatedDose: authoritative.calculatedDose,
+                      finalDose: authoritative.finalDose,
+                      rowKey: authoritative.rowKey,
+                      adjustmentReason: authoritative.adjustmentReason,
+                      isManualDose: authoritative.isManualDose,
+                      manualDoseValue: authoritative.isManualDose
+                        ? authoritative.finalDose
+                        : undefined,
+                      maxDose: authoritative.maxDose,
+                      doseUnit: authoritative.doseUnit,
+                      resultUnit: authoritative.resultUnit,
+                      timeOrigin: authoritative.timeOrigin,
+                      doseRepresents: authoritative.doseRepresents,
+                      frequency: authoritative.frequency,
+                      dailyDose: authoritative.dailyDose,
+                      prescribedDailyDose: authoritative.prescribedDailyDose,
+                    };
+                  }),
+                }
+              : {}),
           },
           ctx.user.id,
           ctx.user.name,
           serverBSA,
           serverEGFR
         );
+        if (validatedTemplate && enrichedData.audit) {
+          enrichedData.audit.toxicityAdjustments = undefined;
+          const manual = validatedTemplate.drugs
+            .filter(drug => drug.isManualDose)
+            .map(drug => ({
+              rowKey: drug.rowKey,
+              drugName: drug.name,
+              originalDose: drug.calculatedDose,
+              manualDose: drug.finalDose,
+              reason: drug.adjustmentReason,
+            }));
+          enrichedData.audit.manualDoseOverrides = manual.length
+            ? manual
+            : undefined;
+        }
         if (validatedTemplate && enrichedData.audit?.formulaVersions)
           enrichedData.audit.formulaVersions.dose =
             "schedule-aware-template-1.0";
@@ -451,7 +503,10 @@ export const appRouter = router({
     getWithNormalization: protectedProcedure
       .input(z.object({ id: z.number() }))
       .query(async ({ ctx, input }) => {
-        const prescription = requireOwned(await db.getPrescriptionById(input.id, ctx.user.id), ctx.user.id);
+        const prescription = requireOwned(
+          await db.getPrescriptionById(input.id, ctx.user.id),
+          ctx.user.id
+        );
 
         // Tentar normalizar payload legado
         const normalized = normalizeLegacyPayload(
@@ -534,7 +589,10 @@ export const appRouter = router({
     get: protectedProcedure
       .input(z.object({ id: z.number() }))
       .query(async ({ ctx, input }) => {
-        return requireOwned(await db.getCustomProtocolById(input.id, ctx.user.id), ctx.user.id);
+        return requireOwned(
+          await db.getCustomProtocolById(input.id, ctx.user.id),
+          ctx.user.id
+        );
       }),
 
     create: protectedProcedure

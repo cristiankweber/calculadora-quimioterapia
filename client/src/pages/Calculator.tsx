@@ -38,7 +38,6 @@ import {
   isActiveTemplateDocument,
   getTemplateExecutionDocument,
   getTemplatePrescriptionIssues,
-  mapResolvedTemplateDrugs,
 } from "@shared/clinicalProtocols/templates";
 import { useAuth } from "@/_core/hooks/useAuth";
 
@@ -57,6 +56,10 @@ import { trpc } from "@/lib/trpc";
 import { usePatientCalculations } from "@/hooks/usePatientCalculations";
 import { useProtocolDoseCalculation } from "@/hooks/useProtocolDoseCalculation";
 import { usePrescriptionActions } from "@/hooks/usePrescriptionActions";
+import {
+  useTemplateDoseAdjustments,
+  buildTemplateSupportDrugs,
+} from "@/hooks/useTemplateDoseAdjustments";
 import { usePatientSession, emptyPatient } from "@/hooks/usePatientSession";
 import {
   readPrescriptionHistory,
@@ -79,6 +82,7 @@ import {
 
 export default function Calculator() {
   const [, setLocation] = useLocation();
+  const { isAuthenticated, user } = useAuth();
 
   // ── Estado do Paciente ──────────────────────────────────────────────────
   const {
@@ -153,15 +157,7 @@ export default function Calculator() {
   const [showEmergency, setShowEmergency] = useState(false);
 
   // ── Dados de Hidratação/Eletrólitos/Transfusão (para PDF) ────────────────
-  const [hydrationSupportData, setHydrationSupportData] =
-    useState<HydrationSupportData | null>(null);
   const [showPdfPreview, setShowPdfPreview] = useState(false);
-  const handleHydrationDataChange = useCallback(
-    (data: HydrationSupportData) => {
-      setHydrationSupportData(data);
-    },
-    []
-  );
 
   // ── Cálculo de Doses ────────────────────────────────────────────────────
   const { calculatedDrugs, handleDoseChange, setCalculatedDrugs } =
@@ -187,12 +183,38 @@ export default function Calculator() {
         : [],
     [isUserTemplate, clinicalDocument, clinicalContext, clinicalResolution]
   );
+  const adjustmentScope = JSON.stringify([
+    sessionKey,
+    patientId,
+    user?.id,
+    isAuthenticated,
+    patientData,
+    selectedProtocol,
+    clinicalDocument,
+    clinicalContext,
+    calculatedValues,
+  ]);
+  const templateAdjustments = useTemplateDoseAdjustments({
+    scopeKey: adjustmentScope,
+    resolution: isUserTemplate ? clinicalResolution : null,
+    enabled:
+      isUserTemplate &&
+      templateIssues.length === 0 &&
+      !prescriptionBlock &&
+      Boolean(calculatedValues),
+  });
+  const clinicalIssues = [...templateIssues, ...templateAdjustments.issues];
   const prescriptionDrugs = useMemo(
     () =>
       isUserTemplate && clinicalResolution
-        ? (mapResolvedTemplateDrugs(clinicalResolution) as Drug[])
+        ? templateAdjustments.drugs
         : calculatedDrugs,
-    [isUserTemplate, clinicalResolution, calculatedDrugs]
+    [
+      isUserTemplate,
+      clinicalResolution,
+      templateAdjustments.drugs,
+      calculatedDrugs,
+    ]
   );
   const prescriptionProtocol = useMemo(
     () =>
@@ -234,23 +256,16 @@ export default function Calculator() {
   const effectiveSupportDrugs = useMemo(
     () =>
       clinicalResolution
-        ? clinicalResolution.rows
-            .filter(row => row.status === "ready")
-            .map(row => ({
-              name: row.source.name,
-              dose: row.dose ?? 0,
-              doseUnit: row.doseUnit ?? row.source.doseUnit,
-              administrationsPerDay:
-                row.doseRepresents === "per_24_hours"
-                  ? 1
-                  : (row.frequency ?? undefined),
-            }))
+        ? buildTemplateSupportDrugs(
+            clinicalResolution,
+            isUserTemplate ? prescriptionDrugs : []
+          )
         : calculatedDrugs.map(drug => ({
             name: drug.name,
             dose: drug.dose,
             doseUnit: drug.doseUnit,
           })),
-    [clinicalResolution, calculatedDrugs]
+    [clinicalResolution, isUserTemplate, prescriptionDrugs, calculatedDrugs]
   );
   const supportSelectionResolved =
     !clinicalResolution ||
@@ -261,6 +276,25 @@ export default function Calculator() {
           clinicalDocument &&
           getClinicalPrescriptionBlock(clinicalDocument).includes(issue)
       ));
+
+  // Reject support snapshots from previous doses/context even before the child effect runs.
+  const supportKey = JSON.stringify([
+    adjustmentScope,
+    effectiveSupportDrugs,
+    supportSelectionResolved,
+  ]);
+  const [supportSnapshot, setSupportSnapshot] = useState<{
+    key: string;
+    data: HydrationSupportData;
+  } | null>(null);
+  const hydrationSupportData =
+    supportSnapshot?.key === supportKey ? supportSnapshot.data : null;
+  const handleHydrationDataChange = useCallback(
+    (data: HydrationSupportData) => {
+      setSupportSnapshot({ key: supportKey, data });
+    },
+    [supportKey]
+  );
 
   // ── Antieméticos ────────────────────────────────────────────────────────
   const antiemetics = useMemo(() => {
@@ -284,7 +318,6 @@ export default function Calculator() {
   );
 
   // ── Configurações Institucionais ────────────────────────────────────────
-  const { isAuthenticated } = useAuth();
   const { data: institutionSettings } = trpc.settings.get.useQuery(undefined, {
     enabled: isAuthenticated,
   });
@@ -329,7 +362,7 @@ export default function Calculator() {
     toxicities,
     institutionSettings,
     hydrationSupportData,
-    clinicalIssues: templateIssues,
+    clinicalIssues,
     patientId,
     sessionKey,
   });
@@ -382,7 +415,7 @@ export default function Calculator() {
       setSelectedCycle(reuse?.cycle ?? 1);
       setClinicalSelection(reuse?.context ?? { cycle: 1 });
       setToxicities({});
-      setHydrationSupportData(null);
+      setSupportSnapshot(null);
       setShowPdfPreview(false);
       setShowPrint(false);
       setShowEmergency(false);
@@ -532,6 +565,16 @@ export default function Calculator() {
                       {d.name}: {d.finalDose ?? "não registrada"}{" "}
                       {d.resultUnit ?? "unidade não registrada"} {d.route} —{" "}
                       {d.days}
+                      {d.finalDose !== undefined &&
+                      d.calculatedDose !== undefined &&
+                      d.finalDose !== d.calculatedDose ? (
+                        <span>
+                          {" "}
+                          — Dose calculada: {d.calculatedDose} {d.resultUnit};
+                          ajuste manual — motivo:{" "}
+                          {d.adjustmentReason || "não registrado"}
+                        </span>
+                      ) : null}
                     </li>
                   ))}
                 </ul>
@@ -559,6 +602,18 @@ export default function Calculator() {
                 document={clinicalDocument}
                 resolution={clinicalResolution}
                 context={clinicalContext}
+                doseEditing={
+                  isUserTemplate &&
+                  clinicalIssues.length === 0 &&
+                  calculatedValues
+                    ? {
+                        scopeKey: templateAdjustments.scopeKey,
+                        drugs: prescriptionDrugs,
+                        onConfirm: templateAdjustments.confirm,
+                        onRestore: templateAdjustments.restore,
+                      }
+                    : undefined
+                }
                 onContextChange={next => {
                   setClinicalSelection(next);
                   setSelectedCycle(next.cycle);
@@ -616,6 +671,7 @@ export default function Calculator() {
       {/* IMPRESSÃO — SOMENTE QUANDO NECESSÁRIO */}
       {showPrint &&
         !prescriptionBlock &&
+        clinicalIssues.length === 0 &&
         selectedProtocol &&
         calculatedValues &&
         outputAntiemetics && (
@@ -657,6 +713,7 @@ export default function Calculator() {
 
       {/* MODAL DE PREVIEW DO PDF */}
       {!prescriptionBlock &&
+        clinicalIssues.length === 0 &&
         selectedProtocol &&
         calculatedValues &&
         outputAntiemetics && (

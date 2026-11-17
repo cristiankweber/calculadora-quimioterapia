@@ -4,11 +4,16 @@ import type {
   ClinicalDrug,
   ClinicalPhase,
   ClinicalProtocolDocument,
+  ClinicalRowIdentity,
   ClinicalSchedule,
   ResolvedClinicalDrug,
   ResolvedClinicalProtocol,
 } from "./types";
-import { getClinicalDecisionIssues, getTemplateExecutionDocument, isActiveTemplateDocument } from "./templates";
+import {
+  getClinicalDecisionIssues,
+  getTemplateExecutionDocument,
+  isActiveTemplateDocument,
+} from "./templates";
 
 const own = (value: object, key: string) =>
   Object.prototype.hasOwnProperty.call(value, key);
@@ -29,7 +34,11 @@ const present = (value: unknown) =>
   value !== false &&
   (!Array.isArray(value) || value.length > 0);
 
-function selectionIssues(value: Record<string, unknown>, scope: string, resolvedKeys: string[] = []): string[] {
+function selectionIssues(
+  value: Record<string, unknown>,
+  scope: string,
+  resolvedKeys: string[] = []
+): string[] {
   return getClinicalDecisionIssues(value, scope, resolvedKeys);
 }
 
@@ -252,7 +261,8 @@ const supportedOrigins = new Set([
   "protocol_II_day_one",
   "maintenance_start",
 ]);
-const canonicalOrigin = (origin: string): string => origin === "cycle_start" ? "cycle_day_one" : origin;
+const canonicalOrigin = (origin: string): string =>
+  origin === "cycle_start" ? "cycle_day_one" : origin;
 
 function scheduleIssues(
   schedule: ClinicalSchedule,
@@ -284,6 +294,8 @@ interface SelectedDrug {
   source: ClinicalDrug;
   schedules?: ClinicalSchedule[];
   issues: string[];
+  drugLocation: "document" | "phase";
+  drugIndex: number;
 }
 
 function selectDrugs(
@@ -304,7 +316,12 @@ function selectDrugs(
       };
     }
     return {
-      drugs: document.drugs.map(source => ({ source, issues: [] })),
+      drugs: document.drugs.map((source, drugIndex) => ({
+        source,
+        drugIndex,
+        drugLocation: "document",
+        issues: [],
+      })),
       issues,
     };
   }
@@ -320,11 +337,9 @@ function selectDrugs(
     };
   if (document.phaseLibrary?.filter(p => p.id === phase.id).length !== 1)
     return { drugs: [], issues: ["phaseId duplicado na phaseLibrary."] };
-  const phaseIssues = selectionIssues(
-    phase,
-    `Fase ${phase.id}`,
-    ["requiresExplicitSelection"]
-  );
+  const phaseIssues = selectionIssues(phase, `Fase ${phase.id}`, [
+    "requiresExplicitSelection",
+  ]);
   if (phase.automaticPrescriptionAllowed === false)
     issues.push(`Fase ${phase.id}: prescrição automática não autorizada.`);
   if (phase.support?.length)
@@ -389,7 +404,15 @@ function selectDrugs(
             }) => ({ ...schedule, days: overrides[0].days })
           );
       }
-      return { source, schedules, issues: localIssues };
+      const phaseIndex = phase.drugs?.indexOf(source) ?? -1;
+      return {
+        source,
+        schedules,
+        issues: localIssues,
+        drugLocation: phaseIndex >= 0 ? "phase" : "document",
+        drugIndex:
+          phaseIndex >= 0 ? phaseIndex : document.drugs.indexOf(source),
+      };
     }),
   };
 }
@@ -400,7 +423,9 @@ interface Frequency {
   represents: string;
   issues: string[];
 }
-interface ExplicitDeclaration { value: unknown }
+interface ExplicitDeclaration {
+  value: unknown;
+}
 
 function getFrequency(
   source: ClinicalDrug,
@@ -409,25 +434,55 @@ function getFrequency(
   phase?: ClinicalPhase
 ): Frequency {
   const issues: string[] = [];
-  const scopeSettings = (scope: ClinicalDrug | ClinicalSchedule, label: string) => {
+  const scopeSettings = (
+    scope: ClinicalDrug | ClinicalSchedule,
+    label: string
+  ) => {
     const containers: Record<string, unknown>[] = [];
-    if (own(scope, "administrationFrequency") && scope.administrationFrequency !== undefined) {
-      if (record(scope.administrationFrequency)) containers.push(scope.administrationFrequency);
-      else issues.push(`${label}: administrationFrequency inválida explícita; não usar fallback.`);
+    if (
+      own(scope, "administrationFrequency") &&
+      scope.administrationFrequency !== undefined
+    ) {
+      if (record(scope.administrationFrequency))
+        containers.push(scope.administrationFrequency);
+      else
+        issues.push(
+          `${label}: administrationFrequency inválida explícita; não usar fallback.`
+        );
     }
-    const invalidContainer = own(scope, "administrationFrequency") && scope.administrationFrequency !== undefined && !record(scope.administrationFrequency);
+    const invalidContainer =
+      own(scope, "administrationFrequency") &&
+      scope.administrationFrequency !== undefined &&
+      !record(scope.administrationFrequency);
     if (record(scope.frequency)) containers.push(scope.frequency);
-    const settings: ClinicalAdministrationFrequency = Object.assign({}, ...containers);
+    const settings: ClinicalAdministrationFrequency = Object.assign(
+      {},
+      ...containers
+    );
     const pick = (key: string): ExplicitDeclaration | undefined => {
       const values = containers.filter(c => own(c, key)).map(c => c[key]);
       if (own(scope, key)) values.unshift(scope[key]);
-      if (key === "administrationsPerDay" && own(scope, "frequency") && !record(scope.frequency) && scope.frequency !== undefined)
+      if (
+        key === "administrationsPerDay" &&
+        own(scope, "frequency") &&
+        !record(scope.frequency) &&
+        scope.frequency !== undefined
+      )
         values.push(scope.frequency);
       if (values.some(v => !Object.is(v, values[0])))
-        issues.push(`${label}: ${key} conflitante no mesmo escopo; nenhuma declaração escolhida.`);
+        issues.push(
+          `${label}: ${key} conflitante no mesmo escopo; nenhuma declaração escolhida.`
+        );
       return values.length ? { value: values[0] } : undefined;
     };
-    return { settings, frequency: invalidContainer ? { value: null } : pick("administrationsPerDay"), represents: pick("doseRepresents"), continuous: pick("continuousInfusion") };
+    return {
+      settings,
+      frequency: invalidContainer
+        ? { value: null }
+        : pick("administrationsPerDay"),
+      represents: pick("doseRepresents"),
+      continuous: pick("continuousInfusion"),
+    };
   };
   const base = scopeSettings(source, "Droga");
   const override = scopeSettings(schedule, "Agenda");
@@ -441,29 +496,56 @@ function getFrequency(
   const continuousValue = (override.continuous ?? base.continuous)?.value;
   if (continuousValue !== undefined && typeof continuousValue !== "boolean")
     issues.push("continuousInfusion inválido.");
-  const policyRepresentation = (node: ClinicalProtocolDocument | ClinicalPhase | undefined) => {
+  const policyRepresentation = (
+    node: ClinicalProtocolDocument | ClinicalPhase | undefined
+  ) => {
     if (!node || !own(node, "calculationPolicy")) return undefined;
     if (!record(node.calculationPolicy)) {
-      issues.push("calculationPolicy explícita inválida; não usar política padrão.");
+      issues.push(
+        "calculationPolicy explícita inválida; não usar política padrão."
+      );
       return undefined;
     }
     const value = node.calculationPolicy.doseRepresents;
     // Existing policy literally declares per-administration unless a more local base is marked.
-    return own(node.calculationPolicy, "doseRepresents") ? {
-      value: value === "per_administration_unless_explicitly_marked" ? "per_administration" : value,
-    } : undefined;
+    return own(node.calculationPolicy, "doseRepresents")
+      ? {
+          value:
+            value === "per_administration_unless_explicitly_marked"
+              ? "per_administration"
+              : value,
+        }
+      : undefined;
   };
   const documentRepresentation = policyRepresentation(document);
   const phaseRepresentation = policyRepresentation(phase);
   // Stage > drug > selected phase policy > document policy > historical per-administration default.
   // A declaration object preserves explicit null instead of treating it as absent.
-  const declarations = [override.represents, base.represents, phaseRepresentation, documentRepresentation];
+  const declarations = [
+    override.represents,
+    base.represents,
+    phaseRepresentation,
+    documentRepresentation,
+  ];
   for (const declaration of declarations) {
-    if (declaration && !["per_administration", "per_24_hours", "total_for_this_infusion"].includes(String(declaration.value)))
-      issues.push("doseRepresents explícito inválido: não substituir null/valor desconhecido por fallback.");
+    if (
+      declaration &&
+      ![
+        "per_administration",
+        "per_24_hours",
+        "total_for_this_infusion",
+      ].includes(String(declaration.value))
+    )
+      issues.push(
+        "doseRepresents explícito inválido: não substituir null/valor desconhecido por fallback."
+      );
   }
-  const selectedRepresentation = declarations.find(value => value !== undefined);
-  const rawRepresents = selectedRepresentation ? selectedRepresentation.value : "per_administration";
+  const selectedRepresentation = declarations.find(
+    value => value !== undefined
+  );
+  const rawRepresents = selectedRepresentation
+    ? selectedRepresentation.value
+    : "per_administration";
   const represents = typeof rawRepresents === "string" ? rawRepresents : "";
   if (
     !["per_administration", "per_24_hours", "total_for_this_infusion"].includes(
@@ -585,6 +667,21 @@ function calculate(
   return { calculatedDose, dailyDose, resultUnit, issues };
 }
 
+/** Opaque stable identity; no name, filtered index, dose value or client-reported BSA. */
+export function clinicalRowKey(identity: ClinicalRowIdentity): string {
+  return JSON.stringify([
+    "clinical-row-v1",
+    identity.documentId,
+    identity.phaseId ?? null,
+    identity.phaseIndex ?? null,
+    identity.drugLocation,
+    identity.drugIndex,
+    identity.scheduleIndex,
+    identity.cycle,
+    identity.day ?? null,
+  ]);
+}
+
 function idle(source: ClinicalDrug): ResolvedClinicalDrug {
   return {
     source,
@@ -612,9 +709,18 @@ export function resolveClinicalProtocol(
   const globalIssues = selectionIssues(document, "Documento");
   if (template) {
     if (Array.isArray(document.templateExecutionIssues))
-      globalIssues.push(...document.templateExecutionIssues.filter((issue): issue is string => typeof issue === "string"));
-    if (document.referenceOnly === true || document.calculationPolicy?.referenceOnly === true)
-      globalIssues.push("Documento referenceOnly: somente consulta, sem prescrição.");
+      globalIssues.push(
+        ...document.templateExecutionIssues.filter(
+          (issue): issue is string => typeof issue === "string"
+        )
+      );
+    if (
+      document.referenceOnly === true ||
+      document.calculationPolicy?.referenceOnly === true
+    )
+      globalIssues.push(
+        "Documento referenceOnly: somente consulta, sem prescrição."
+      );
   }
   if (!positiveInteger(context.cycle))
     globalIssues.push("cycle deve ser inteiro positivo explícito.");
@@ -655,6 +761,22 @@ export function resolveClinicalProtocol(
   const rows: ResolvedClinicalDrug[] = [];
   for (const selectedDrug of selected.drugs) {
     const { source } = selectedDrug;
+    const identify = (scheduleIndex: number | null) => {
+      const rowIdentity: ClinicalRowIdentity = {
+        documentId: document.id,
+        phaseId: context.phaseId,
+        phaseIndex: selected.phase
+          ? document.phaseLibrary!.indexOf(selected.phase)
+          : undefined,
+        drugLocation: selectedDrug.drugLocation,
+        drugIndex: selectedDrug.drugIndex,
+        scheduleIndex,
+        cycle: context.cycle,
+        day: context.day,
+      };
+      return { rowIdentity, rowKey: clinicalRowKey(rowIdentity) };
+    };
+    const idleRow = () => ({ ...idle(source), ...identify(null) });
     const continuousSentinel =
       document.cycles === 999 &&
       record(document.cycleDefinition) &&
@@ -664,7 +786,7 @@ export function resolveClinicalProtocol(
       positiveInteger(document.cycles) &&
       context.cycle > document.cycles
     ) {
-      rows.push(idle(source));
+      rows.push(idleRow());
       continue;
     }
     const drugIssues = [
@@ -675,12 +797,28 @@ export function resolveClinicalProtocol(
     if (template && source.dose === 0)
       drugIssues.push(`Droga ${source.id}: dose zero não é uma ordem válida.`);
     const schedules = selectedDrug.schedules ?? source.schedule ?? [];
-    const eligibleSchedules = schedules.filter(schedule =>
-      inCycle(schedule, context.cycle) && !(schedule.phase && context.phaseId && schedule.phase !== context.phaseId));
-    const origins = new Set(eligibleSchedules.map(schedule => canonicalOrigin(
-      schedule.timeOrigin ?? source.timeOrigin ?? (selected.phase ? "phase_day_one" : "cycle_day_one"))));
+    const eligibleSchedules = schedules.filter(
+      schedule =>
+        inCycle(schedule, context.cycle) &&
+        !(
+          schedule.phase &&
+          context.phaseId &&
+          schedule.phase !== context.phaseId
+        )
+    );
+    const origins = new Set(
+      eligibleSchedules.map(schedule =>
+        canonicalOrigin(
+          schedule.timeOrigin ??
+            source.timeOrigin ??
+            (selected.phase ? "phase_day_one" : "cycle_day_one")
+        )
+      )
+    );
     if (origins.size > 1)
-      drugIssues.push("Agendas da mesma droga usam origens distintas sem contexto temporal para provar compatibilidade; não inferir offsets.");
+      drugIssues.push(
+        "Agendas da mesma droga usam origens distintas sem contexto temporal para provar compatibilidade; não inferir offsets."
+      );
     for (const schedule of schedules) {
       if (
         inCycle(schedule, context.cycle) &&
@@ -695,7 +833,7 @@ export function resolveClinicalProtocol(
     }
     allIssues.push(...drugIssues);
     if (!schedules.length) {
-      const row = idle(source);
+      const row = idleRow();
       row.status = "blocked";
       row.issues = [
         ...drugIssues,
@@ -706,7 +844,12 @@ export function resolveClinicalProtocol(
     }
     const candidates: ResolvedClinicalDrug[] = [];
     const calendars: Calendar[] = [];
-    for (const schedule of schedules) {
+    for (
+      let scheduleIndex = 0;
+      scheduleIndex < schedules.length;
+      scheduleIndex++
+    ) {
+      const schedule = schedules[scheduleIndex];
       if (
         !inCycle(schedule, context.cycle) &&
         cycleIssues(schedule).length === 0
@@ -721,8 +864,9 @@ export function resolveClinicalProtocol(
       const value = calendar(schedule);
       const origin = canonicalOrigin(
         schedule.timeOrigin ??
-        source.timeOrigin ??
-        (selected.phase ? "phase_day_one" : "cycle_day_one"));
+          source.timeOrigin ??
+          (selected.phase ? "phase_day_one" : "cycle_day_one")
+      );
       const temporalIssues: string[] = [];
       if (!supportedOrigins.has(origin))
         temporalIssues.push(
@@ -746,7 +890,10 @@ export function resolveClinicalProtocol(
       )
         continue;
       const settings = getFrequency(source, schedule, document, selected.phase);
-      const dose = validDose(schedule.dose) && !(template && schedule.dose === 0) ? schedule.dose : null;
+      const dose =
+        validDose(schedule.dose) && !(template && schedule.dose === 0)
+          ? schedule.dose
+          : null;
       const calculated = calculate(
         dose,
         schedule.doseUnit ?? source.doseUnit,
@@ -764,6 +911,7 @@ export function resolveClinicalProtocol(
       ]);
       calendars.push(value);
       candidates.push({
+        ...identify(scheduleIndex),
         source,
         dose,
         frequency: settings.frequency,
@@ -798,7 +946,7 @@ export function resolveClinicalProtocol(
     }
     if (candidates.length) rows.push(...candidates);
     else {
-      const row = idle(source);
+      const row = idleRow();
       if (drugIssues.length) {
         row.status = "blocked";
         row.issues = unique(drugIssues);

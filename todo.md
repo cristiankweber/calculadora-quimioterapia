@@ -866,3 +866,17 @@ Erro informado: failed to connect to websocket / closed without opened na prévi
 - [x] Configurar hmr: { server } em setupVite e mesclar viteConfig.server. Mantidas restrições de filesystem e demais opções. Nenhuma porta/hostname externo fixo, alteração de token, dependência ou supressão de logs.
 - [x] Reiniciar prévia e confirmar handshake/frame connected e log [vite] connected em WS local porta3000 e WSS HTTPS na própria origem (443 implícita), zero erros JS/conexão e zero gravações externas. Suíte completa 1.049 testes/56 arquivos, TypeScript/build/diff--check aprovados, DATABASE_URL='' nos testes. Cache apenas da origem de prévia invalidado.
 - [x] Preparar entrega verificada para checkpoint restaurável. Correção de infraestrutura de desenvolvimento; dados, protocolos, cálculos e produção estática não alterados. Recarregar a prévia para atualizar cliente em cache.
+
+---
+
+## Ajustes individual e de dose-padrão — 17/11/2026
+
+Desenho aprovado: `/home/ubuntu/ajustes-dose/desenho-ajustes-individual-e-protocolo.md`. Implementar ambos; sem alterar valores dos templates ou registros assistenciais automaticamente.
+
+- [x] Identidade por etapa/posição original e contexto, baseline calculada separada de finalDose; motivo, prescribedDailyDose com null preservado e máximo da fonte armazenada.
+- [x] Editor absoluto/percentual, restauração e invalidação síncrona por paciente/revisão/contexto/entradas; cópia, PDF mínimo, prévia, impressão e histórico preservam referência/final/motivo. Suporte proporcional à quantidade prescrita.
+- [x] Servidor reexecuta template próprio ativo e reconstrói auditoria; exceção somente finalDose explícita válida. Baseline/unidades/frequência/calendário/limite forjados, zero/motivo ausente e decisões não resolvidas recusados.
+- [x] Editor específico de doses principais/agendas/fases, espelhos equivalentes juntos; fontes/original/metadados e dose solta da raiz protegidos. Decisões/doses null não preenchidas, JSON clínico íntegro.
+- [x] Revisão transacional owner/hash/row-lock: insert nova versão ativa + archive anterior; histórico e registros existentes intactos. Conflitos de conteúdo/revisão e outro usuário recusados; round-trip preservado. Timestamps novos UTCms.
+- [x] RED/GREEN incorporados, 1.204 testes/67 arquivos com DATABASE_URL='' e TypeScript/build/diff--check aprovados. Navegador final:18 verificações, 375px/desktop, zero exceções JavaScript/gravações externas. Fixtures portáteis; nenhuma revisão da conta/paciente/prescrição real criada para teste.
+- [x] Guia de uso/limites preparado em `/home/ubuntu/ajustes-dose/guia-ajustes-dose.md`. Checkpoint restaurável salva a entrega; publicar no painel do Manus para atualizar o domínio existente.

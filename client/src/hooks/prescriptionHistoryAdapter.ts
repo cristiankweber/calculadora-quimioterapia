@@ -7,6 +7,8 @@ const record = (value: unknown): Record<string, any> =>
     : {};
 const finite = (value: unknown): number | undefined =>
   typeof value === "number" && Number.isFinite(value) ? value : undefined;
+const nullableFinite = (value: unknown): number | null | undefined =>
+  value === null ? null : finite(value);
 
 /** Read-only clinical snapshot. This is deliberately NOT an executable Protocol. */
 export interface PrescriptionHistorySnapshot {
@@ -20,12 +22,17 @@ export interface PrescriptionHistorySnapshot {
     name: string;
     baseDose?: number;
     finalDose?: number;
+    calculatedDose?: number;
+    rowKey?: string;
+    adjustmentReason?: string;
+    isManualDose?: boolean;
     doseUnit?: string;
     resultUnit?: string;
     route?: string;
     days?: string;
-    frequency?: number;
-    dailyDose?: number;
+    frequency?: number | null;
+    dailyDose?: number | null;
+    prescribedDailyDose?: number | null;
     timeOrigin?: string;
     doseRepresents?: string;
     notes?: string;
@@ -91,6 +98,14 @@ export function readPrescriptionHistory(
               : "Medicamento não identificado",
           baseDose: finite(d.baseDose ?? d.dose),
           finalDose: finite(d.finalDose ?? d.calculatedDose),
+          calculatedDose: finite(d.calculatedDose),
+          rowKey: typeof d.rowKey === "string" ? d.rowKey : undefined,
+          adjustmentReason:
+            typeof d.adjustmentReason === "string"
+              ? d.adjustmentReason
+              : undefined,
+          isManualDose:
+            typeof d.isManualDose === "boolean" ? d.isManualDose : undefined,
           doseUnit: typeof d.doseUnit === "string" ? d.doseUnit : undefined,
           // Legacy absolute unit may be stored as unit; never label a normalized base as absolute.
           resultUnit:
@@ -107,8 +122,9 @@ export function readPrescriptionHistory(
                 : typeof d.schedule === "string"
                   ? d.schedule
                   : undefined,
-          frequency: finite(d.frequency),
-          dailyDose: finite(d.dailyDose),
+          frequency: nullableFinite(d.frequency),
+          dailyDose: nullableFinite(d.dailyDose),
+          prescribedDailyDose: nullableFinite(d.prescribedDailyDose),
           timeOrigin:
             typeof d.timeOrigin === "string" ? d.timeOrigin : undefined,
           doseRepresents:

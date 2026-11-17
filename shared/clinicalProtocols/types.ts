@@ -128,7 +128,21 @@ export interface ClinicalContext {
   gfrForCalvert?: number;
 }
 
+/** Original document positions, never the filtered output index or drug name. */
+export interface ClinicalRowIdentity {
+  documentId: string;
+  phaseId?: string;
+  phaseIndex?: number;
+  drugLocation: "document" | "phase";
+  drugIndex: number;
+  scheduleIndex: number | null;
+  cycle: number;
+  day?: number;
+}
+
 export interface ResolvedClinicalDrug {
+  rowKey?: string;
+  rowIdentity?: ClinicalRowIdentity;
   /** Exact, unmodified drug object in the original document or selected phase. */
   source: ClinicalDrug;
   /** Declared dose for this calendar segment, before patient factors/division. */

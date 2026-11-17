@@ -594,7 +594,7 @@ export default function PdfPreviewModal({
                             Dose Base
                           </th>
                           <th className="border border-gray-300 p-2 text-left font-bold">
-                            Dose Calculada
+                            Dose Prescrita
                           </th>
                           <th className="border border-gray-300 p-2 text-left font-bold">
                             Via

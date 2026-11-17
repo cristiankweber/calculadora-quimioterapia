@@ -1,7 +1,8 @@
 import * as React from "react";
-import { useId } from "react";
+import { useId, useState } from "react";
 import {
   getTemplateExecutionDocument,
+  getTemplatePrescriptionIssues,
   isActiveTemplateDocument,
 } from "@shared/clinicalProtocols/templates";
 import type {
@@ -9,6 +10,10 @@ import type {
   ClinicalProtocolDocument,
   ResolvedClinicalProtocol as ClinicalResolution,
 } from "@shared/clinicalProtocols/types";
+import type { TemplateDoseOverride } from "@shared/clinicalProtocols/manualAdjustments";
+import type { Drug } from "@/types/calculator";
+import TemplateDoseAdjustmentEditor from "./TemplateDoseAdjustmentEditor";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -35,6 +40,12 @@ export interface ClinicalProtocolPanelProps {
   context: ClinicalContext;
   onContextChange: (next: ClinicalContext) => void;
   packageData?: Record<string, unknown>;
+  doseEditing?: {
+    scopeKey: string;
+    drugs: Drug[];
+    onConfirm: (override: TemplateDoseOverride) => string[];
+    onRestore: (rowKey: string) => void;
+  };
 }
 
 type ResolvedRow = ClinicalResolution["rows"][number];
@@ -311,12 +322,18 @@ function DoseGroup({
   rows,
   status,
   isTemplate = false,
+  doseEditing,
 }: {
   title: string;
   rows: ResolvedRow[];
   status: ResolvedRow["status"];
   isTemplate?: boolean;
+  doseEditing?: ClinicalProtocolPanelProps["doseEditing"];
 }) {
+  const [editingRowKey, setEditingRowKey] = useState<string | null>(null);
+  const prescribedByKey = new Map(
+    doseEditing?.drugs.map(drug => [drug.rowKey, drug]) ?? []
+  );
   if (rows.length === 0) return null;
   return (
     <section aria-label={title} className="min-w-0 space-y-3">
@@ -344,7 +361,8 @@ function DoseGroup({
               {[
                 "Medicamento / procedimento",
                 "Base informada",
-                "Dose por aplicação",
+                "Dose calculada por aplicação",
+                ...(doseEditing ? ["Dose prescrita por aplicação"] : []),
                 "Total diário / 24h",
                 "Frequência / duração",
                 "Período e origem temporal",
@@ -378,9 +396,20 @@ function DoseGroup({
               const unavailable =
                 status === "not_scheduled" ? "Não programada" : "Não calculada";
               const canDisplay = status === "ready";
+              const prescribed = prescribedByKey.get(row.rowKey);
+              const finalDose =
+                prescribed?.finalDose === undefined
+                  ? row.calculatedDose
+                  : prescribed.finalDose;
+              const dailyDose =
+                prescribed?.prescribedDailyDose === undefined
+                  ? row.dailyDose
+                  : prescribed.prescribedDailyDose;
+              const rowKey = row.rowKey;
+              const adjusted = finalDose !== row.calculatedDose;
               return (
                 <tr
-                  key={`${text(source.id, "row")}-${index}`}
+                  key={row.rowKey ?? `${text(source.id, "row")}-${index}`}
                   className="border-b align-top last:border-0"
                 >
                   <th
@@ -438,11 +467,71 @@ function DoseGroup({
                       </p>
                     ) : null}
                   </td>
+                  {doseEditing ? (
+                    <td className="min-w-[260px] space-y-2 p-3">
+                      <p className="font-semibold text-primary">
+                        {doseText(finalDose, row.resultUnit)}
+                      </p>
+                      {adjusted ? (
+                        <p className="text-xs">
+                          Ajuste manual — motivo:{" "}
+                          {prescribed?.adjustmentReason || "não registrado"}
+                        </p>
+                      ) : null}
+                      {rowKey ? (
+                        <div className="flex flex-wrap gap-2">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setEditingRowKey(rowKey)}
+                          >
+                            Ajustar dose
+                          </Button>
+                          {adjusted ? (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                doseEditing.onRestore(rowKey);
+                                setEditingRowKey(null);
+                              }}
+                            >
+                              Restaurar dose calculada
+                            </Button>
+                          ) : null}
+                        </div>
+                      ) : null}
+                      {rowKey &&
+                      editingRowKey === rowKey &&
+                      isFiniteNumber(row.calculatedDose) &&
+                      isFiniteNumber(finalDose) ? (
+                        <TemplateDoseAdjustmentEditor
+                          rowKey={rowKey}
+                          name={text(source.name)}
+                          baseline={row.calculatedDose}
+                          finalDose={finalDose}
+                          unit={row.resultUnit}
+                          doseRepresents={row.doseRepresents}
+                          continuousInfusion={row.continuousInfusion}
+                          maxDose={
+                            prescribed?.maxDose ??
+                            (isFiniteNumber(source.maxDose)
+                              ? source.maxDose
+                              : undefined)
+                          }
+                          onConfirm={doseEditing.onConfirm}
+                          onCancel={() => setEditingRowKey(null)}
+                        />
+                      ) : null}
+                    </td>
+                  ) : null}
                   <td className="p-3">
                     {canDisplay
-                      ? totalInfusion && row.dailyDose === null
+                      ? totalInfusion && dailyDose === null
                         ? "Não definido para esta infusão"
-                        : doseText(row.dailyDose, row.resultUnit, "/24h")
+                        : doseText(dailyDose, row.resultUnit, "/24h")
                       : unavailable}
                   </td>
                   <td className="space-y-1 p-3">
@@ -489,13 +578,14 @@ function DoseGroup({
   );
 }
 
-/** Controlled display only: no dose calculation, approval toggle, persistence or prescription export. */
+/** Baseline display stays controlled; optional individual overrides never edit the registered document. */
 export default function ClinicalProtocolPanel({
   document,
   resolution,
   context,
   onContextChange,
   packageData,
+  doseEditing,
 }: ClinicalProtocolPanelProps) {
   const id = useId();
   const doc = record(document);
@@ -554,6 +644,10 @@ export default function ClinicalProtocolPanel({
   const notScheduled = missingPhase
     ? []
     : resolution.rows.filter(row => row.status === "not_scheduled");
+  const editable =
+    isTemplate &&
+    !missingPhase &&
+    getTemplatePrescriptionIssues(document, context, resolution).length === 0;
   const coveredKeys = new Set([
     "name",
     "id",
@@ -842,6 +936,7 @@ export default function ClinicalProtocolPanel({
         ) : (
           <>
             <DoseGroup
+              key={doseEditing?.scopeKey ?? "read-only"}
               title={
                 isTemplate
                   ? "Doses resolvidas para revisão"
@@ -850,6 +945,7 @@ export default function ClinicalProtocolPanel({
               rows={ready}
               status="ready"
               isTemplate={isTemplate}
+              doseEditing={editable ? doseEditing : undefined}
             />
             <DoseGroup
               title="Doses bloqueadas"
