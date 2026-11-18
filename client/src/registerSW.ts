@@ -1,14 +1,15 @@
 export function registerServiceWorker() {
-  if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker
-        .register('/sw.js')
-        .then((registration) => {
-          console.log('[SW] Service Worker registered:', registration.scope);
-        })
-        .catch((error) => {
-          console.log('[SW] Service Worker registration failed:', error);
-        });
-    });
-  }
+  if (import.meta.env.DEV || !("serviceWorker" in navigator)) return;
+  const register = () => {
+    navigator.serviceWorker
+      .register("/sw.js", { updateViaCache: "none" })
+      .then(registration =>
+        console.log("[SW] Service Worker registrado:", registration.scope)
+      )
+      .catch(error =>
+        console.warn("[SW] Registro do Service Worker indisponível:", error)
+      );
+  };
+  if (document.readyState === "complete") register();
+  else window.addEventListener("load", register, { once: true });
 }

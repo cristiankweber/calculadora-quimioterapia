@@ -894,3 +894,15 @@ Escopo aprovado: editar campos clínicos do template via nova versão ativa; pre
 - [x] Tela, prévia, cópia, PDF e impressão usam versão clínica atual e antiemese cadastrada; ausência aparece como não informado. Snapshot do template reconstruído do cadastro pelo servidor; notas individuais da prescrição preservadas.
 - [x] RED/GREEN incorporados, suíte final 1.373 testes/74 arquivos com DATABASE_URL='' aprovada; TypeScript/build/diff--check aprovados. Chromium final:20 verificações, desktop/375px, zero erros JS e zero gravações externas, transporte interceptado e fixture portátil do BuEM.
 - [x] Guia em `/home/ubuntu/editor-clinico/guia-editor-clinico.md`; entrega pronta para checkpoint restaurável e publicação pelo painel Manus. Nenhum protocolo/paciente/prescrição real alterado para validação.
+
+---
+
+## Correção React/Dialogs — 18/11/2026
+
+Escopo: corrigir a mistura de dependências React de versões de otimização distintas no cache da prévia; preservar autenticação, banco e funcionalidades clínicas.
+
+- [x] Causa comprovada: SW v1 cache-first armazenava módulos de desenvolvimento sem invalidação; stack misturava hashes Vite ced61b0b/389b4afb. React/DOM/renderer 19.2.0 alinhados e mesma instalação física; Dialog usa hooks corretamente.
+- [x] Bootstrap sem React espera limpeza DEV de caches calculadora-quimio-* e SW /sw.js próprio antes de importar main. Controlador removido pede navegação única; unregister recusado não gera loop. DEV não registra novo SW; produção usa updateViaCache:none e preserva funcionamento do worker. Cookies/localStorage/caches alheios preservados.
+- [x] SW v2 exclui módulos DEV/API/terceiros/nãoGET e contextos privados; assets fingerprintados/MIME corretos somente; navegação network-first; HTML nunca fallback de JS. Remove apenas caches próprios antigos na ativação e não precacheia HTML personalizado.
+- [x] RED/GREEN de cache/bootstrap e 1.445 testes/76 arquivos aprovados (DATABASE_URL=''); TypeScript/build/diff--check aprovados. Chromium com worker v1 real e cache contaminado:11 verificações, emergência/histórico anônimos, segundo reload, zero erros JS/escritas clínicas; fixture histórica portátil incluída.
+- [x] Prévia persistente confirmada: appLoaded:true, unexpectedError:false, registrations:[], ownCaches:[], controller:null; sem limpeza manual necessária após novo bootstrap. Implementação verificada pronta para checkpoint restaurável; nenhum dado clínico alterado.

@@ -22,21 +22,8 @@
 
   <body>
     <div id="root"></div>
-    <!-- Desregistrar Service Worker do Manus Space para evitar cache agressivo -->
-    <script>
-      if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.getRegistrations().then(function(registrations) {
-          for(let registration of registrations) {
-            registration.unregister().then(function(success) {
-              if (success) {
-                console.log('[SW] Service Worker desregistrado com sucesso');
-              }
-            });
-          }
-        });
-      }
-    </script>
-    <script type="module" src="/src/main.tsx"></script>
+    <!-- Limpar o cache da prévia antes de carregar React e os componentes. -->
+    <script type="module" src="/src/bootstrap.ts"></script>
     <script
       defer
       src="%VITE_ANALYTICS_ENDPOINT%/umami"
