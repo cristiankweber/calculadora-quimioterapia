@@ -22,8 +22,7 @@ import type { ToxicityGrade } from "@/data/ctcae";
 import { getDoseAdjustmentFactor } from "@/data/ctcae";
 import {
   generatePrescriptionPDF,
-  drugPrescriptionOutput,
-  templatePrescriptionMetadata,
+  generatePrescriptionText,
 } from "@/lib/pdfGenerator";
 import { trpc } from "@/lib/trpc";
 import type { HydrationSupportData } from "@/components/HydrationCalculator";
@@ -138,6 +137,9 @@ export function buildPrescriptionDataV2(ctx: PrescriptionContext) {
       totalCycles: protocol.cycles,
       templateContext: protocol.templateContext,
       calvertGfrAbsolute: protocol.calvertGfrAbsolute,
+      ...(protocol.isUserTemplate && protocol.clinicalDocument
+        ? { clinicalDocument: protocol.clinicalDocument }
+        : {}),
     },
     calculatedValues: {
       bsa: calculatedValues.bsa,
@@ -182,6 +184,13 @@ export function buildPrescriptionDataV2(ctx: PrescriptionContext) {
           })),
         ]
       : undefined,
+    ...(protocol.isUserTemplate
+      ? {
+          antiemetics: ctx.antiemetics ?? undefined,
+          prophylaxis: protocol.prophylaxis,
+          nursingCare: protocol.nursingCare,
+        }
+      : {}),
     alerts: protocol.specialAlerts?.map(msg => ({
       type: "protocol",
       message: msg,
@@ -409,32 +418,14 @@ export function usePrescriptionActions(
       calculatedDrugs,
     } = ctx;
 
-    let text = `PRESCRIÇÃO DE QUIMIOTERAPIA\n\n`;
-    text += `Paciente: ${patientData.name}\n`;
-    text += `Idade: ${patientData.age} anos | Sexo: ${patientData.sex}\n`;
-    text += `Peso: ${patientData.weight} kg | Altura: ${patientData.height} cm\n`;
-    text += `SC: ${calculatedValues!.bsa.toFixed(2)} m² | eGFR: ${calculatedValues!.egfr.toFixed(1)}\n\n`;
-
-    text += `PROTOCOLO: ${selectedProtocol!.name}\nCiclo: ${selectedCycle}/${selectedProtocol!.cycles}\n`;
-    text += `Indicação: ${selectedProtocol!.indication}\n\n`;
-    const metadata = templatePrescriptionMetadata(selectedProtocol!);
-    if (metadata.length) text += `${metadata.join("\n")}\n\n`;
-    if (selectedProtocol!.isUserTemplate) {
-      const c = selectedProtocol!.templateContext;
-      text += `Template do usuário — validar antes de administrar.\nFase: ${c?.phaseId ?? "não aplicável"} | Dia: ${c?.day ?? "agenda completa do ciclo"}\n\n`;
-    }
-
-    text += `DROGAS:\n`;
-    calculatedDrugs.forEach(d => {
-      const output = drugPrescriptionOutput(d, selectedProtocol!);
-      text += `• ${d.name}: ${output.calculated} ${d.route} (Dias ${d.days})\n`;
-      output.details.forEach(line => {
-        text += `  ${line}\n`;
-      });
-      if (selectedProtocol!.isUserTemplate && d.observations)
-        text += `  ${d.observations}\n`;
+    const text = generatePrescriptionText({
+      patient: patientData,
+      calculatedValues: calculatedValues!,
+      protocol: selectedProtocol!,
+      cycle: selectedCycle,
+      drugs: calculatedDrugs,
+      antiemetics: ctx.antiemetics!,
     });
-
     navigator.clipboard.writeText(text);
     toast.success("Prescrição copiada!");
   }, [ctx, validateBeforeAction]);

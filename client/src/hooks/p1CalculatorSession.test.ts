@@ -17,6 +17,7 @@ vi.mock("@/_core/hooks/useAuth", () => ({
 }));
 vi.mock("@/lib/trpc", () => ({
   trpc: {
+    useUtils: () => ({}),
     settings: { get: { useQuery: () => ({ data: null }) } },
     customProtocols: {
       listActive: { useQuery: () => ({ data: io.protocols }) },

@@ -24,6 +24,8 @@ export interface CalculatedValues {
 }
 
 export interface Drug {
+  /** Identificador estável da fonte clínica para vincular a farmacotécnica. */
+  id?: string;
   name: string;
   dose: number;
   doseUnit:
@@ -103,6 +105,8 @@ export interface AntiemeticProphylaxis {
   days2to4: string[];
   rescue: string[];
   alerts: string[];
+  /** Referência explicitamente cadastrada; não inferir dias relativos ao D0. */
+  timeReference?: string;
 }
 
 export interface Prescription {

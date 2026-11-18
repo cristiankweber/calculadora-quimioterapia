@@ -6,6 +6,8 @@ import PatientForm from "@/components/PatientForm";
 import ProtocolSelector from "@/components/ProtocolSelector";
 import HydrationCalculator from "@/components/HydrationCalculator";
 import ClinicalProtocolPanel from "@/components/ClinicalProtocolPanel";
+import PdfPreviewModal from "@/components/PdfPreviewModal";
+import { mapStoredProtocol } from "@/lib/clinicalCatalogue";
 import type { PatientData, Protocol } from "@/types/calculator";
 import type { ClinicalProtocolDocument } from "@shared/clinicalProtocols/types";
 
@@ -26,7 +28,7 @@ vi.mock("@/lib/trpc", () => ({
     patients: {
       list: {
         useQuery: () => ({
-          data: io.records,
+          data: [],
           refetch: () => {},
           isLoading: false,
         }),
@@ -120,6 +122,7 @@ const props = (type: any) => root.root.findByType(type?.type ?? type).props;
 beforeEach(() => {
   io.userId = 1;
   io.copied = "";
+  io.records = [];
   vi.useFakeTimers();
   vi.stubGlobal("React", React);
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
@@ -163,6 +166,73 @@ function adjust() {
 }
 
 describe("Calculadora real propaga ajuste sem vazar contexto", () => {
+  it("antiemese explícita e farmacotécnica atual chegam à cópia e à prévia sem gerador genérico", () => {
+    const current = {
+      ...document,
+      antiemetics: {
+        day1: ["PRÉ-QT EXPLÍCITO"],
+        days2to4: ["SEGUIMENTO EXPLÍCITO"],
+        rescue: ["RESGATE EXPLÍCITO"],
+        alerts: ["NOTA EXPLÍCITA"],
+        timeReference: "RELATIVO À ADMINISTRAÇÃO, NÃO AO D0",
+      },
+      prophylaxis: ["PROFILAXIA ATUAL"],
+      nursingCare: ["ENFERMAGEM ATUAL"],
+      dilutionInfo: [
+        {
+          drugId: "one",
+          drugName: "Ciclofosfamida fictícia",
+          diluent: "DILUENTE ATUAL",
+        },
+      ],
+      sourceDocument: {
+        dilutionInfo: [
+          {
+            drugId: "one",
+            drugName: "Ciclofosfamida fictícia",
+            diluent: "DILUENTE ARQUIVADO",
+          },
+        ],
+      },
+    };
+    const record = {
+      id: 42,
+      userId: 1,
+      isActive: 1,
+      protocolId: "template-fictitious-current",
+      clinicalDocument: current,
+      clinicalPackage: { version: "user-protocol-template-1.0" },
+    };
+    io.records = [record];
+    act(() =>
+      props(ProtocolSelector).onProtocolChange(mapStoredProtocol(record))
+    );
+    act(() => vi.advanceTimersByTime(300));
+    const preview = props(PdfPreviewModal);
+    expect(preview.antiemetics).toMatchObject({
+      day1: ["PRÉ-QT EXPLÍCITO"],
+      rescue: ["RESGATE EXPLÍCITO"],
+      timeReference: "RELATIVO À ADMINISTRAÇÃO, NÃO AO D0",
+    });
+    const copy = root.root
+      .findAllByType("button")
+      .find(b => b.children.some(child => child === " Copiar"));
+    act(() => copy!.props.onClick());
+    for (const value of [
+      "PRÉ-QT EXPLÍCITO",
+      "RESGATE EXPLÍCITO",
+      "PROFILAXIA ATUAL",
+      "ENFERMAGEM ATUAL",
+      "DILUENTE ATUAL",
+    ])
+      expect(io.copied).toContain(value);
+    expect(io.copied).not.toContain("DILUENTE ARQUIVADO");
+    const edit = root.root
+      .findAllByType("button")
+      .find(b => b.children.some(child => child === "Editar protocolo"));
+    expect(edit).toBeDefined();
+    expect(edit!.props.disabled).not.toBe(true);
+  });
   it("painel continua baseline, prescrição final e suporte base proporcional", () => {
     adjust();
     expect(props(ClinicalProtocolPanel).resolution.rows[0].calculatedDose).toBe(

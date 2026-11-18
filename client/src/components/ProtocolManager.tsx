@@ -5,6 +5,7 @@ import { isEnrichedClinicalDocument } from "@shared/clinicalProtocols/library";
 import { isActiveTemplateDocument } from "@shared/clinicalProtocols/templates";
 import { getDoseResultUnit } from "@shared/clinicalDoseEngine";
 import { TemplateDoseRevisionDialog } from "./TemplateDoseRevisionDialog";
+import { TemplateClinicalRevisionDialog } from "./TemplateClinicalRevisionDialog";
 import {
   Card,
   CardContent,
@@ -388,6 +389,9 @@ export default function ProtocolManager() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [doseRevisionId, setDoseRevisionId] = useState<number | null>(null);
+  const [clinicalRevisionId, setClinicalRevisionId] = useState<number | null>(
+    null
+  );
   const [editingId, setEditingId] = useState<number | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
@@ -827,7 +831,7 @@ export default function ProtocolManager() {
               className={`transition-all ${protocol.isActive === 0 ? "opacity-60 border-dashed" : ""} ${selectedIds.has(protocol.id) ? "ring-2 ring-primary/50" : ""}`}
             >
               <CardContent className="py-4">
-                <div className="flex items-start justify-between gap-4">
+                <div className="flex flex-wrap items-start justify-between gap-4">
                   {/* Checkbox */}
                   {protocol.isActive === 1 && (
                     <button
@@ -921,8 +925,9 @@ export default function ProtocolManager() {
                           {isActiveTemplateDocument(protocol.clinicalDocument)
                             ? "Selecione este template na calculadora para consultar a agenda e prescrever após resolver as decisões necessárias. Revise antes de administrar."
                             : "Para simular calendário e doses, selecione este protocolo na calculadora."}{" "}
-                          Revisões devem ser importadas em JSON completo, sem
-                          remover decisões e calendários.
+                          {isActiveTemplateDocument(protocol.clinicalDocument)
+                            ? "Use Editar protocolo completo para revisar os campos disponíveis, preservando fontes, decisões e calendários não alterados."
+                            : "Este rascunho permanece somente para consulta; revisões exigem importação do documento clínico completo."}
                         </p>
                         <pre className="max-h-80 overflow-auto rounded-md bg-muted p-3 text-xs">
                           {JSON.stringify(protocol.clinicalDocument, null, 2)}
@@ -930,7 +935,7 @@ export default function ProtocolManager() {
                       </details>
                     )}
                   </div>
-                  <div className="flex items-center gap-1 shrink-0">
+                  <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
                     {protocol.isActive === 0 ? (
                       <Button
                         variant="outline"
@@ -948,33 +953,48 @@ export default function ProtocolManager() {
                         {protocol.clinicalPackage?.version ===
                           "user-protocol-template-1.0" &&
                         isActiveTemplateDocument(protocol.clinicalDocument) ? (
+                          <>
+                            <Button
+                              size="sm"
+                              className="gap-1"
+                              onClick={() => setClinicalRevisionId(protocol.id)}
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                              Editar protocolo completo
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="gap-1"
+                              onClick={() => setDoseRevisionId(protocol.id)}
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                              Editar doses-padrão
+                            </Button>
+                          </>
+                        ) : null}
+                        {!isActiveTemplateDocument(
+                          protocol.clinicalDocument
+                        ) ? (
                           <Button
-                            variant="outline"
+                            variant="ghost"
                             size="sm"
-                            className="gap-1"
-                            onClick={() => setDoseRevisionId(protocol.id)}
+                            onClick={() => openEditDialog(protocol)}
+                            disabled={isEnrichedClinicalDocument(
+                              protocol.clinicalDocument
+                            )}
+                            title={
+                              isEnrichedClinicalDocument(
+                                protocol.clinicalDocument
+                              )
+                                ? "Rascunho somente para consulta; o editor legado não preserva fases."
+                                : "Editar protocolo"
+                            }
+                            aria-label="Editar protocolo legado"
                           >
-                            <Pencil className="h-3.5 w-3.5" />
-                            Editar doses-padrão
+                            <Pencil className="h-4 w-4" />
                           </Button>
                         ) : null}
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => openEditDialog(protocol)}
-                          disabled={isEnrichedClinicalDocument(
-                            protocol.clinicalDocument
-                          )}
-                          title={
-                            isEnrichedClinicalDocument(
-                              protocol.clinicalDocument
-                            )
-                              ? "Revisar por JSON completo; o editor legado não preserva fases."
-                              : "Editar protocolo"
-                          }
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
                         <Button
                           variant="ghost"
                           size="sm"
@@ -1002,6 +1022,17 @@ export default function ProtocolManager() {
           id={doseRevisionId}
           onClose={() => {
             setDoseRevisionId(null);
+            setSelectedIds(new Set());
+          }}
+        />
+      ) : null}
+
+      {clinicalRevisionId !== null ? (
+        <TemplateClinicalRevisionDialog
+          key={clinicalRevisionId}
+          id={clinicalRevisionId}
+          onClose={() => {
+            setClinicalRevisionId(null);
             setSelectedIds(new Set());
           }}
         />

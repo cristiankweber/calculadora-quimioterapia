@@ -192,6 +192,20 @@ export const prescriptionDataSchemaV2 = z.object({
     )
     .optional(),
 
+  // Conteúdo de suporte explícito; templates são reconstruídos do cadastro pelo servidor.
+  antiemetics: z
+    .object({
+      risk: z.enum(["high", "moderate", "low", "minimal"]),
+      day1: z.array(z.string()),
+      days2to4: z.array(z.string()),
+      rescue: z.array(z.string()),
+      alerts: z.array(z.string()),
+      timeReference: z.string().optional(),
+    })
+    .optional(),
+  prophylaxis: z.array(z.string()).optional(),
+  nursingCare: z.array(z.string()).optional(),
+
   // Alertas clínicos
   alerts: z.array(alertSchema).optional(),
 

@@ -18,6 +18,8 @@ import {
 import { clinicalProtocolsRouter } from "./routers/clinicalProtocols";
 import { validateActiveTemplatePrescription } from "./activeTemplatePrescription";
 import { templateDoseRevisionRouter } from "./templateDoseRevision";
+import { templateClinicalRevisionRouter } from "./templateClinicalRevision";
+import { projectTemplateAntiemetics } from "../shared/clinicalProtocols/antiemetics";
 import {
   createPrescriptionInputSchema,
   validateDoseSafety,
@@ -154,6 +156,7 @@ export const appRouter = router({
   system: systemRouter,
   clinicalProtocols: clinicalProtocolsRouter,
   templateDoseRevision: templateDoseRevisionRouter,
+  templateClinicalRevision: templateClinicalRevisionRouter,
   auth: router({
     me: publicProcedure.query(opts => opts.ctx.user),
     logout: publicProcedure.mutation(({ ctx }) => {
@@ -404,6 +407,44 @@ export const appRouter = router({
             ...input.prescriptionData,
             ...(validatedTemplate
               ? {
+                  protocol: {
+                    ...input.prescriptionData.protocol,
+                    clinicalDocument: structuredClone(
+                      validatedTemplate.document
+                    ) as unknown as Record<string, unknown>,
+                  },
+                  antiemetics: projectTemplateAntiemetics(
+                    validatedTemplate.document
+                  ),
+                  preMedications: (() => {
+                    const anti = projectTemplateAntiemetics(
+                      validatedTemplate.document
+                    );
+                    return [
+                      ...anti.day1.map(name => ({
+                        name,
+                        schedule: `Pré-QT / Dia 1 — ${anti.timeReference || "referência temporal não informada"}`,
+                      })),
+                      ...anti.days2to4.map(name => ({
+                        name,
+                        schedule: `Dias seguintes (2–4) — ${anti.timeReference || "referência temporal não informada"}`,
+                      })),
+                    ];
+                  })(),
+                  prophylaxis: Array.isArray(
+                    validatedTemplate.document.prophylaxis
+                  )
+                    ? validatedTemplate.document.prophylaxis.filter(
+                        (item): item is string => typeof item === "string"
+                      )
+                    : [],
+                  nursingCare: Array.isArray(
+                    validatedTemplate.document.nursingCare
+                  )
+                    ? validatedTemplate.document.nursingCare.filter(
+                        (item): item is string => typeof item === "string"
+                      )
+                    : [],
                   calculatedValues: {
                     ...input.prescriptionData.calculatedValues,
                     globalAdjustmentFactor: 1,

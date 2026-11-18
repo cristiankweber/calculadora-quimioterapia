@@ -3,15 +3,34 @@ import { appRouter } from "./routers";
 import { normalizeLegacyPayload } from "./prescriptionSchema";
 const state = vi.hoisted(() => ({ writes: [] as any[] }));
 vi.mock("./_core/env", () => ({ ENV: {} }));
-vi.mock("./_core/notification", () => ({ notifyOwner: () => { throw new Error("Notification prohibited"); } }));
+vi.mock("./_core/notification", () => ({
+  notifyOwner: () => {
+    throw new Error("Notification prohibited");
+  },
+}));
 vi.mock("./db", () => ({
   getPatientById: async (id: number, userId: number) =>
-    id === 1 && userId === 7 ? {
-      id, userId, name: "Fictício", age: 40, sex: "M", weight: 70, height: 170,
-      creatinine: "1.00", bilirubin: "0.00", ecog: 0, comorbidities: null,
-      cumulativeDoxorubicin: 0, cumulativeDaunorubicin: 0, cumulativeIdarubicin: 0, cumulativeEpirubicin: 0,
-      createdAt: new Date(), updatedAt: new Date(),
-    } : undefined,
+    id === 1 && userId === 7
+      ? {
+          id,
+          userId,
+          name: "Fictício",
+          age: 40,
+          sex: "M",
+          weight: 70,
+          height: 170,
+          creatinine: "1.00",
+          bilirubin: "0.00",
+          ecog: 0,
+          comorbidities: null,
+          cumulativeDoxorubicin: 0,
+          cumulativeDaunorubicin: 0,
+          cumulativeIdarubicin: 0,
+          cumulativeEpirubicin: 0,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        }
+      : undefined,
   getCustomProtocolByProtocolId: async (id: string) =>
     id === "template-owned-abc"
       ? {
@@ -27,6 +46,23 @@ vi.mock("./db", () => ({
             indication: "Fixture",
             cycles: 1,
             cycleLength: 21,
+            prophylaxis: ["PROFILAXIA AUTORITATIVA"],
+            nursingCare: ["ENFERMAGEM AUTORITATIVA"],
+            emetogenicRisk: "high",
+            antiemetics: {
+              day1: ["PRÉ-QT AUTORITATIVO"],
+              days2to4: [],
+              rescue: ["RESGATE AUTORITATIVO"],
+              alerts: [],
+              timeReference: "Após a administração de teste",
+            },
+            dilutionInfo: [
+              {
+                drugId: "a",
+                drugName: "Droga A",
+                diluent: "DILUENTE AUTORITATIVO",
+              },
+            ],
             templateUsage: {
               kind: "user_managed",
               status: "active",
@@ -114,6 +150,41 @@ const input = () => ({
 });
 beforeEach(() => state.writes.splice(0));
 describe("Endpoint revalida autoridade e seleção de templates antes da persistência", () => {
+  it("snapshot salva conteúdo clínico atual do registro, não conteúdo adulterado do cliente", async () => {
+    const p = input() as any;
+    p.prescriptionData.protocol.clinicalDocument = {
+      nursingCare: ["CLIENTE FORJADO"],
+    };
+    p.prescriptionData.antiemetics = {
+      risk: "high",
+      day1: ["CLIENTE FORJADO"],
+      days2to4: [],
+      rescue: [],
+      alerts: [],
+    };
+    await appRouter.createCaller(ctx).prescriptions.create(p);
+    const saved = state.writes[0].prescriptionData;
+    expect(saved.protocol.clinicalDocument).toMatchObject({
+      prophylaxis: ["PROFILAXIA AUTORITATIVA"],
+      nursingCare: ["ENFERMAGEM AUTORITATIVA"],
+      dilutionInfo: [
+        { drugId: "a", drugName: "Droga A", diluent: "DILUENTE AUTORITATIVO" },
+      ],
+    });
+    expect(saved.antiemetics).toMatchObject({
+      day1: ["PRÉ-QT AUTORITATIVO"],
+      rescue: ["RESGATE AUTORITATIVO"],
+      timeReference: "Após a administração de teste",
+    });
+    const normalized = normalizeLegacyPayload(saved)!;
+    expect(normalized.protocol.clinicalDocument).toEqual(
+      saved.protocol.clinicalDocument
+    );
+    expect((normalized as any).antiemetics.rescue).toEqual([
+      "RESGATE AUTORITATIVO",
+    ]);
+    expect(JSON.stringify(saved)).not.toContain("CLIENTE FORJADO");
+  });
   it("persiste template próprio resolvido com auditoria do registro e contexto", async () => {
     const result = await appRouter
       .createCaller(ctx)

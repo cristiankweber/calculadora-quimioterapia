@@ -880,3 +880,17 @@ Desenho aprovado: `/home/ubuntu/ajustes-dose/desenho-ajustes-individual-e-protoc
 - [x] Revisão transacional owner/hash/row-lock: insert nova versão ativa + archive anterior; histórico e registros existentes intactos. Conflitos de conteúdo/revisão e outro usuário recusados; round-trip preservado. Timestamps novos UTCms.
 - [x] RED/GREEN incorporados, 1.204 testes/67 arquivos com DATABASE_URL='' e TypeScript/build/diff--check aprovados. Navegador final:18 verificações, 375px/desktop, zero exceções JavaScript/gravações externas. Fixtures portáteis; nenhuma revisão da conta/paciente/prescrição real criada para teste.
 - [x] Guia de uso/limites preparado em `/home/ubuntu/ajustes-dose/guia-ajustes-dose.md`. Checkpoint restaurável salva a entrega; publicar no painel do Manus para atualizar o domínio existente.
+
+---
+
+## Editor clínico completo dos templates — 18/11/2026
+
+Escopo aprovado: editar campos clínicos do template via nova versão ativa; preservar fonte arquivada e prescrições históricas. Nenhuma alteração automática nos 53 templates ou pacientes.
+
+- [x] Editor versionado de medicamentos/observações/via/dias/frequência/doses e farmacotécnica (status, diluente, volume, tempo, estabilidade, instruções); dados calculados separados dos textos. Acesso direto Calculator e ProtocolManager; doses individuais mantidas.
+- [x] Profilaxias, alertas, orientações de ajustes e cuidados de enfermagem editáveis, incluindo adicionar/remover itens; formulários tipados, sem editor JSON arbitrário nem edição de IDs/decisões condicionais.
+- [x] Antiemese explícita: pré-QT, dias seguintes, resgate, notas e referência temporal; sem preenchimento médico presumido. BuEM vazio explicitamente não informado; nenhuma medicação gerada pelo risco.
+- [x] Revisão autorizada por proprietário/hash/row-lock e transação, nova versão ativa/antiga arquivada, fontes/original/calendários não editados preservados, conflito e adulteração recusados, cadeia de revisão e round-trip mantidos.
+- [x] Tela, prévia, cópia, PDF e impressão usam versão clínica atual e antiemese cadastrada; ausência aparece como não informado. Snapshot do template reconstruído do cadastro pelo servidor; notas individuais da prescrição preservadas.
+- [x] RED/GREEN incorporados, suíte final 1.373 testes/74 arquivos com DATABASE_URL='' aprovada; TypeScript/build/diff--check aprovados. Chromium final:20 verificações, desktop/375px, zero erros JS e zero gravações externas, transporte interceptado e fixture portátil do BuEM.
+- [x] Guia em `/home/ubuntu/editor-clinico/guia-editor-clinico.md`; entrega pronta para checkpoint restaurável e publicação pelo painel Manus. Nenhum protocolo/paciente/prescrição real alterado para validação.

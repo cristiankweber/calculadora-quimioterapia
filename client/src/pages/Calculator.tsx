@@ -21,6 +21,8 @@ import PdfPreviewModal, {
   type PdfSections,
 } from "@/components/PdfPreviewModal";
 import ClinicalProtocolPanel from "@/components/ClinicalProtocolPanel";
+import { TemplateClinicalRevisionDialog } from "@/components/TemplateClinicalRevisionDialog";
+import { projectTemplateAntiemetics } from "@shared/clinicalProtocols/antiemetics";
 import {
   getKnownClinicalDocument,
   getPrescriptionBlockReason,
@@ -66,7 +68,10 @@ import {
   preparePrescriptionReuse,
   type PrescriptionHistorySnapshot,
 } from "@/hooks/prescriptionHistoryAdapter";
-import { getClinicalCatalogue } from "@/lib/clinicalCatalogue";
+import {
+  getClinicalCatalogue,
+  mapStoredProtocol,
+} from "@/lib/clinicalCatalogue";
 
 import {
   FileDown,
@@ -83,6 +88,10 @@ import {
 export default function Calculator() {
   const [, setLocation] = useLocation();
   const { isAuthenticated, user } = useAuth();
+  const utils = trpc.useUtils();
+  const [editingTemplateId, setEditingTemplateId] = useState<number | null>(
+    null
+  );
 
   // ── Estado do Paciente ──────────────────────────────────────────────────
   const {
@@ -303,18 +312,13 @@ export default function Calculator() {
   }, [selectedProtocol?.emetogenicRisk, clinicalDocument]);
   const outputAntiemetics = useMemo(
     () =>
-      isUserTemplate
-        ? {
-            risk: selectedProtocol!.emetogenicRisk,
-            day1: [],
-            days2to4: [],
-            rescue: [],
-            alerts: [
-              "Antiemese e demais ordens de suporte do template devem ser conferidas pelo prescritor; não foram preenchidas por esquema genérico.",
-            ],
-          }
+      isUserTemplate && clinicalDocument
+        ? projectTemplateAntiemetics(
+            clinicalDocument,
+            selectedProtocol!.emetogenicRisk
+          )
         : antiemetics,
-    [isUserTemplate, selectedProtocol, antiemetics]
+    [isUserTemplate, clinicalDocument, selectedProtocol, antiemetics]
   );
 
   // ── Configurações Institucionais ────────────────────────────────────────
@@ -340,6 +344,36 @@ export default function Calculator() {
       )
     );
   }, [storedProtocols]);
+  const editableTemplate =
+    isUserTemplate && isAuthenticated
+      ? storedProtocols?.find(
+          record =>
+            record.protocolId === selectedProtocol?.id &&
+            record.isActive === 1 &&
+            record.userId === user?.id
+        )
+      : undefined;
+  const handleClinicalRevisionSaved = async (result: {
+    id: number;
+    protocolId: string;
+  }) => {
+    const current = await utils.customProtocols.get.fetch({ id: result.id });
+    if (
+      !current ||
+      current.protocolId !== result.protocolId ||
+      current.userId !== user?.id ||
+      current.isActive !== 1
+    ) {
+      throw new Error(
+        "Não foi possível carregar a nova versão ativa. Selecione-a novamente no catálogo."
+      );
+    }
+    setShowPdfPreview(false);
+    handleProtocolChange(
+      mapStoredProtocol(current as unknown as Record<string, unknown>)
+    );
+    setSupportSnapshot(null);
+  };
 
   // ── Ações de Prescrição (salvar, copiar, PDF, imprimir) ─────────────────
   const {
@@ -598,31 +632,51 @@ export default function Calculator() {
             )}
 
             {clinicalDocument && clinicalResolution ? (
-              <ClinicalProtocolPanel
-                document={clinicalDocument}
-                resolution={clinicalResolution}
-                context={clinicalContext}
-                doseEditing={
-                  isUserTemplate &&
-                  clinicalIssues.length === 0 &&
-                  calculatedValues
-                    ? {
-                        scopeKey: templateAdjustments.scopeKey,
-                        drugs: prescriptionDrugs,
-                        onConfirm: templateAdjustments.confirm,
-                        onRestore: templateAdjustments.restore,
+              <>
+                {isUserTemplate && (
+                  <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-card p-4">
+                    <p className="text-sm text-muted-foreground">
+                      Editar o cadastro cria uma nova versão. Ajustes
+                      individuais de dose continuam separados.
+                    </p>
+                    <Button
+                      variant="outline"
+                      disabled={!editableTemplate}
+                      onClick={() =>
+                        editableTemplate &&
+                        setEditingTemplateId(editableTemplate.id)
                       }
-                    : undefined
-                }
-                onContextChange={next => {
-                  setClinicalSelection(next);
-                  setSelectedCycle(next.cycle);
-                }}
-                packageData={
-                  selectedProtocol?.clinicalPackage ??
-                  (clinicalPackage as unknown as Record<string, unknown>)
-                }
-              />
+                    >
+                      Editar protocolo
+                    </Button>
+                  </div>
+                )}
+                <ClinicalProtocolPanel
+                  document={clinicalDocument}
+                  resolution={clinicalResolution}
+                  context={clinicalContext}
+                  doseEditing={
+                    isUserTemplate &&
+                    clinicalIssues.length === 0 &&
+                    calculatedValues
+                      ? {
+                          scopeKey: templateAdjustments.scopeKey,
+                          drugs: prescriptionDrugs,
+                          onConfirm: templateAdjustments.confirm,
+                          onRestore: templateAdjustments.restore,
+                        }
+                      : undefined
+                  }
+                  onContextChange={next => {
+                    setClinicalSelection(next);
+                    setSelectedCycle(next.cycle);
+                  }}
+                  packageData={
+                    selectedProtocol?.clinicalPackage ??
+                    (clinicalPackage as unknown as Record<string, unknown>)
+                  }
+                />
+              </>
             ) : (
               <>
                 <DrugsTable
@@ -705,6 +759,13 @@ export default function Calculator() {
         )}
 
       {/* MODAL DE EMERGÊNCIA */}
+      {editingTemplateId !== null && isAuthenticated && (
+        <TemplateClinicalRevisionDialog
+          id={editingTemplateId}
+          onClose={() => setEditingTemplateId(null)}
+          onSaved={handleClinicalRevisionSaved}
+        />
+      )}
       <EmergencyModal
         open={showEmergency}
         onOpenChange={setShowEmergency}

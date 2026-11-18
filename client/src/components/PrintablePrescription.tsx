@@ -14,6 +14,7 @@ import type {
 } from "@/lib/hydrationSupport";
 import type { PdfSections } from "./PdfPreviewModal";
 import {
+  antiemeticPrescriptionOutput,
   drugPrescriptionOutput,
   templatePrescriptionMetadata,
 } from "@/lib/pdfGenerator";
@@ -61,6 +62,10 @@ export default function PrintablePrescription({
   const prescriptionId = savedPrescriptionId || `RX-TEMP-${Date.now()}`;
   const metadata = templatePrescriptionMetadata(protocol);
   const selectedCycle = protocol.templateContext?.cycle ?? cycle;
+  const anti = antiemeticPrescriptionOutput(
+    antiemetics,
+    protocol.emetogenicRisk
+  );
 
   useEffect(() => {
     // Gerar QR code com ID da prescrição para rastreabilidade
@@ -320,54 +325,39 @@ export default function PrintablePrescription({
       {sections?.antiemetics !== false && (
         <div className="mb-6">
           <h2 className="text-lg font-semibold mb-3 text-gray-900">
-            Profilaxia Antiemética (Risco: {antiemetics.risk.toUpperCase()})
+            Profilaxia Antiemética (Risco {anti.riskLabel})
           </h2>
           <div className="text-sm space-y-3">
-            <div>
-              <p className="font-medium mb-1">D1 (Dia da Quimioterapia):</p>
-              <ul className="list-disc list-inside space-y-1 ml-2">
-                {antiemetics.day1.map((med, index) => (
-                  <li key={index}>{med}</li>
-                ))}
-              </ul>
-            </div>
-            <div>
-              <p className="font-medium mb-1">D2-D4:</p>
-              <ul className="list-disc list-inside space-y-1 ml-2">
-                {antiemetics.days2to4.map((med, index) => (
-                  <li key={index}>{med}</li>
-                ))}
-              </ul>
-            </div>
-            <div>
-              <p className="font-medium mb-1">Resgate (se necessário):</p>
-              <ul className="list-disc list-inside space-y-1 ml-2">
-                {antiemetics.rescue.map((med, index) => (
-                  <li key={index}>{med}</li>
-                ))}
-              </ul>
-            </div>
+            <p>{anti.timeReferenceLine}</p>
+            {anti.sections.map(section => (
+              <div key={section.key}>
+                <p className="font-medium mb-1">{section.label}:</p>
+                <ul className="list-disc list-inside space-y-1 ml-2">
+                  {section.items.map((item, index) => (
+                    <li key={index}>{item}</li>
+                  ))}
+                </ul>
+              </div>
+            ))}
           </div>
         </div>
       )}
 
       {/* Alertas */}
-      {sections?.antiemetics !== false &&
-        antiemetics.alerts &&
-        antiemetics.alerts.length > 0 && (
-          <div className="mb-6 bg-yellow-50 border border-yellow-300 p-4 rounded">
-            <h3 className="text-sm font-semibold mb-2 text-yellow-900">
-              Alertas Importantes:
-            </h3>
-            <ul className="text-sm space-y-1">
-              {antiemetics.alerts.map((alert, index) => (
-                <li key={index} className="text-yellow-800">
-                  • {alert}
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
+      {sections?.antiemetics !== false && anti.alerts.length > 0 && (
+        <div className="mb-6 bg-yellow-50 border border-yellow-300 p-4 rounded">
+          <h3 className="text-sm font-semibold mb-2 text-yellow-900">
+            Alertas antieméticos:
+          </h3>
+          <ul className="text-sm space-y-1">
+            {anti.alerts.map((alert, index) => (
+              <li key={index} className="text-yellow-800">
+                • {alert}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {/* Hidratação */}
       {sections?.hydration !== false &&

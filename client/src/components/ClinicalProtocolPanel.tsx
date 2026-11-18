@@ -1,5 +1,6 @@
 import * as React from "react";
 import { useId, useState } from "react";
+import { projectTemplateAntiemetics } from "@shared/clinicalProtocols/antiemetics";
 import {
   getTemplateExecutionDocument,
   getTemplatePrescriptionIssues,
@@ -595,6 +596,10 @@ export default function ClinicalProtocolPanel({
     : document;
   const original = record(doc.sourceDocument ?? document);
   const review = record(doc.review);
+  const pharmacy = Object.prototype.hasOwnProperty.call(doc, "dilutionInfo")
+    ? doc.dilutionInfo
+    : original.dilutionInfo;
+  const antiemetics = projectTemplateAntiemetics(doc);
   const phases = items(execution.phaseLibrary)
     .map(record)
     .filter(phase => typeof phase.id === "string" && phase.id !== "");
@@ -974,11 +979,69 @@ export default function ClinicalProtocolPanel({
             value={doc.essentialSupportOrders}
           />
           <DataSection
+            title="Profilaxias Obrigatórias/Recomendadas"
+            value={doc.prophylaxis}
+          />
+          <DataSection title="Cuidados de Enfermagem" value={doc.nursingCare} />
+          <DataSection title="Alertas do protocolo" value={doc.specialAlerts} />
+          <DataSection
+            title="Orientações de ajustes renais"
+            value={doc.renalAdjustments}
+          />
+          <DataSection
+            title="Orientações de ajustes hepáticos"
+            value={doc.hepaticAdjustments}
+          />
+          <DataSection
+            title="Orientações de ajustes hematológicos"
+            value={doc.hematologicAdjustments}
+          />
+          <DataSection
             title="Variante selecionada"
             value={doc.selectedVariant}
             empty="Variante não informada no documento; nenhuma alternativa escolhida pelo painel."
           />
         </div>
+        <section
+          aria-label="Antieméticos cadastrados"
+          className="min-w-0 space-y-3 rounded-xl border p-4"
+        >
+          <h3 className="text-sm font-semibold">Antieméticos cadastrados</h3>
+          <p className="text-sm text-muted-foreground">
+            Referência temporal:{" "}
+            {antiemetics.timeReference ||
+              "não informada — conferir antes de prescrever"}
+            . Os rótulos não são convertidos automaticamente para dias do
+            transplante.
+          </p>
+          <div className="grid min-w-0 gap-4 sm:grid-cols-3">
+            <div>
+              <h4 className="text-sm font-medium">Dia 1 / Pré-QT</h4>
+              <ProvidedValue
+                value={antiemetics.day1}
+                empty="Não informado — cadastrar e conferir com o prescritor."
+              />
+            </div>
+            <div>
+              <h4 className="text-sm font-medium">Dias seguintes (2–4)</h4>
+              <ProvidedValue
+                value={antiemetics.days2to4}
+                empty="Não informado — cadastrar e conferir com o prescritor."
+              />
+            </div>
+            <div>
+              <h4 className="text-sm font-medium">Medicações de resgate</h4>
+              <ProvidedValue
+                value={antiemetics.rescue}
+                empty="Não informado — cadastrar e conferir com o prescritor."
+              />
+            </div>
+          </div>
+          <ProvidedValue
+            value={antiemetics.alerts}
+            empty="Sem notas adicionais cadastradas."
+          />
+        </section>
         {selectedPhase && selectedPhase.support !== undefined ? (
           <DataSection
             title="Suporte fornecido da fase selecionada"
@@ -987,22 +1050,20 @@ export default function ClinicalProtocolPanel({
         ) : null}
         <DataSection
           title="Informações farmacêuticas fornecidas"
-          value={original.dilutionInfo ?? doc.dilutionInfo}
+          value={pharmacy}
           empty="Dados farmacêuticos não fornecidos. Validar produto, diluente, concentração, estabilidade e liberação com a farmácia; nenhum parâmetro universal foi aplicado."
         />
         {isTemplate
-          ? items(original.dilutionInfo ?? doc.dilutionInfo).map(
-              (entry, index) => (
-                <p key={index} className="text-xs text-muted-foreground">
-                  {text(record(entry).drugName, "Item farmacêutico")} · Status
-                  farmacêutico:{" "}
-                  {text(
-                    record(entry).validationStatus ?? record(entry).status,
-                    "não informado"
-                  )}
-                </p>
-              )
-            )
+          ? items(pharmacy).map((entry, index) => (
+              <p key={index} className="text-xs text-muted-foreground">
+                {text(record(entry).drugName, "Item farmacêutico")} · Status
+                farmacêutico:{" "}
+                {text(
+                  record(entry).validationStatus ?? record(entry).status,
+                  "não informado"
+                )}
+              </p>
+            ))
           : null}
         <p className="text-xs text-muted-foreground">
           Informações farmacêuticas reproduzidas do documento, dependentes de

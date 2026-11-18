@@ -13,6 +13,11 @@ import type {
 import type { PdfSections } from "@/components/PdfPreviewModal";
 import { isActiveTemplateDocument } from "@shared/clinicalProtocols/templates";
 import { getDoseResultUnit } from "@shared/clinicalDoseEngine";
+import {
+  ANTIEMETIC_SECTION_NOTICES,
+  projectTemplateAntiemetics,
+  type AntiemeticRisk,
+} from "@shared/clinicalProtocols/antiemetics";
 
 interface PrescriptionData {
   patient: PatientData;
@@ -41,6 +46,39 @@ function escapeHtml(text: string | number | undefined | null): string {
 function renderList(items: string[]): string {
   if (!items || items.length === 0) return "<li>Nenhum</li>";
   return items.map(item => `<li>${escapeHtml(item)}</li>`).join("");
+}
+
+/** Empty notices are presentation, never medication orders. Shared with SSR and copy. */
+export function antiemeticPrescriptionOutput(
+  value: unknown,
+  risk?: AntiemeticRisk
+) {
+  const anti = projectTemplateAntiemetics(
+    { antiemetics: value, emetogenicRisk: asRecord(value).risk },
+    risk
+  );
+  const riskLabel = {
+    high: "Alto",
+    moderate: "Moderado",
+    low: "Baixo",
+    minimal: "Mínimo",
+  }[anti.risk];
+  return {
+    ...anti,
+    riskLabel,
+    timeReferenceLine: `Referência temporal dos dias: ${anti.timeReference ?? "Não informada — conferir/cadastrar a origem dos dias."}`,
+    sections: (
+      [
+        ["day1", "Dia 1"],
+        ["days2to4", "Dias 2-4"],
+        ["rescue", "Medicações de Resgate"],
+      ] as const
+    ).map(([key, label]) => ({
+      key,
+      label,
+      items: anti[key].length ? anti[key] : [ANTIEMETIC_SECTION_NOTICES[key]],
+    })),
+  };
 }
 
 function asRecord(value: unknown): Record<string, unknown> {
@@ -172,33 +210,171 @@ export function drugPrescriptionOutput(
   if (structured) {
     const doc = asRecord(protocol.clinicalDocument);
     const original = asRecord(doc.sourceDocument ?? doc);
-    const entries = original.dilutionInfo ?? doc.dilutionInfo;
-    const matches = Array.isArray(entries)
-      ? entries
-          .map(asRecord)
-          .filter(
-            entry => entry.drugName === drug.name || entry.name === drug.name
-          )
+    const extensions = asRecord(doc.extensions);
+    const own = (value: object, key: string) =>
+      Object.prototype.hasOwnProperty.call(value, key);
+    // Explicit []/null/invalid means no current data; archival fallback is only historical.
+    const entries = own(doc, "dilutionInfo")
+      ? doc.dilutionInfo
+      : own(extensions, "dilutionInfo")
+        ? extensions.dilutionInfo
+        : own(original, "dilutionInfo")
+          ? original.dilutionInfo
+          : asRecord(original.extensions).dilutionInfo;
+    const candidates = Array.isArray(entries) ? entries.map(asRecord) : [];
+    const id =
+      typeof drug.id === "string" && drug.id.trim() ? drug.id : undefined;
+    const identityMatches = id
+      ? candidates.filter(entry => entry.drugId === id)
       : [];
-    if (matches.length === 0)
+    const matches = identityMatches.length
+      ? identityMatches
+      : candidates.filter(
+          entry =>
+            // A different explicit identity must never be adopted by coincident name.
+            (!id ||
+              entry.drugId === undefined ||
+              entry.drugId === null ||
+              entry.drugId === "") &&
+            (entry.drugName === drug.name || entry.name === drug.name)
+        );
+    if (matches.length > 1)
+      pharmaceutical.push(
+        "Dados farmacêuticos ambíguos para este medicamento — conferir/cadastrar drugId único e validar com a farmácia. Nenhuma entrada escolhida."
+      );
+    else if (matches.length === 0)
       pharmaceutical.push(
         "Dados farmacêuticos não fornecidos para este medicamento; validar com a farmácia. Nenhum parâmetro universal aplicado."
       );
-    for (const entry of matches) {
-      pharmaceutical.push(
-        `Status farmacêutico: ${providedText(entry.validationStatus ?? entry.status)}`
-      );
-      for (const [key, label] of [
-        ["diluent", "Diluente"],
-        ["volume", "Volume"],
-        ["infusionTime", "Tempo de infusão"],
-        ["stability", "Estabilidade específica"],
-        ["specialInstructions", "Instruções específicas"],
-      ])
-        pharmaceutical.push(`${label}: ${providedText(entry[key])}`);
-    }
+    else
+      for (const entry of matches) {
+        pharmaceutical.push(
+          `Status farmacêutico: ${providedText(entry.validationStatus ?? entry.status)}`,
+          "Status farmacêutico informado pelo usuário; não equivale a liberação institucional."
+        );
+        for (const [key, label] of [
+          ["diluent", "Diluente"],
+          ["volume", "Volume"],
+          ["infusionTime", "Tempo de infusão"],
+          ["stability", "Estabilidade específica"],
+          ["specialInstructions", "Instruções específicas"],
+        ])
+          pharmaceutical.push(`${label}: ${providedText(entry[key])}`);
+      }
   }
   return { calculated, details, pharmaceutical };
+}
+
+/** Clipboard content uses the same clinical presentation as print/preview/PDF. */
+export function generatePrescriptionText(data: PrescriptionData): string {
+  const { patient, calculatedValues, protocol, drugs } = data;
+  const cycle = protocol.templateContext?.cycle ?? data.cycle;
+  const s = data.sections;
+  const lines = ["PRESCRIÇÃO DE QUIMIOTERAPIA", ""];
+  if (s?.patientData !== false)
+    lines.push(
+      `Paciente: ${patient.name}`,
+      `Idade: ${patient.age} anos | Sexo: ${patient.sex}`,
+      `Peso: ${patient.weight} kg | Altura: ${patient.height} cm`
+    );
+  if (s?.calculatedValues !== false)
+    lines.push(
+      `SC: ${calculatedValues.bsa.toFixed(2)} m² | eGFR: ${calculatedValues.egfr.toFixed(1)}`,
+      ""
+    );
+  if (s?.protocol !== false)
+    lines.push(
+      `PROTOCOLO: ${protocol.name}`,
+      `Ciclo: ${cycle}/${protocol.cycles}`,
+      `Indicação: ${protocol.indication}`,
+      ""
+    );
+  lines.push(...templatePrescriptionMetadata(protocol), "");
+  if (s?.drugs !== false) {
+    lines.push("DROGAS:");
+    for (const drug of drugs) {
+      const output = drugPrescriptionOutput(drug, protocol);
+      lines.push(
+        `• ${drug.name}: ${output.calculated} ${drug.route} (Dias ${drug.days})`
+      );
+      lines.push(...output.details.map(line => `  ${line}`));
+      if (protocol.isUserTemplate && drug.observations)
+        lines.push(`  ${drug.observations}`);
+      lines.push(...output.pharmaceutical.map(line => `  ${line}`));
+    }
+    lines.push("");
+  }
+  if (s?.antiemetics !== false) {
+    const anti = antiemeticPrescriptionOutput(
+      data.antiemetics,
+      protocol.emetogenicRisk
+    );
+    lines.push(
+      `PROFILAXIA ANTIEMÉTICA (Risco ${anti.riskLabel})`,
+      anti.timeReferenceLine
+    );
+    for (const section of anti.sections)
+      lines.push(
+        `${section.label}:`,
+        ...section.items.map(item => `• ${item}`)
+      );
+    if (anti.alerts.length)
+      lines.push(
+        "Alertas antieméticos:",
+        ...anti.alerts.map(alert => `• ${alert}`)
+      );
+  }
+  const appendClinicalList = (
+    title: string,
+    values: unknown,
+    enabled: boolean
+  ) => {
+    if (!enabled) return;
+    const provided = Array.isArray(values)
+      ? values.filter(
+          (value): value is string =>
+            typeof value === "string" && !!value.trim()
+        )
+      : [];
+    lines.push(
+      "",
+      `${title}:`,
+      ...(provided.length
+        ? provided.map(value => `• ${value}`)
+        : ["Não informado — conferir/cadastrar antes de administrar."])
+    );
+  };
+  appendClinicalList(
+    "PROFILAXIAS OBRIGATÓRIAS/RECOMENDADAS",
+    protocol.prophylaxis,
+    s?.prophylaxis !== false
+  );
+  appendClinicalList(
+    "CUIDADOS DE ENFERMAGEM",
+    protocol.nursingCare,
+    s?.nursingCare !== false
+  );
+  appendClinicalList(
+    "ALERTAS DO PROTOCOLO",
+    protocol.specialAlerts,
+    s?.specialAlerts !== false
+  );
+  appendClinicalList(
+    "ORIENTAÇÕES DE AJUSTES RENAIS",
+    protocol.renalAdjustments,
+    s?.doseAdjustments !== false
+  );
+  appendClinicalList(
+    "ORIENTAÇÕES DE AJUSTES HEPÁTICOS",
+    protocol.hepaticAdjustments,
+    s?.doseAdjustments !== false
+  );
+  appendClinicalList(
+    "ORIENTAÇÕES DE AJUSTES HEMATOLÓGICOS",
+    protocol.hematologicAdjustments,
+    s?.doseAdjustments !== false
+  );
+  return lines.join("\n");
 }
 
 function renalStatusClass(status: string): string {
@@ -619,14 +795,10 @@ export async function generatePrescriptionPDF(
   `
       : "";
 
-  const antiemeticRiskLabel =
-    antiemetics.risk === "high"
-      ? "Alto"
-      : antiemetics.risk === "moderate"
-        ? "Moderado"
-        : antiemetics.risk === "low"
-          ? "Baixo"
-          : "Mínimo";
+  const anti = antiemeticPrescriptionOutput(
+    antiemetics,
+    protocol.emetogenicRisk
+  );
 
   const htmlContent = `<!DOCTYPE html>
 <html lang="pt-BR">
@@ -715,19 +887,23 @@ export async function generatePrescriptionPDF(
   ${
     s.antiemetics
       ? `<div class="section">
-    <div class="section-title">PROFILAXIA ANTIEMÉTICA (Risco ${antiemeticRiskLabel})</div>
-    <div style="margin-bottom: 15px;">
-      <strong>Dia 1 (Pré-QT):</strong>
-      <ul class="prophylaxis-list">${renderList(antiemetics.day1)}</ul>
-    </div>
-    <div style="margin-bottom: 15px;">
-      <strong>Dias 2-4:</strong>
-      <ul class="prophylaxis-list">${renderList(antiemetics.days2to4)}</ul>
-    </div>
-    <div>
-      <strong>Medicações de Resgate:</strong>
-      <ul class="prophylaxis-list">${renderList(antiemetics.rescue)}</ul>
-    </div>
+    <div class="section-title">PROFILAXIA ANTIEMÉTICA (Risco ${anti.riskLabel})</div>
+    <p>${escapeHtml(anti.timeReferenceLine)}</p>
+    ${anti.sections
+      .map(
+        section => `<div style="margin-bottom: 15px;">
+      <strong>${escapeHtml(section.label)}:</strong>
+      <ul class="prophylaxis-list">${renderList(section.items)}</ul>
+    </div>`
+      )
+      .join("")}
+    ${
+      anti.alerts.length
+        ? `<div class="alert-box"><strong>Alertas antieméticos:</strong>
+      <ul class="prophylaxis-list">${renderList(anti.alerts)}</ul>
+    </div>`
+        : ""
+    }
   </div>`
       : ""
   }
